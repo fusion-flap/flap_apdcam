@@ -111,9 +111,7 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
         chlist_proc, ch_index = flap.select_signals(chlist_adc,chspec)
     except ValueError as e:
         raise e
-    ch_proc = []
-    for i in ch_index:
-        ch_proc.append(chlist[i])
+    ch_proc = [chlist[chi] for chi in ch_index]
 
     read_range = None
     read_samplerange = None
@@ -166,7 +164,7 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
         if (len(ch_proc) is not 1):
             data_arr = np.empty((ndata,len(ch_proc)),dtype=dtype)
         for i in range(len(ch_proc)):
-            fn = os.path.join(datapath,fnames[ch_proc[i]-1])
+            fn = os.path.join(datapath,fnames[ch_index[i]])
             try:
                 f = open(fn,"rb")
             except OSError:
@@ -174,12 +172,8 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
             try:
                 f.seek(int(read_samplerange[0]),os.SEEK_SET)
                 if (len(ch_proc) is 1):
-                    # This line was for testing
-                    # data_arr = np.full(ndata,np.int16(2**t['bits']-1-ch_proc[i]))
                     data_arr = np.fromfile(f,dtype=np.int16,count=ndata)
                 else:
-                    # This line was for testing
-                    # d = np.full(ndata,np.int16(2**t['bits']-1-ch_proc[i]))
                     d = np.fromfile(f,dtype=np.int16,count=ndata)
                     data_arr[:,i] = d
             except Exception:

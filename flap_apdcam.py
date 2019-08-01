@@ -53,7 +53,7 @@ def apdcam_get_config(xml):
     return retval
 
 
-def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, coordinates=None):
+def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, coordinates=None, data_source=None):
     """ Data read function for APDCAM 1G and 10G.
     data_name: ADCxxx (string): ADC number. Unix style regular expressions are allowed:
                        ADC*
@@ -73,7 +73,9 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
     default_options = {'Datapath':'data',
                        'Scaling':'Digit'
                        }
-    _options = flap.config.merge_options(default_options,options,data_source='APDCAM')
+    if (data_source is None):
+        data_source = 'APDCAM'
+    _options = flap.config.merge_options(default_options,options,data_source=data_source)
     datapath = _options['Datapath']
 
     xmlfile = os.path.join(datapath,'APDCAM_config.xml')

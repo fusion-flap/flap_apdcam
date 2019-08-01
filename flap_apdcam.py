@@ -235,5 +235,7 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
 def add_coordinate(data_object, new_coordinates, options=None):
     raise NotImplementedError("Coordinate conversions not implemented yet.")
 
-def register():
-    flap.register_data_source('APDCAM', get_data_func=apdcam_get_data, add_coord_func=add_coordinate)
+def register(data_source=None):
+    if (data_source is None):
+        data_source = 'APDCAM'
+    flap.register_data_source(data_source, get_data_func=apdcam_get_data, add_coord_func=add_coordinate)

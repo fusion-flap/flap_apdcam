@@ -127,6 +127,8 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
                 raise TypeError("Coordinate description should be flap.Coordinate.")
             if (coord.unit.name is 'Time'):
                 if (coord.mode.equidistant):
+                    if (coord.c_range is None):
+                        continue
                     read_range = [float(coord.c_range[0]),float(coord.c_range[1])]
                 else:
                     raise NotImplementedError("Non-equidistant Time axis is not implemented yet.")
@@ -192,7 +194,7 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
 
     coord = [None]*data_arr.ndim * 2
     c_mode = flap.CoordinateMode(equidistant=True)
-    coord[0] = copy.deepcopy(flap.Coordinate(name='Sample',unit='n.a.',
+    coord[1] = copy.deepcopy(flap.Coordinate(name='Sample',unit='n.a.',
                                              mode=c_mode,
                                              shape=ndata,
                                              start=read_samplerange[0],
@@ -200,7 +202,7 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
                                              dimension_list=[0]))
     if (read_range is None):
         read_range = float(t['starttime']) + read_samplerange * float(t['sampletime'])
-    coord[1] = copy.deepcopy(flap.Coordinate(name='Time',unit='Second',
+    coord[0] = copy.deepcopy(flap.Coordinate(name='Time',unit='Second',
                                              mode=c_mode,
                                              shape=ndata,
                                              start=read_range[0],

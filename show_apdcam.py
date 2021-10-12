@@ -13,7 +13,7 @@ import math
 flap_apdcam.register()
 
     
-def show_apdcam(chnum=None,datapath='data',timerange=None):
+def show_apdcam(chnum=64,datapath='data',timerange=None):
     """
     Show the signals as ADCs.
 

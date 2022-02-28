@@ -10,10 +10,10 @@ import flap_apdcam.apdcam_control as apdcam_control
 
 def test_channel_map():
     
-    camera_types =    ['4x32','4x32','8x16']
-    camera_versions = [     0,     1,     0]
-    rows =            [    32,    32,    16]
-    columns =         [     4,     4,     8]
+    camera_types =    ['4x32','4x32','8x16','8x16','8x8','8x8','8x8','4x16','4x16','4x16','8x16A']
+    camera_versions = [     0,     1,     0,    1,     0,    1,    2,     0,     1,     2,      1]
+    rows =            [    32,    32,    16,   16,     8,    8,    8,     16,   16,    16,     16]
+    columns =         [     4,     4,     8,    8,     8,    8,    8,      4,    4,     4,      8]
     for camera_type,camera_version,column, row in zip(camera_types,camera_versions,columns, rows):
         m = apdcam_control.apdcam10g_channel_map(camera_type=camera_type,camera_version=camera_version)
         if ((m.shape[0] != column) or (m.shape[1] !=row)):

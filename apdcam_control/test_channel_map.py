@@ -10,11 +10,13 @@ import flap_apdcam.apdcam_control as apdcam_control
 
 def test_channel_map():
     
-    camera_types = ['4x32','4x32']
-    camera_versions = [0, 1]
-    for camera_type,camera_version in zip(camera_types,camera_versions):
+    camera_types =    ['4x32','4x32','8x16']
+    camera_versions = [     0,     1,     0]
+    rows =            [    32,    32,    16]
+    columns =         [     4,     4,     8]
+    for camera_type,camera_version,column, row in zip(camera_types,camera_versions,columns, rows):
         m = apdcam_control.apdcam10g_channel_map(camera_type=camera_type,camera_version=camera_version)
-        if ((m.shape[0] != 4) or (m.shape[1] != 32)):
+        if ((m.shape[0] != column) or (m.shape[1] !=row)):
             raise ValueError("Invalid shape of channel map. Camera_type:{:s}, version:{:d}, shape:({:d},{:d})".\
                               format(camera_type,camera_version,m.shape[0],m.shape[1])
                             )

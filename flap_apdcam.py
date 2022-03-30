@@ -153,7 +153,7 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
     if (read_samplerange[0] < 0):
         read_samplerange[0] = 0
     if (read_samplerange[1] >= t['samplenumber']):
-        read_samplerange[1] = t['samplenumber']
+        read_samplerange[1] = t['samplenumber'] - 1
     ndata = int(read_samplerange[1] - read_samplerange[0] + 1)
     if (_options['Scaling'] is 'Volt'):
         scale_to_volts = True
@@ -180,8 +180,9 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
                 else:
                     d = np.fromfile(f,dtype=np.int16,count=ndata)
                     data_arr[:,i] = d
-            except Exception:
+            except IOError:
                 raise IOError("Error reading from file: " + fn)
+            f.close()
         if (scale_to_volts):
             if (camera_family == 'APDCAM-10G'):
                 data_arr = ((2 ** t['bits'] - 1) - data_arr) / (2. ** t['bits'] - 1) * 2
@@ -190,7 +191,6 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
         else:
             if (camera_family == 'APDCAM-10G'):
                 data_arr = (2**t['bits'] - 1) - data_arr
-            f.close
 
     coord = [None]*data_arr.ndim * 2
     c_mode = flap.CoordinateMode(equidistant=True)

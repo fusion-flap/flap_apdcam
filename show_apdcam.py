@@ -4,15 +4,17 @@ Spyder Editor
 
 This is a temporary script file.
 """
-import flap
-import .flap_apdcam
-from flap_apdcam 
+
 import matplotlib.pyplot as plt
 import time
 import math
 import os
 import re
     
+import flap
+import flap_apdcam
+flap_adpcam.register()
+
 def show_apdcam(camera_type=None,camera_version=1,datapath='data',timerange=None,pixel_layout=True,
                 figure=None,figsize=(20,16)):
     """
@@ -72,12 +74,12 @@ def show_apdcam(camera_type=None,camera_version=1,datapath='data',timerange=None
             chlist.append(int(l[8:11]))
     chlist.sort()
     chnum = len(chlist)
-    if (chnum == 0:
+    if (chnum == 0):
         raise ValueError("No data found. Wrong datanatpath?")
     if ((chnum != 64) and (chnum != 128)):
         raise ValueError("Incorrect number of data files in '{:s}. Should be either 64 or 128.".format(datapath))
     chlist = np.array(chlist)
-    if (len(np.nonzero(np.diff(np.sort(chlist) != 1)[0]) != 0):
+    if (len(np.nonzero(np.diff(np.sort(chlist) != 1)[0]) != 0)):
         raise ValueError("Incorrect data file names.")
     if (camera_type is not None):
         chmap = 

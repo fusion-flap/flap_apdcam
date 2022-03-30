@@ -1427,7 +1427,7 @@ class APDCAM10G_regCom:
                 sampleDiv=None, datapath="data", bits=None, waitForResult=True, externalTriggerPolarity=None,\
                 internalTrigger=False, triggerDelay = 0):
         """ This method measures by calling APDTest it will be replaced by another method in the
-        APDCAM_data class as soon as Python measured fast.
+        APDCAM_data class as soon as Python measures fast.
         externalTriggerPolarity: None: no external trigger
                                     0: Positive edge
                                     1: Negative edge

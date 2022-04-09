@@ -267,7 +267,7 @@ def apdcam10g_channel_map(camera_type=None,camera_version=1):
                               [ 21, 93, 68, 12,  6, 78, 83, 27]
                               ])
         else:
-            raise ValueError("Version {:d} is not possible for camera type '{:s}'.".format(camera_type))
+            raise ValueError("Version {:d} is not possible for camera type '{:s}'.".format(camera_version,camera_type))
         return np.transpose(chmap)
     elif (camera_type == "FC"):
         np.arange(64,dtype=int)  

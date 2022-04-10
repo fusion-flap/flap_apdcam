@@ -1421,7 +1421,28 @@ class APDCAM10G_regCom:
             if (err != ""):
                 return "Error in setOffsets, ADC {:d}: {:s}".format(i_adc+1,err)
         return ""
-       
+    
+    def getOffsets(self):
+        """ Get all of the offset values on the channels.
+            Returns an error message and list of offsets.
+        """
+        n_adc = len(self.status.ADC_address)
+        adcmap = DAC_ADC_channel_mapping()
+        data = []
+        for i_adc in range(n_adc):
+            err,offsets = self.readPDI(self.status.ADC_address[i_adc],self.codes_ADC.ADC_REG_DAC1,numberOfBytes=64,arrayData=True)
+            if (err != ""):
+                return "Error in setOffsets, ADC {:d}: {:s}".format(i_adc+1,err),None
+            for i in range(32):
+                dac_addr = adcmap[i]-1
+                data.append(int.from_bytes(offsets[dac_addr * 2:dac_addr * 2 + 2]), 'little')
+        return "",data
+    
+    def setCallight(self,value):
+        """ Set the calibration light.
+        """    
+        err = self.writePDI(self.codes_PC.PC_CARD,self.codes_PC.PC_REG_CALLIGHT,value,numberOfBytes=2,arrayData=False)
+        return err        
         
     def measure(self,numberOfSamples=100000, channelMasks=[0xffffffff,0xffffffff, 0xffffffff, 0xffffffff], \
                 sampleDiv=None, datapath="data", bits=None, waitForResult=True, externalTriggerPolarity=None,\

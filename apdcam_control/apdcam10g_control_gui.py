@@ -19,7 +19,7 @@ import subprocess
 import matplotlib.pyplot as plt
 
 
-#from .APDCAM10G_control import *
+from .APDCAM10G_control import *
 
 #from .read_config
         
@@ -28,7 +28,6 @@ class APDCAM_GUI_config_class:
     CLK_EXTERNAL = 1
     def __init__(self):
         self.configFile = "APDCAM_GUI.cfg"
-        self.clockSource = APDCAM_GUI_config_class.CLK_INTERNAL
         self.triggerTime = 0.0
         self.datapath = "data"
         self.APDCAMStartTime = 0
@@ -43,13 +42,6 @@ class APDCAM_GUI_status_class:
         self.Update_APDCAM  = False  # If 1 update widgets from hardware
         self.APDCAM_reg = None
         self.APDCAM_data = None
-
-        self.CMOS_on = False
-        self.CMOS_connected = False
-        self.Update_CMOS = False
-
-        self.Beam_connected = False
-        self.Update_beam = False
 
         # This is set ot True if stop measurement is requested
         self.stopMeasurement = False 
@@ -174,19 +166,10 @@ class APDCAM_GUI_class(tk.Frame):
     def read_config(self):
         self.state.config.datapath = self.readConfigElement("General","Datapath","data","string")
         self.state.config.camera_type = self.readConfigElement("General","CameraType","","string")
-        self.state.config.camera_version = self.readConfigElement("General","CameraVersion","","string")
+        self.state.config.camera_version = self.readConfigElement("General","CameraVersion","1","int")
         self.state.config.APDCAMStartTime = self.readConfigElement("Trigger","APDCAMStartTime",0,"float")       
-        self.state.config.triggerTime = self.readConfigElement("Trigger","TriggerTime",0,"float")
-        txt = self.readConfigElement("Trigger","ClockSource","INTERNAL","string")
-        if (txt.lower() == "internal"):
-                self.state.config.clockSource =   APDCAM_GUI_config_class.CLK_INTERNAL
-        elif (txt.lower() == "external"):
-                self.state.config.clockSource =   APDCAM_GUI_config_class.CLK_EXTERNAL
-        else:
-            self.state.GUI.add_message("Invalid ClockSource value in config file. Using INTERNAL.")
-            self.state.config.clockSource =   APDCAM_GUI_config_class.CLK_INTERNAL
-                  
-        self.state.config.channel_masks = [0xffffffff,0xffffffff]        
+        self.state.config.triggerTime = self.readConfigElement("Trigger","TriggerTime",0,"float")                  
+        self.state.config.channel_masks = [0xffffffff,0xffffffff,0xffffffff,0xffffffff]        
                         
     def set_defaults(self):              
         for w in self.widget_list :
@@ -270,10 +253,10 @@ class GUI_shotControl_class :
         
         shotSettingsFrame = tk.Frame(self.frame_widg , bd=2, padx=2, pady=2)
         shotSettingsFrame.grid(row=3,column=1,columnspan=3)
-        w = tk.Label(shotSettingsFrame,text='Test ID:').grid(row=1,column=1)
+        w = tk.Label(shotSettingsFrame,text='Measurement ID:').grid(row=1,column=1)
         self.shotID_widg = tk.Entry(shotSettingsFrame,width=15,textvariable=self.var_shotID)
         self.shotID_widg.grid(row=1,column=2)
-        optionList = ('Test','Test w. trigger')
+        optionList = ('SW Trigger','HW Trigger')
         self.var_shot_mode.set(optionList[0])
         self.shot_mode_widg = tk.OptionMenu(shotSettingsFrame,self.var_shot_mode,*optionList)
         self.shot_mode_widg.grid(row=1,column=3)                                    
@@ -571,6 +554,10 @@ class APDCAM10G_GUI_class:
         self.var_APDCAM_sample = tk.StringVar()
         self.APDCAM_samplerates = []
         self.APDCAM_samplerate_names = []
+        self.var_clocksource = tk.StringVar()
+        self.var_offset = tk.IntVar()
+        self.var_callight = tk.IntVar()
+        
         
     def create_widgets(self,parent) :
         self.frame_widg = tk.LabelFrame(parent,bd=2,relief=tk.GROOVE,padx=2,pady=2,text="APDCAM")
@@ -682,16 +669,28 @@ class APDCAM10G_GUI_class:
         self.APDCAM_sample_widg = tk.OptionMenu(miscblock,self.var_APDCAM_sample,*optionList)
         self.APDCAM_sample_widg.grid(row=1,column=2)                                    
         self.APDCAM_sample_widg["width"] = 13  
-        w = tk.Label(miscblock,text='Ext. clock:').grid(row=1,column=3)
-        if (self.GUI_status.config.clockSource == APDCAM_GUI_config_class.CLK_INTERNAL):
-            txt = "Not used"
-            color = "white"
-        else:
-            txt = "???"
-            color = APDCAM10G_GUI_class.OffColor
+        w = tk.Label(miscblock,text='Ext. clock:').grid(row=2,column=3)
+        txt = "---"
+        color = APDCAM10G_GUI_class.OffColor
         self.APDCAM_extclock_widg = tk.Label(miscblock,text=txt,bg=color,\
                                         width=20)  
-        self.APDCAM_extclock_widg.grid(column=4,row=1) 
+        self.APDCAM_extclock_widg.grid(column=4,row=2) 
+        w = tk.Label(miscblock,text='Clock source:').grid(row=2,column=1,sticky='w')
+        optionList_clk = ('Internal', 'External')
+        self.var_clocksource.set(optionList_clk[0])
+        self.APDCAM_clocksource_widg = tk.OptionMenu(miscblock,self.var_clocksource,*optionList_clk,command=self.clocksource_change)
+        self.APDCAM_clocksource_widg.grid(row=2,column=2,sticky='w')
+        w = tk.Label(miscblock,text='Calib. light:').grid(row=3,column=1,sticky='e')
+        self.APDCAM_calibration_light_widg = tk.Scale(miscblock, from_=0, to=1000,
+                                                      orient=tk.HORIZONTAL,
+                                                      command=self.callight_change,
+                                                      variable=self.var_callight
+                                                      )
+        self.APDCAM_calibration_light_widg.grid(row=3,column=2,sticky='w')
+        w = tk.Label(miscblock,text='Offset:').grid(row=3,column=3,sticky='e')
+        self.offset_widg = tk.Entry(miscblock,width=4,textvariable=self.var_offset)
+        self.offset_widg.bind('<Return>',self.set_offset)
+        self.offset_widg.grid(row=3,column=4,sticky='w')
         
     def set_defaults(self) :
         self.GUI_status.APDCAM_on = False
@@ -762,15 +761,17 @@ class APDCAM10G_GUI_class:
         self.var_HV4_set.set("{:5.1f}".format(self.GUI_status.APDCAM_status.HV_set[3]))
         self.var_detTemp_set.set("---")
         self.var_detTemp_set.set("{:5.1f}".format(self.GUI_status.APDCAM_status.ref_temp))
-        if (self.GUI_status.config.clockSource == APDCAM_GUI_config_class.CLK_EXTERNAL): 
+        if (self.var_clocksource.get() == 'External'): 
             err = self.GUI_status.APDCAM_reg.setClock(APDCAM10G_regCom.CLK_EXTERNAL,extmult=4,extdiv=2,autoExternal=True)
         else:
             err = self.GUI_status.APDCAM_reg.setClock(APDCAM10G_regCom.CLK_INTERNAL)
-        # This is to correct a problem in the APDTest program, see the comment in APDCAM10G_control.py at the
-        # defininiton of the resetStreams() function
-        # self.GUI_status.APDCAM_reg.resetStream3()    
-        # self.GUI_status.Update_APDCAM = True
-        
+        err,d = self.GUI_status.APDCAM_reg.getOffsets()
+        if (err != ""):
+            self.GUI_status.GUI.add_message("Error reading offsets: {:s}".format(err))
+        else:
+            # Assuming all offsets are the same, using the first one
+            self.var_offset = d[0]
+            
     def commErrorResponse(self,err):
         if (err != ""):
             self.GUI_status.GUI.add_message(err)
@@ -778,7 +779,22 @@ class APDCAM10G_GUI_class:
             self.GUI_status.APDCAM_connected = False
             self.APDCAM_comm_widg.config(text="Error",bg=APDCAM10G_GUI_class.OffColor)
         return err
-            
+   
+    def set_offset(self,event):
+        if (self.GUI_status.APDCAM_connected):
+            self.GUI_status.APDCAM_reg.setOffsets([int(self.var_offset.get())]*128)
+        print()
+    
+    def callight_change(self,value):
+        print(value)
+        
+    def clocksource_change(self,value):
+        if (self.GUI_status.APDCAM_connected):
+            if (value == 'External'): 
+                err = self.GUI_status.APDCAM_reg.setClock(APDCAM10G_regCom.CLK_EXTERNAL,extmult=4,extdiv=2,autoExternal=True)
+            else:
+                err = self.GUI_status.APDCAM_reg.setClock(APDCAM10G_regCom.CLK_INTERNAL)
+         
             
     def HV_onOff(self,n,on):
         if (self.GUI_status.APDCAM_connected):
@@ -797,7 +813,7 @@ class APDCAM10G_GUI_class:
                                                      d,numberOfBytes=1,arrayData=False)
             if (self.commErrorResponse(err) != ""):
                return      
-          
+        
     def hv1_on(self):
         self.HV_onOff(1,1)
         
@@ -929,7 +945,7 @@ class APDCAM10G_GUI_class:
                     else:
                         self.var_powerTemp_act.set("---") 
                     self.var_CCTemp_act.set("{:3d}".format(self.GUI_status.APDCAM_status.CCTemp))
-                    if (self.GUI_status.config.clockSource == APDCAM_GUI_config_class.CLK_EXTERNAL):
+                    if (self.var_clocksource.get() == 'External'):
                         if (self.GUI_status.APDCAM_status.extclock_valid) : 
                             clk = self.GUI_status.APDCAM_status.extclock_freq/1000
                             self.APDCAM_extclock_widg.config(text="{:3.2f} MHz".format(clk),\

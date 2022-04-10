@@ -771,6 +771,7 @@ class APDCAM10G_GUI_class:
         else:
             # Assuming all offsets are the same, using the first one
             self.var_offset = d[0]
+        
             
     def commErrorResponse(self,err):
         if (err != ""):
@@ -786,7 +787,8 @@ class APDCAM10G_GUI_class:
         print()
     
     def callight_change(self,value):
-        print(value)
+        if (self.GUI_status.APDCAM_connected):
+            self.GUI_status.APDCAM_reg.setCallight(int(self.var_offset.get()))
         
     def clocksource_change(self,value):
         if (self.GUI_status.APDCAM_connected):

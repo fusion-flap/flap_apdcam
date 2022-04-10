@@ -23,19 +23,33 @@ def apdcam_channel_map(sensor_rotation=0):
         channel_map[nr,nc] is lower right corner if nr is number of rows, nc is number of columns
 
     """
-    if ((sensor_rotation != 0) and (sensor_rotation != 90)):
-        raise ValueError("sensor_rotation can be only 0 or 90.")
-    chmap = np.array([[18,20,21,23],
-                      [25,27,28,30],
-                      [19,17,22,24],
-                      [26,32,29,31],
-                      [15,13,16,10],
-                      [ 8, 6, 1, 3],
-                      [14,12,11, 9],
-                      [ 7, 5, 4, 2]
+    if ((sensor_rotation != 0) and (sensor_rotation != 90) and (sensor_rotation != 180) and (sensor_rotation != 270)):
+        raise ValueError("sensor_rotation can be only 0, 90, 180 or 270.")
+    chmap = np.array([[18,19,15,14],
+                      [20,17,13,12],
+                      [21,22,16,11],
+                      [23,24,10, 9],
+                      [25,26, 8, 7],
+                      [27,32, 6, 5],
+                      [28,29, 1, 4],
+                      [30,31, 3, 2]
                      ])
+    chmap = chmap.astype(int)
     chmap = np.transpose(chmap)
-    nrot = int(round(sensor_rotation / 90))
-    for i in range(nrot):
-        chmap = np.rot90(chmap)
-    return chmap
+    if (sensor_rotation == 0):
+        return chmap
+    if (sensor_rotation == 90):
+       chmap_rot = np.rot90(chmap) 
+       chmap_rot = ((chmap_rot + 8 - 1) % 32) + 1
+       return chmap_rot
+    if (sensor_rotation == 180):
+       chmap_rot = np.rot90(chmap) 
+       chmap_rot = np.rot90(chmap_rot) 
+       chmap_rot = ((chmap_rot + 16 - 1) % 32) + 1
+       return chmap_rot    
+    if (sensor_rotation == 180):
+       chmap_rot = np.rot90(chmap) 
+       chmap_rot = np.rot90(chmap_rot) 
+       chmap_rot = np.rot90(chmap_rot) 
+       chmap_rot = ((chmap_rot + 24 - 1) % 32) + 1
+       return chmap_rot

@@ -528,6 +528,12 @@ class APDCAM10G_regCom:
         """ Connect to the camera and start the answrer reading socket
         Returns and error message or ""
         """
+        if (type(ip) is str):
+            _ip = bytearray(ip,encoding='ASCII')
+        elif(type(ip) is bytes):
+            _ip = ip
+        else:
+            raise ValueError("Invalid IP address for camera. Should be sting or bytearray.")
         self.APDCAM_IP = ip
         err = APDCAM10G_regCom.startReceiveAnswer(self)
         if (err != "") :

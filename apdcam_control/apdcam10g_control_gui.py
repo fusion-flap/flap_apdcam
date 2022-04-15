@@ -18,8 +18,12 @@ import subprocess
 
 import matplotlib.pyplot as plt
 
+import flap
+import flap_apdcam
+flap_apdcam.register()
 
 from .APDCAM10G_control import *
+from .apdcam_plot import APDCAM_Plot_class
 
 #from .read_config
         
@@ -31,6 +35,7 @@ class APDCAM_GUI_config_class:
         self.triggerTime = 0.0
         self.datapath = "data"
         self.APDCAMStartTime = 0
+        self.APDCAMAddress = '10.123.13.102'
 
 class APDCAM_GUI_status_class:
     """ This contains various information about the system and shared
@@ -62,6 +67,15 @@ class startup_message_class :
                
 class APDCAM_GUI_class(tk.Frame):
     def __init__(self, master=None,show_data_func = None):
+        """ Constructor for the GUI
+            
+            Parameters
+            ----------
+            master: The instationation of the root Tk class above this
+            show_data_func: function (datapath=<shotdir>)
+                The function to call after a measurement.
+        """
+            
         super().__init__(master)
         # This is the global status block
         self.state = APDCAM_GUI_status_class()
@@ -74,11 +88,14 @@ class APDCAM_GUI_class(tk.Frame):
         self.GUI_shotControl_widg = \
             GUI_shotControl_class(GUI_status=self.state,show_data_func=show_data_func)
         self.GUI_APDCAM_widg = APDCAM10G_GUI_class(GUI_status=self.state)
+        self.GUI_APDCAM_widg1 = APDCAM10G_GUI_class(GUI_status=self.state)
+        self.APDCAM_plot_widg = APDCAM_Plot_class()
 
         # Creating a list of the sub-GUIs. 
 
         self.widget_list = [self.GUI_shotControl_widg, \
-                            self.GUI_APDCAM_widg]
+                            self.GUI_APDCAM_widg
+                            ]
 
         # This will collect any error message during read_config
         # After the widgets are created self.state.GUI.add_message will be redirected
@@ -107,14 +124,22 @@ class APDCAM_GUI_class(tk.Frame):
         GUI_frame_widg.grid()
 
         col1 = tk.Frame(GUI_frame_widg)
-        col1.grid(row=1,column=1)
+        col1.grid(row=0,column=0)
         shotControlFrame = tk.Frame(col1)
-        shotControlFrame.grid(row=1,column=1)       
+        shotControlFrame.grid(row=0,column=0)       
         self.GUI_shotControl_widg.create_widgets(shotControlFrame)
             
         APDCAMControlFrame = tk.Frame(col1)
-        APDCAMControlFrame.grid(row=3,column=1)   
+        APDCAMControlFrame.grid(row=1,column=0)   
         self.GUI_APDCAM_widg.create_widgets(APDCAMControlFrame) 
+        APDCAMPlotFrame = tk.Frame(col1)
+        APDCAMPlotFrame.grid(row=2,column=0)   
+        self.APDCAM_plot_widg.create_widgets(APDCAMPlotFrame,
+                                             camera_type=self.state.config.camera_type,
+                                             camera_version=self.state.config.camera_version
+                                             ) 
+
+#        self.APDCAM_plot_widg.create_widgets(parent=col1)
             
     def config_get(self,file,section,key) :
         """ Reads an element from a configuration file
@@ -165,6 +190,7 @@ class APDCAM_GUI_class(tk.Frame):
         
     def read_config(self):
         self.state.config.datapath = self.readConfigElement("General","Datapath","data","string")
+        self.state.config.APDCAMAddress = self.readConfigElement("General","Address","10.123.13.102","string")
         self.state.config.camera_type = self.readConfigElement("General","CameraType","","string")
         self.state.config.camera_version = self.readConfigElement("General","CameraVersion","1","int")
         self.state.config.APDCAMStartTime = self.readConfigElement("Trigger","APDCAMStartTime",0,"float")       
@@ -218,29 +244,6 @@ class GUI_shotControl_class :
         self.stop_button_widg["height"] = 1
         self.stop_button_widg["command"] = self.stopExp
         self.stop_button_widg.grid(row=1,column=2)
-
-#        w_stat = tk.Frame(self.frame_widg)
-#        w_stat.grid(row=1,column=2)
-#        self.prep_widg = tk.Button(w_stat, text=" ")
-#        self.prep_widg["font"] = ('Helvetica', '8')
-#        self.prep_widg["width"] = 15
-#        self.prep_widg["height"] = 1
-#        self.prep_widg["bg"] = 'white'
-#        self.prep_widg.grid(row=1,column=1)
-#
-#        self.meas_widg = tk.Button(w_stat, text="measure")
-#        self.meas_widg["font"] = ('Helvetica', '8')
-#        self.meas_widg["width"] = 15
-#        self.meas_widg["height"] = 1
-#        self.meas_widg["bg"] = 'white'
-#        self.meas_widg.grid(row=1,column=2)
-# 
-#        self.save_widg = tk.Button(w_stat, text="save data")
-#        self.save_widg["font"] = ('Helvetica', '8')
-#        self.save_widg["width"] = 15
-#        self.save_widg["height"] = 1
-#        self.save_widg["bg"] = 'white'
-#        self.save_widg.grid(row=1,column=3)
         
         self.exit_button_widg = tk.Button(self.frame_widg, text="EXIT")
         self.exit_button_widg["font"] = ('Helvetica', '16')
@@ -397,7 +400,7 @@ class GUI_shotControl_class :
                                   bits=14,\
                                   waitForResult=False,\
                                   externalTriggerPolarity=externalTriggerPolarity,\
-                                  triggerDelay=(meas_start_time-self.GUI_status.config.triggerTime)*1e6)
+                                  triggerDelay=(meas_start_time - self.GUI_status.config.triggerTime)*1e6)
                 if (err != ""):
                     err = "Error starting APDCAM: "+err
                     self.add_message(err) 
@@ -719,7 +722,7 @@ class APDCAM10G_GUI_class:
         self.APDCAM_comm_widg.config(text="Not connected",bg=APDCAM10G_GUI_class.OffColor)
                                          
             
-    def APDCAM_on(self,ip=None):
+    def APDCAM_on(self):
         for i in range(10) :
             if (self.GUI_status.APDCAM_reg == None):
                 self.GUI_status.APDCAM_reg = APDCAM10G_regCom()
@@ -727,7 +730,7 @@ class APDCAM10G_GUI_class:
             self.APDCAM_comm_widg.config(text="Trying...{:d}".format(i+1),bg=APDCAM10G_GUI_class.TryColor)
             self.APDCAM_comm_widg.update_idletasks()
             print("Connecting...attempt {:d}".format(i+1))
-            ret = self.GUI_status.APDCAM_reg.connect()
+            ret = self.GUI_status.APDCAM_reg.connect(ip=self.GUI_status.config.APDCAMAddress)
             print("Connect returned")
             if (ret == ""):
                 time.sleep(1) 
@@ -955,7 +958,8 @@ class APDCAM10G_GUI_class:
                         else :
                             self.APDCAM_extclock_widg.config(text="Invalid",bg=APDCAM10G_GUI_class.OffColor)
             time.sleep(0.1)
-                    
+
+
 def gui(show_data_func='show_apdcam'):       
     global root
     root = tk.Tk()

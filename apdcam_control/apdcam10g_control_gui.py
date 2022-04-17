@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-This is the graphical user interface for the Alkali BES diagnostic on
-Wendelstein 7-X
- Author: S. Zoletnik  April 2019, based on W7-X ABES GUI
-      
+This is the graphical user interface for measuring with APDCAM-10G
+and plotting data using the flap environment
+
+Author: S. Zoletnik  zoletnik.sandor@ek-cer.hu
+    
  """
  
  
@@ -15,6 +16,7 @@ import time
 import pathlib
 import configparser
 import subprocess
+import os
 
 import matplotlib.pyplot as plt
 
@@ -23,11 +25,14 @@ import flap_apdcam
 flap_apdcam.register()
 
 from .APDCAM10G_control import *
-from .apdcam_plot import APDCAM_Plot_class
+from .apdcam_plot import * #APDCAM_Plot_class
 
 #from .read_config
         
 class APDCAM_GUI_config_class:
+    """
+    Configuration information. This will be set during startup
+    """
     CLK_INTERNAL = 0
     CLK_EXTERNAL = 1
     def __init__(self):
@@ -36,6 +41,8 @@ class APDCAM_GUI_config_class:
         self.datapath = "data"
         self.APDCAMStartTime = 0
         self.APDCAMAddress = '10.123.13.102'
+        # The APDCAM plot class
+        self.APDCAM_Plot = None
 
 class APDCAM_GUI_status_class:
     """ This contains various information about the system and shared
@@ -59,6 +66,9 @@ class APDCAM_GUI_status_class:
         self.config = APDCAM_GUI_config_class()
 
 class startup_message_class :
+    """ This is used for collecting messages before the GUI is created.
+    """
+    
     def __init__(self):
         self.messages = []
     
@@ -66,14 +76,12 @@ class startup_message_class :
         self.messages.append(message)
                
 class APDCAM_GUI_class(tk.Frame):
-    def __init__(self, master=None,show_data_func = None):
+    def __init__(self, master=None):
         """ Constructor for the GUI
             
             Parameters
             ----------
             master: The instationation of the root Tk class above this
-            show_data_func: function (datapath=<shotdir>)
-                The function to call after a measurement.
         """
             
         super().__init__(master)
@@ -86,13 +94,13 @@ class APDCAM_GUI_class(tk.Frame):
          
         # Instantiating the sub-GUIs 
         self.GUI_shotControl_widg = \
-            GUI_shotControl_class(GUI_status=self.state,show_data_func=show_data_func)
+            GUI_shotControl_class(GUI_status=self.state)
         self.GUI_APDCAM_widg = APDCAM10G_GUI_class(GUI_status=self.state)
         self.GUI_APDCAM_widg1 = APDCAM10G_GUI_class(GUI_status=self.state)
-        self.APDCAM_plot_widg = APDCAM_Plot_class()
+        self.APDCAM_plot_widg = APDCAM_Plot_class(root=root)
+        self.state.config.APDCAM_Plot = self.APDCAM_plot_widg
 
-        # Creating a list of the sub-GUIs. 
-
+        # Creating a list of the sub-GUIs. The plot widget is separate not included in this list. 
         self.widget_list = [self.GUI_shotControl_widg, \
                             self.GUI_APDCAM_widg
                             ]
@@ -119,8 +127,9 @@ class APDCAM_GUI_class(tk.Frame):
 
         
     def create_widgets(self):
-        
-        GUI_frame_widg = tk.Frame(self)
+        """ Create the widgets
+        """
+        GUI_frame_widg = tk.Frame(self,bd=4,padx=4,pady=4)
         GUI_frame_widg.grid()
 
         col1 = tk.Frame(GUI_frame_widg)
@@ -133,7 +142,7 @@ class APDCAM_GUI_class(tk.Frame):
         APDCAMControlFrame.grid(row=1,column=0)   
         self.GUI_APDCAM_widg.create_widgets(APDCAMControlFrame) 
         APDCAMPlotFrame = tk.Frame(col1)
-        APDCAMPlotFrame.grid(row=2,column=0)   
+        APDCAMPlotFrame.grid(row=0,column=1,rowspan=2,sticky='n')   
         self.APDCAM_plot_widg.create_widgets(APDCAMPlotFrame,
                                              camera_type=self.state.config.camera_type,
                                              camera_version=self.state.config.camera_version
@@ -143,10 +152,10 @@ class APDCAM_GUI_class(tk.Frame):
             
     def config_get(self,file,section,key) :
         """ Reads an element from a configuration file
-        The file format is 
-        [Section]
-        key = value
-        # comment
+            The file format is 
+            [Section]
+            key = value
+            # comment
         """
         config = configparser.ConfigParser()
         try:
@@ -162,12 +171,34 @@ class APDCAM_GUI_class(tk.Frame):
         return "", value
         
     def readConfigElement(self,section,element,default,datatype):
-        """ Reads an element from the config file. If not found or conversion
+        """
+            Reads an element from the config file. If not found or conversion
             error occurs sends an error message through add_message().
             Returns the value read or the default.
             This is a helper for the set_defaults method.
+            
+            The config file has the following structure:
+                [Section]
+                 element = value
+
+        Parameters
+        ----------
+        section : string
+            The section name in the config file.
+        element : string
+            The element name in the section.
+        default : string, int or float depending on datatype
+            This value will be returned if the element not found
+        datatype : string
+            The type of the data expected:
+                'float','int','string'
+
+        Returns
+        -------
+        value : string, int or float
+            The return value.
+
         """
-        
         err,txt = self.config_get(self.state.config.configFile,section,element)
         if (err == ""):
             try:
@@ -189,6 +220,14 @@ class APDCAM_GUI_class(tk.Frame):
        
         
     def read_config(self):
+        """
+        Read the configuration file and store data in the configuration class variables
+
+        Returns
+        -------
+        None.
+        """
+        
         self.state.config.datapath = self.readConfigElement("General","Datapath","data","string")
         self.state.config.APDCAMAddress = self.readConfigElement("General","Address","10.123.13.102","string")
         self.state.config.camera_type = self.readConfigElement("General","CameraType","","string")
@@ -197,31 +236,57 @@ class APDCAM_GUI_class(tk.Frame):
         self.state.config.triggerTime = self.readConfigElement("Trigger","TriggerTime",0,"float")                  
         self.state.config.channel_masks = [0xffffffff,0xffffffff,0xffffffff,0xffffffff]        
                         
-    def set_defaults(self):              
+    def set_defaults(self):   
+        """
+        Calls set_defaults() in all the widgets
+
+        Returns
+        -------
+        None.
+
+        """           
         for w in self.widget_list :
             w.set_defaults()
        
     def start(self):
+        """
+        Calls start() in all the widgets
+
+        Returns
+        -------
+        None.
+
+        """           
         for w in self.widget_list :
             w.start()
 
     def stop(self):
+        """
+        Calls stop() in all the widgets
+
+        Returns
+        -------
+        None.
+
+        """           
         for w in self.widget_list :
             w.stop()
         time.sleep(0.5)    
     
 class GUI_shotControl_class :
-    def __init__(self, GUI_status=None,show_data_func=None):
+    """
+    This clas controls the measurement.
+    """
+    def __init__(self, GUI_status=None):
         self.GUI_status = GUI_status
         self.var_shotID= tk.StringVar()
         self.var_shot_mode= tk.StringVar()
         self.var_meas_start = tk.StringVar()
         self.var_meas_length = tk.StringVar()
         self.GUI_status.GUI = self
-        self.show_data_func = show_data_func
         
     def create_widgets(self,parent):
-        self.frame_widg = tk.Frame(parent)
+        self.frame_widg = tk.LabelFrame(parent,bd=2,relief=tk.GROOVE,padx=2,pady=2,text="Measurement control",labelanchor='n')
         self.frame_widg.grid(row=1,column=1)
         self.frame_widg["bd"] = 2
         self.frame_widg["padx"] = 2
@@ -467,7 +532,7 @@ class GUI_shotControl_class :
                 
         # Here all data are on the disk or error happened
         # moving data to datapath
-        shotdir = self.GUI_status.config.datapath+"/"+shotID
+        shotdir = os.path.joint(self.GUI_status.config.datapath,shotID)
         self.add_message("Copying data to "+shotdir)
         cmd = "mkdir "+shotdir+" ; cp data/Channel*.dat data/APDCAM_config.xml data/apd_python_meas.cmd "\
             +"data/APDTest.out "+shotdir+"/"
@@ -476,24 +541,13 @@ class GUI_shotControl_class :
 
         self.GUI_status.measurementRunning = False
         self.add_message("Shot "+shotID+" finished.")
-                     
+        self.GUI_status.config.APDCAM_Plot.var_shotID.set(shotdir)                    
         try:
             f = open("APDCAM_GUI_testshot_counter.dat","wt")
             f.writelines(str(act_year)+"\n"+str(act_month)+"\n"+str(act_day)+"\n"+str(act_shot))
             f.close()
         except:
            self.add_message("Warning: Could not write last test shot number into file.") 
-
-        if (self.show_data_func is not None):
-            f = open("diag.py","wt")
-            f.write("from "+self.show_data_func+" import *\n")
-            f.write(self.show_data_func+"(datapath='"+shotdir+"')\n")
-            f.write("input('Press Enter to continue...')\n")
-            f.close()
-            cmd = "xterm -e python diag.py &"
-            d=subprocess.run([cmd],check=False,shell=True) 
-        else:
-            pass
  
     # End of run_measurement
             
@@ -509,12 +563,16 @@ class GUI_shotControl_class :
         self.testThread.start()
         
     def stopExp(self) :
+        """ This is called when the stop experiment button is pressed.
+        """
         print("Stop experiment pressed") 
         self.GUI_status.stopMeasurement = True
         
         
     
     def exitGUI(self) :
+        """ This is called when the exit button is pressed.
+        """
         print("Exit pressed")
         self.GUI_status.GUI_top.stop()
         self.GUI_status.root_widg.destroy()
@@ -525,6 +583,8 @@ class APDCAM_settings:
         self.sampleDiv = 0 # Calculated from samplerate
     
 class APDCAM10G_GUI_class:
+    """ This implements APDCAM control
+    """
     OffColor = "#FCC"
     OnColor = "#CFC"
     TryColor = "yellow"
@@ -723,6 +783,9 @@ class APDCAM10G_GUI_class:
                                          
             
     def APDCAM_on(self):
+        """
+        Connects to APDCAM
+        """
         for i in range(10) :
             if (self.GUI_status.APDCAM_reg == None):
                 self.GUI_status.APDCAM_reg = APDCAM10G_regCom()
@@ -775,7 +838,6 @@ class APDCAM10G_GUI_class:
             # Assuming all offsets are the same, using the first one
             self.var_offset = d[0]
         
-            
     def commErrorResponse(self,err):
         if (err != ""):
             self.GUI_status.GUI.add_message(err)
@@ -919,6 +981,8 @@ class APDCAM10G_GUI_class:
         return "",s
         
     def update_APDCAM_widgets(self):
+        """ This is called periodically to update the widgets with the APDCAM state
+        """
         from time import sleep
         while self.stopThreadSignal == False :
             if (self.GUI_status.Update_APDCAM):
@@ -960,11 +1024,14 @@ class APDCAM10G_GUI_class:
             time.sleep(0.1)
 
 
-def gui(show_data_func='show_apdcam'):       
+def gui():       
     global root
     root = tk.Tk()
-    print("Creating APDCAM-GUI")
-    app = APDCAM_GUI_class(master=root,show_data_func=show_data_func)
+    print("Creating APDCAM-GUI")    
+    app = APDCAM_GUI_class(master=root)
+    root.title(string='APDCAM graphical interface')
+    thisdir = os.path.dirname(os.path.realpath(__file__))
+    root.iconbitmap(os.path.join(thisdir,'flap_apdcam_icon.ico'))
     app.mainloop()
     
 #apdcam10g_control_gui()

@@ -4,20 +4,25 @@ Created on Wed Apr 13 22:23:47 2022
 
 GUI for plotting APDCAM data
 
-@author: Zoletnik
+@author: Sandor Zoletnik zoletnik.sandor@ek-cer.hu
 """
 import tkinter as tk
 from tkinter import messagebox
 from tkinter.ttk import *
+import os
 
 import matplotlib.pyplot as plt
 import flap
 import flap
 import flap_apdcam
-      
+
 class APDCAM_Plot_class:
+    """
+    This is the class doing everything
+    """
     
-    def __init__(self):
+    def __init__(self,root=None):
+        self.root = root
         self.var_shotID = tk.StringVar()
         self.var_shotID.set(value="")
         self.var_figure = tk.StringVar()
@@ -59,22 +64,27 @@ class APDCAM_Plot_class:
         self.var_spectrplot_options_yrange1.set(str(0))
         self.var_spectrplot_options_yrange2= tk.StringVar()
         self.var_spectrplot_options_yrange2.set("{:4.2e}".format(1e5))
+        self.var_spectrplot_options_logfres = tk.IntVar()
+        self.spectrplot_options_logfres = True
+        self.var_spectrplot_options_fres = tk.StringVar()
+        self.var_spectrplot_options_frange1 = tk.StringVar()
+        self.var_spectrplot_options_frange2 = tk.StringVar()
+        self.var_spectrplot_options_logy = tk.IntVar()
+        self.var_spectrplot_options_logx = tk.IntVar()
         
     def create_widgets(self,parent,config_file=None,camera_type=None,camera_version=None,plot_background=None):
-        
         self.camera_type = camera_type
         self.camera_version = camera_version
         if (config_file is not None):
             flap.config.read(file_name=config_file)
         self.config_file = config_file
-        self.plotControl_widg = tk.LabelFrame(parent,bd=2, padx=2, pady=2,relief=tk.GROOVE,text='Plot control',bg=plot_background)
+        self.plotControl_widg = tk.LabelFrame(parent,bd=2, padx=2, pady=2,relief=tk.GROOVE,text='Plot control',bg=plot_background,labelanchor='n')
         self.plotControl_widg.grid(row=0,column=0)
         
         row0 = 0
         if ((camera_type is None) or (camera_version is None)):
             camera_settings_frame = tk.LabelFrame(self.plotControl_widg,bd=4, padx=2, pady=2,relief=tk.GROOVE,text='Camera selection',bg=plot_background)
-            camera_settings_frame.grid(row=0,column=0,sticky='w')
-            row0 = 1
+            camera_settings_frame.grid(row=0,column=0)
             if (camera_type is None):
                 w = tk.Label(camera_settings_frame,text='Camera type:',bg=plot_background).grid(row=0,column=0,sticky='e')
                 self.camera_select_widg = tk.OptionMenu(camera_settings_frame,self.var_camera_type,*tuple(self.camera_type_list),command=self.camera_type_select)
@@ -83,18 +93,36 @@ class APDCAM_Plot_class:
                 w = tk.Label(camera_settings_frame,text='Camera version:',bg=plot_background).grid(row=0,column=2,sticky='e')
                 self.camera_version_select_widg = tk.OptionMenu(camera_settings_frame,self.var_camera_version,("n.a"),command=self.camera_version_select)
                 self.camera_version_select_widg.grid(row=0,column=3,sticky='w')
-                
+        else:
+            camera_settings_frame = tk.LabelFrame(self.plotControl_widg,bd=4, padx=2, pady=2,relief=tk.GROOVE,text='Camera selection',bg=plot_background)
+            camera_settings_frame.grid(row=0,column=0)
+            row0 = 1
+            if (camera_type is None):
+                w = tk.Label(camera_settings_frame,text='Camera type:',bg=plot_background).grid(row=0,column=0,sticky='e')
+                self.camera_select_widg = tk.OptionMenu(camera_settings_frame,self.var_camera_type,*tuple(self.camera_type_list),command=self.camera_type_select)
+                self.camera_select_widg.grid(row=0,column=1,sticky='w')
+            else:
+                w = tk.Label(camera_settings_frame,text='Camera type:'+camera_type,bg=plot_background).grid(row=0,column=0)
+            if (camera_version is None):
+                w = tk.Label(camera_settings_frame,text='      Camera version:',bg=plot_background).grid(row=0,column=2,sticky='e')
+                self.camera_version_select_widg = tk.OptionMenu(camera_settings_frame,self.var_camera_version,("n.a"),command=self.camera_version_select)
+                self.camera_version_select_widg.grid(row=0,column=3,sticky='w')
+            else:
+                w = tk.Label(camera_settings_frame,text='      Camera version: {:d}'.format(camera_version),bg=plot_background).grid(row=0,column=2)
+        row0 = 1            
                 
         general_settings_frame = tk.LabelFrame(self.plotControl_widg,bd=4, padx=2, pady=2,relief=tk.GROOVE,text='Data',bg=plot_background)
         general_settings_frame.grid(row=row0,column=0)
-        w = tk.Label(general_settings_frame,text='Measurement ID:',bg=plot_background).grid(row=0,column=0,sticky='e')
-        self.shotID_widg = tk.Entry(general_settings_frame,width=10,textvariable=self.var_shotID,bg=plot_background)
-        self.shotID_widg.grid(row=0,column=1,sticky='w')
-        w = tk.Label(general_settings_frame,text='Signals:',bg=plot_background).grid(row=0,column=2,sticky='e')
-        self.signals_widg = tk.Entry(general_settings_frame,width=10,textvariable=self.var_signals,bg=plot_background)
-        self.signals_widg.grid(row=0,column=3,sticky='w')
+        w = tk.Label(general_settings_frame,text='Measurement dir:',bg=plot_background).grid(row=0,column=0,sticky='e')
+        self.shotID_widg = tk.Entry(general_settings_frame,width=70,textvariable=self.var_shotID,bg=plot_background)
+        self.shotID_widg.grid(row=0,column=1,columnspan=2,sticky='w')
+        signals_frame = tk.Frame(general_settings_frame)
+        signals_frame.grid(row=1,column=0) 
+        w = tk.Label(signals_frame,text='Signals:',bg=plot_background).grid(row=0,column=0,sticky='e')
+        self.signals_widg = tk.Entry(signals_frame,width=10,textvariable=self.var_signals,bg=plot_background)
+        self.signals_widg.grid(row=0,column=1,sticky='e')
         time_frame = tk.Frame(general_settings_frame,bg=plot_background)
-        time_frame.grid(row=1,column=0,columnspan=4)
+        time_frame.grid(row=1,column=1)
         w = tk.Label(time_frame,text='Timerange[s]:',bg=plot_background).grid(row=0,column=0,sticky='e')
         self.start_time_widg = tk.Entry(time_frame,width=10,textvariable=self.var_start_time,bg=plot_background)
         self.start_time_widg.grid(row=0,column=1,sticky='e')
@@ -102,25 +130,34 @@ class APDCAM_Plot_class:
         self.end_time_widg = tk.Entry(time_frame,width=10,textvariable=self.var_end_time,bg=plot_background)
         self.end_time_widg.grid(row=0,column=3,sticky='w')
         self.getdata_widg = tk.Button(general_settings_frame,command=self.getdata,text='GET DATA',bg=plot_background)
-        self.getdata_widg .grid(row=2,column=0,columnspan=2)
-        w = tk.Label(general_settings_frame,text='Figure:',bg=plot_background).grid(row=2,column=2,sticky='e')
-        self.figure_select_widg = tk.OptionMenu(general_settings_frame,self.var_figure,*tuple(self.figure_list),command=self.figure_select)
-        self.figure_select_widg.grid(row=2,column=3,sticky='w')
-        self.var_figure.set(self.figure_list[0])
-        self.message_widg = tk.Text(general_settings_frame,font=('Times','10'),height=3,width=80,bg=plot_background)
-        self.message_widg.grid(row=3,column=0,columnspan=4)    
+        self.getdata_widg .grid(row=1,column=2,columnspan=2,sticky='w')
         
+        self.message_widg = tk.Text(general_settings_frame,font=('Times','10'),height=6,width=80,bg=plot_background)
+        self.message_widg.grid(row=2,column=0,columnspan=4)  
+        
+        figure_frame = tk.Frame(self.plotControl_widg)
+        figure_frame.grid(row=row0+1,column=0,sticky='e')
+        w = tk.Label(figure_frame,text='Figure:',bg=plot_background).grid(row=0,column=0,sticky='e')
+        self.figure_select_widg = tk.OptionMenu(figure_frame,self.var_figure,*tuple(self.figure_list),command=self.figure_select)
+        self.figure_select_widg.grid(row=0,column=1,sticky='w')
+        self.var_figure.set(self.figure_list[0])
+        
+        self.root.update()
+        pwidth = general_settings_frame.winfo_width()
         #---------------- Raw signal plots --------------
-        self.rawplot_widg = tk.LabelFrame(self.plotControl_widg,bd=4, padx=2, pady=2,relief=tk.GROOVE,text='Raw data plot',bg=plot_background)
-        self.rawplot_widg.grid(row=row0 + 1,column=0,columnspan=4)
+        self.rawplot_widg = tk.LabelFrame(self.plotControl_widg,bd=4, padx=2, pady=2,relief=tk.GROOVE,text='Raw data plot',bg=plot_background) 
+        self.rawplot_widg.grid(row=row0 + 2,column=0,columnspan=4)
         self.rawplot_button_widg = tk.Button(self.rawplot_widg,command=self.rawplot,text='PLOT',bg=plot_background)
-        self.rawplot_button_widg.grid(row=0,column=0)
-        w = tk.Label(self.rawplot_widg,text='  Plot type:',bg=plot_background).grid(row=0,column=1,sticky='e')
-        self.plot_type_select_widg = tk.OptionMenu(self.rawplot_widg,self.plot_type,*tuple(self.plot_type_list),command=self.plot_type_select)
-        self.plot_type_select_widg.grid(row=0,column=2,sticky='w')
-        rawplot_options_widg = tk.Frame(self.rawplot_widg,bg=plot_background)
+        self.rawplot_button_widg.grid(row=0,column=0,sticky='n')
+        raw_plottype_frame = tk.Frame(self.rawplot_widg,bg=plot_background)
+        raw_plottype_frame.grid(row=0,column=1,sticky='n')
+        w = tk.Label(raw_plottype_frame,text='Plot type',bg=plot_background).grid(row=0,column=0,sticky='s')
+        self.plot_type_select_widg = tk.OptionMenu(raw_plottype_frame,self.plot_type,*tuple(self.plot_type_list),command=self.plot_type_select)
+        self.plot_type_select_widg.grid(row=1,column=0,sticky='n')
+        
+        rawplot_options_widg = tk.Frame(self.rawplot_widg,bg=plot_background,bd=4, padx=2, pady=2,relief=tk.GROOVE)
         rawplot_options_widg.grid(row=0,column=3)
-        w = tk.Label(rawplot_options_widg,text='  Plot options ',bg=plot_background).grid(row=0,column=0)
+        w = tk.Label(rawplot_options_widg,text='  Plot options    ',bg=plot_background).grid(row=0,column=0)
         self.raw_option_allpoints = tk.Radiobutton(rawplot_options_widg,text='Plot all points',padx=20,variable=self.var_rawplot_options_allpoints,
                                                    command=self.raw_options_allpoints_func,value=1
                                                    )
@@ -140,29 +177,78 @@ class APDCAM_Plot_class:
         self.rawplot_yscale2_widg = tk.Entry(rawplot_yscale_frame_widg,width=10,textvariable=self.var_rawplot_options_yrange2,bg=plot_background)
         self.rawplot_yscale2_widg .grid(row=0,column=3,sticky='w')
 
+        self.root.update()
+        pheight = self.rawplot_widg.winfo_height()
+        self.rawplot_widg.config(width=pwidth)
+        self.rawplot_widg.config(height=pheight)
+        self.rawplot_widg.grid_propagate(0)
+
         #---------------- Spectrum signal plots --------------
         self.spectrplot_widg = tk.LabelFrame(self.plotControl_widg,bd=4, padx=2, pady=2,relief=tk.GROOVE,text='Spectrum plot',bg=plot_background)
-        self.spectrplot_widg.grid(row=row0 + 2,column=0,columnspan=4)
+        self.spectrplot_widg.grid(row=row0 + 3,column=0,columnspan=4)
         self.spectrplot_button_widg = tk.Button(self.spectrplot_widg,command=self.spectrplot,text='PLOT',bg=plot_background)
-        self.spectrplot_button_widg.grid(row=0,column=0)
-        w = tk.Label(self.spectrplot_widg,text='  Plot type:',bg=plot_background).grid(row=0,column=1,sticky='e')
-        self.splot_type_select_widg = tk.OptionMenu(self.spectrplot_widg,self.splot_type,*tuple(self.splot_type_list),command=self.splot_type_select)
-        self.splot_type_select_widg.grid(row=0,column=2,sticky='w')
-        spectrplot_options_widg = tk.Frame(self.spectrplot_widg,bg=plot_background)
-        spectrplot_options_widg.grid(row=0,column=3)
-        w = tk.Label(spectrplot_options_widg,text='  Plot options ',bg=plot_background).grid(row=0,column=0)
-        self.spectrum_option_allpoints = tk.Radiobutton(spectrplot_options_widg,text='Plot all points',padx=20,variable=self.var_spectrplot_options_allpoints,
-                                                   command=self.spectrplot_options_allpoints_func,value=1
+        self.spectrplot_button_widg.grid(row=0,column=0,sticky='n')
+        
+        spectr_plottype_frame = tk.Frame(self.spectrplot_widg,bg=plot_background)
+        spectr_plottype_frame.grid(row=0,column=1,sticky='n')
+        w = tk.Label(spectr_plottype_frame,text='Plot type',bg=plot_background).grid(row=0,column=0,sticky='s')
+        self.splot_type_select_widg = tk.OptionMenu(spectr_plottype_frame,self.splot_type,*tuple(self.splot_type_list),command=self.splot_type_select)
+        self.splot_type_select_widg.grid(row=1,column=0,sticky='n')
+        
+        spectrplot_options_widg = tk.Frame(self.spectrplot_widg,bg=plot_background,bd=4, padx=2, pady=2,relief=tk.GROOVE)
+        spectrplot_options_widg.grid(row=0,column=3,sticky='e')
+        w = tk.Label(spectrplot_options_widg,text='Spectrum options    ').grid(row=0,column=0)
+        fres_widg = tk.Frame(spectrplot_options_widg,bg=plot_background)
+        fres_widg.grid(row=0,column=1,sticky='w')
+        w = tk.Label(fres_widg,text='Frequency resolution [Hz]:',bg=plot_background).grid(row=0,column=0,sticky='e')
+        self.spectrplot_fres_widg = tk.Entry(fres_widg,width=10,textvariable=self.var_spectrplot_options_fres,bg=plot_background)
+        self.spectrplot_fres_widg.grid(row=0,column=1,sticky='e')
+        try:
+            self.var_spectrplot_options_fres.set("{:4.2e}".format(float(flap.config.get('PS','Resolution',default='1e3'))))
+        except ValueError:
+            self.var_spectrplot_options_fres.set("1E3")
+        self.spectrum_option_logfres = tk.Radiobutton(spectrplot_options_widg,text='Log. freqency resolution',padx=20,variable=self.var_spectrplot_options_logfres,
+                                                   command=self.spectrplot_options_logfres_func,value=1
                                                    )
-        self.var_spectrplot_options_allpoints.set(0)
-        self.spectrum_option_allpoints.grid(row=0,column=1,sticky='w')
-        self.spectrum_option_autoscale = tk.Radiobutton(spectrplot_options_widg,text='Autoscale power',padx=20,variable=self.var_spectrplot_options_autoscale,
-                                                   command=self.spectrplot_options_autoscale_func,value=1
-                                                   )
-        self.var_spectrplot_options_autoscale.set(0)
-        self.spectrum_option_autoscale.grid(row=2,column=1,sticky='w')
-        spectrplot_yscale_frame_widg = tk.Frame(spectrplot_options_widg,bg=plot_background)
-        spectrplot_yscale_frame_widg.grid(row=3,column=1)
+        val = flap.config.interpret_config_value(flap.config.get('PS','Logarithmic',default=True))
+        if (type(val) == bool):
+            self.spectrplot_options_logfres = val
+        else:
+            self.spectrplot_options_logfres = True
+        if (self.spectrplot_options_logfres):
+            self.var_spectrplot_options_logfres.set(1)
+        else:
+            self.var_spectrplot_options_logfres.set(0)
+        self.spectrum_option_logfres.grid(row=1,column=1,sticky='e')
+        
+        spectrplot_frange_frame_widg = tk.Frame(spectrplot_options_widg,bg=plot_background)
+        spectrplot_frange_frame_widg.grid(row=2,column=1)
+        w = tk.Label(spectrplot_frange_frame_widg,text='Frequency range [Hz]:',bg=plot_background).grid(row=0,column=0,sticky='e')
+        self.spectrplot_frange1_widg = tk.Entry(spectrplot_frange_frame_widg,width=10,textvariable=self.var_spectrplot_options_frange1,bg=plot_background)
+        self.spectrplot_frange1_widg.grid(row=0,column=1,sticky='e')
+        w = tk.Label(spectrplot_frange_frame_widg,text='-',bg=plot_background).grid(row=0,column=2,sticky='e')
+        self.spectrplot_frange2_widg = tk.Entry(spectrplot_frange_frame_widg,width=10,textvariable=self.var_spectrplot_options_frange2,bg=plot_background)
+        self.spectrplot_frange2_widg .grid(row=0,column=3,sticky='w')
+
+        val = flap.config.interpret_config_value(flap.config.get('PS','Range',default=[1e3,1e6]))
+        if (type(val) is list):
+            try:
+                f1 = float(val[0])
+                f2 = float(val[1])
+            except ValueError:
+                f1=1e3
+                f2=1e6
+        else:
+                f1=1e3
+                f2=1e6
+        self.var_spectrplot_options_frange1.set("{:4.2e}".format(f1))
+        self.var_spectrplot_options_frange2.set("{:4.2e}".format(f2))
+        
+        spectrplot_plotoptions_widg = tk.Frame(self.spectrplot_widg,bg=plot_background,bd=4, padx=2, pady=2,relief=tk.GROOVE)
+        spectrplot_plotoptions_widg.grid(row=1,column=3)
+        w = tk.Label(spectrplot_plotoptions_widg,text='   Plot options    ',bg=plot_background).grid(row=0,column=0)
+        spectrplot_yscale_frame_widg = tk.Frame(spectrplot_plotoptions_widg,bg=plot_background)
+        spectrplot_yscale_frame_widg.grid(row=0,column=1,sticky='w')
         w = tk.Label(spectrplot_yscale_frame_widg,text='Power range:',bg=plot_background).grid(row=0,column=0,sticky='e')
         self.spectrplot_yscale1_widg = tk.Entry(spectrplot_yscale_frame_widg,width=10,textvariable=self.var_spectrplot_options_yrange1,bg=plot_background)
         self.spectrplot_yscale1_widg.grid(row=0,column=1,sticky='e')
@@ -170,7 +256,68 @@ class APDCAM_Plot_class:
         self.spectrplot_yscale2_widg = tk.Entry(spectrplot_yscale_frame_widg,width=10,textvariable=self.var_spectrplot_options_yrange2,bg=plot_background)
         self.spectrplot_yscale2_widg .grid(row=0,column=3,sticky='w')
     
+        self.spectrum_option_autoscale = tk.Radiobutton(spectrplot_plotoptions_widg,text='Autoscale power',padx=20,variable=self.var_spectrplot_options_autoscale,
+                                                   command=self.spectrplot_options_autoscale_func,value=1
+                                                   )
+        self.var_spectrplot_options_autoscale.set(0)
+        self.spectrum_option_autoscale.grid(row=1,column=1,sticky='e')
+        
+        self.spectrum_option_allpoints = tk.Radiobutton(spectrplot_plotoptions_widg,text='Plot all points',padx=20,variable=self.var_spectrplot_options_allpoints,
+                                                   command=self.spectrplot_options_allpoints_func,value=1
+                                                   )
+        self.var_spectrplot_options_allpoints.set(0)
+        self.spectrplot_options_allpoints = False
+        self.spectrum_option_allpoints.grid(row=2,column=1,sticky='w')
+        
+        self.spectrum_option_logx = tk.Radiobutton(spectrplot_plotoptions_widg,text='Log x',padx=20,variable=self.var_spectrplot_options_logx,
+                                                   command=self.spectrplot_options_logx_func,value=1
+                                                   )
+        val = flap.config.interpret_config_value(flap.config.get('Plot','Log x',default=True))
+        if (type(val) == bool):
+            self.spectrplot_options_logx = val
+        else:
+            self.spectrplot_options_logx = True
+        if (self.spectrplot_options_logx):
+            self.var_spectrplot_options_logx.set(1)
+        else:
+            self.var_spectrplot_options_logx.set(0)
+        self.spectrum_option_logx.grid(row=3,column=1,sticky='w')
+        
+        self.spectrum_option_logy = tk.Radiobutton(spectrplot_plotoptions_widg,text='Log y',padx=20,variable=self.var_spectrplot_options_logy,
+                                                   command=self.spectrplot_options_logy_func,value=1
+                                                   )
+        val = flap.config.interpret_config_value(flap.config.get('Plot','Log y',default=True))
+        if (type(val) == bool):
+            self.spectrplot_options_logy = val
+        else:
+            self.spectrplot_options_logy = True
+        if (self.spectrplot_options_logy):
+            self.var_spectrplot_options_logy.set(1)
+        else:
+            self.var_spectrplot_options_logy.set(0)
+        self.spectrum_option_logy.grid(row=4,column=1,sticky='w')
+        
+        self.root.update()
+        pheight = self.spectrplot_widg.winfo_height()
+        self.spectrplot_widg.config(width=pwidth)
+        self.spectrplot_widg.config(height=pheight)
+        self.spectrplot_widg.grid_propagate(0)
+
+        
     def camera_type_select(self,event):
+        """
+        Camera type select widget. Sets the version select widget menu according to the camera versions
+
+        Parameters
+        ----------
+        event : n.a.
+            Not used, required by tk
+
+        Returns
+        -------
+        None.
+
+        """
         self.camera_type = self.var_camera_type.get()
         index = self.camera_type_list.index(self.camera_type)
         self.camera_version_list = self.camera_version_list_list[index]
@@ -189,10 +336,25 @@ class APDCAM_Plot_class:
         if (self.camera_type is None):
             return
         self.camera_version = int(self.var_camera_version.get())
-        print("camera_type:{:s}, camera_version:{:s}".format(self.camera_type,str(self.camera_version)))
 
         
     def figure_select(self,event):
+        """
+        This is called when the figure select widget is activated.
+        If menu 0 is selected a new figure is created.
+        If a figure is selected which has been delated, creates it.
+        Handles the plotIDs for the flap.plot method, so as overplots are handled correctly.
+
+        Parameters
+        ----------
+        event : n.a.
+            Not used, required by tk.
+
+        Returns
+        -------
+        None.
+
+        """
         if (event is None):
             if (len(plt.get_fignums()) == 0):
                 self.var_figure.set(self.figure_list[0])
@@ -210,20 +372,8 @@ class APDCAM_Plot_class:
                 plt.figure(int(self.var_figure.get()))
             except ValueError:
                 plt.figure(int(self.var_figure.get()),figsize=self.figsize)
-                plt.plotID_list[int(self.var_figure.get())] = None
+                self.plotID_list[int(self.var_figure.get())] = None
                 self.legend_list[int(self.var_figure.get())] = []
-        #     figure_list_int = []
-        #     for i in range(1,len(self.figure_list)):
-        #         figure_list_int.append(int(self.figure_list[i]))
-        #     temp = [(v,i) for i,v in enumerate(figure_list_int)]
-        #     temp.sort
-        #     ind,figure_list_ind = zip(*temp)
-        #     plotID_tmp = self.plotID_list[1:]
-        #     self.figure_list = [self.figure_list[0]]
-        #     self.plotID_list = [self.plotID_list[0]]
-        #     for i in figure_list_int:
-        #         self.figure_list.append(str(i))
-        #         self.plotID_list.append([plotID_tmp[ind[i]]])
         menu = self.figure_select_widg['menu']
         menu.delete("0",tk.END)
         for i,item in enumerate(self.figure_list):
@@ -232,12 +382,46 @@ class APDCAM_Plot_class:
         self.act_plotID = self.plotID_list[plt.gcf().number]
             
     def plot_type_select(self,event):
+        """
+        Raw data plot type select. Does nothing
+
+        Parameters
+        ----------
+        event : n.a.
+            Not used, required by tk.
+
+        Returns
+        -------
+        None.
+
+        """
         pass  
 
     def splot_type_select(self,event):
+        """
+        Spectrum plot type select. Does nothing
+
+        Parameters
+        ----------
+        event : n.a.
+            Not used, required by tk.
+
+        Returns
+        -------
+        None.
+
+        """
         pass  
 
     def raw_options_allpoints_func(self):
+        """
+        Callback function for raw plot allpoints radiobutton.
+
+        Returns
+        -------
+        None.
+
+        """
         if (not self.rawplot_options_allpoints):
             self.var_rawplot_options_allpoints.set(1)
             self.rawplot_options_allpoints = True
@@ -246,6 +430,14 @@ class APDCAM_Plot_class:
             self.rawplot_options_allpoints = False
           
     def spectrplot_options_allpoints_func(self):
+        """
+        Callback function for spectrum plot allpoints radiobutton.
+
+        Returns
+        -------
+        None.
+
+        """
         if (not self.spectrplot_options_allpoints):
             self.var_spectrplot_options_allpoints.set(1)
             self.spectrplot_options_allpoints = True
@@ -253,7 +445,63 @@ class APDCAM_Plot_class:
             self.var_spectrplot_options_allpoints.set(0)
             self.spectrplot_options_allpoints = False
 
+    def spectrplot_options_logfres_func(self):
+        """
+        Callback function for sectrum plot logarithmic fres radiobutton.
+
+        Returns
+        -------
+        None.
+
+        """
+        if (not self.spectrplot_options_logfres):
+            self.var_spectrplot_options_logfres.set(1)
+            self.spectrplot_options_logfres = True
+        else:
+            self.var_spectrplot_options_logfres.set(0)
+            self.spectrplot_options_logfres = False
+            
+    def spectrplot_options_logx_func(self):
+        """
+        Callback function for spectrum plot log x radiobutton.
+
+        Returns
+        -------
+        None.
+
+        """
+        if (not self.spectrplot_options_logx):
+            self.var_spectrplot_options_logx.set(1)
+            self.spectrplot_options_logx = True
+        else:
+            self.var_spectrplot_options_logx.set(0)
+            self.spectrplot_options_logx = False
+
+    def spectrplot_options_logy_func(self):
+        """
+        Callback function for spectrum plot log y radiobutton.
+
+        Returns
+        -------
+        None.
+
+        """
+        if (not self.spectrplot_options_logy):
+            self.var_spectrplot_options_logy.set(1)
+            self.spectrplot_options_logy = True
+        else:
+            self.var_spectrplot_options_logy.set(0)
+            self.spectrplot_options_logy = False
+            
     def raw_options_autoscale_func(self):        
+        """
+        Callback function for raw signal plot autoscale radiobutton.
+
+        Returns
+        -------
+        None.
+
+        """
         if (not self.rawplot_options_autoscale):
             self.var_rawplot_options_autoscale.set(1)
             self.rawplot_options_autoscale = True
@@ -266,6 +514,14 @@ class APDCAM_Plot_class:
             self.rawplot_yscale2_widg['state'] = tk.NORMAL           
 
     def spectrplot_options_autoscale_func(self):        
+        """
+        Callback function for spectrum plot power autoscale radiobutton.
+
+        Returns
+        -------
+        None.
+
+        """
         if (not self.spectrplot_options_autoscale):
             self.var_spectrplot_options_autoscale.set(1)
             self.spectrplot_options_autoscale = True
@@ -279,6 +535,14 @@ class APDCAM_Plot_class:
 
 
     def rawplot(self):
+        """
+        Callback function for raw signal plots.
+
+        Returns
+        -------
+        None.
+
+        """
         if (self.data is None):
             self.add_message("Cannot plot, load data first.")  
             return
@@ -286,6 +550,8 @@ class APDCAM_Plot_class:
         plot_type = self.plot_type.get()
         options = {}
         options['All points'] = self.rawplot_options_allpoints
+        options['Log x'] = False
+        options['Log y'] = False        
         if (plot_type == 'xy'):
             if (self.data.data.ndim != 1):
                 self.add_message("'xy plot' is applicable only for a single channel like APD-2-3.")  
@@ -348,16 +614,65 @@ class APDCAM_Plot_class:
         self.add_message("Plot done for {:s}.".format(self.data.data_title))  
 
     def spectrplot(self):
+        """
+        Callback function for spectrum plots.
+
+        Returns
+        -------
+        None.
+
+        """
         if (self.data is None):
             self.add_message("Cannot plot, load data first.")  
             return
-        self.figure_select(None)
         plot_type = self.splot_type.get()
+        if (plot_type == 'xy'):
+            if (self.data.data.ndim != 1):
+                self.add_message("'xy plot' is applicable only for a single channel like APD-2-3.")  
+                return
+        elif (plot_type == 'grid xy'):
+            if (self.data.data.ndim != 3):
+                self.add_message("'grid xy' plot is applicable only for a 2D channel matrix.")  
+                return
+        elif (plot_type == 'image'):
+            if (self.data.data.ndim != 3):
+                self.add_message("'image' plot is applicable only for a 2D channel matrix.")  
+                return
+        elif (plot_type == 'anim-image'):
+            if (self.data.data.ndim != 3):
+                self.add_message("'anim-image' plot is applicable only for a 2D channel matrix.")  
+                return
+        else:
+            self.add_message("'{:s}' plot not implemented yet.".format(plot_type)) 
+            return
+
+        self.figure_select(None)
+        
         options = {}
         options['All points'] = self.spectrplot_options_allpoints
+        options['Log x'] = self.spectrplot_options_logx
+        options['Log y'] = self.spectrplot_options_logy
+        power_options = {}
+        try:
+            power_options['Resolution'] = float(self.var_spectrplot_options_fres.get())
+        except ValueError:
+            self.add_message("Invalid frequency resolution.")  
+            return
+        try:
+            f1 = float(self.var_spectrplot_options_frange1.get())
+            f2 = float(self.var_spectrplot_options_frange2.get())
+            power_options['Range'] = [f1,f2]
+        except ValueError:
+            self.add_message("Invalid frequency range.")  
+            return
+        power_options['Logarithmic'] = self.spectrplot_options_logfres
         self.add_message("Calculating spectra...")
         root.update()
-        psdata = self.data.apsd(coordinate='Time')
+        try:
+            psdata = self.data.apsd(coordinate='Time',options=power_options)
+        except Exception as e:
+            self.add_message("Error in spectrum calculation:{:s}".format(str(e)))  
+            return
         self.add_message("   ...done") 
         root.update()
         plotrange = [float(self.var_spectrplot_options_yrange1.get()),float(self.var_spectrplot_options_yrange2.get())]
@@ -427,6 +742,14 @@ class APDCAM_Plot_class:
         self.add_message("Plot done for {:s}.".format(self.data.data_title))  
     
     def getdata(self):
+        """
+        Callback function for get data.
+
+        Returns
+        -------
+        None.
+
+        """
         if (len(self.var_shotID.get() )== 0):
             self.add_message("No Measurement ID (directory name) is set.")
             return
@@ -459,6 +782,19 @@ class APDCAM_Plot_class:
         root.destroy()
         
     def add_message(self,txt):
+        """
+        Function to add a message to the message area.
+
+        Parameters
+        ----------
+        txt : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         self.message_widg.insert(tk.END,"\n"+txt)
         self.message_widg.see(tk.END)
         
@@ -468,13 +804,16 @@ def plot_gui():
      
     global root
     root = tk.Tk()
-    print("Creating plot GUI")
-    pgui = APDCAM_Plot_class()
+    print("Creating flap_apdcam plot GUI")
+    pgui = APDCAM_Plot_class(root=root)
     GUI_frame_widg = tk.Frame(root)
     GUI_frame_widg.grid()
     GUI_exit_widg = tk.Button(GUI_frame_widg,text='EXIT',command=pgui.plot_gui_exit)
     GUI_exit_widg.grid(row=0,column=0,sticky='e')
     w = tk.Frame(GUI_frame_widg)
     w.grid(row=1,column=0)
+    root.title(string='flap_apdcam plot graphical interface')
+    thisdir = os.path.dirname(os.path.realpath(__file__))
+    root.iconbitmap(os.path.join(thisdir,'flap_apdcam_icon.ico'))
     pgui.create_widgets(parent=w)
     GUI_frame_widg.mainloop()

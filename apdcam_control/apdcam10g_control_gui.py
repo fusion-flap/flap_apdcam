@@ -532,10 +532,10 @@ class GUI_shotControl_class :
                 
         # Here all data are on the disk or error happened
         # moving data to datapath
-        shotdir = os.path.joint(self.GUI_status.config.datapath,shotID)
+        shotdir = os.path.join(self.GUI_status.config.datapath,shotID)
         self.add_message("Copying data to "+shotdir)
         cmd = "mkdir "+shotdir+" ; cp data/Channel*.dat data/APDCAM_config.xml data/apd_python_meas.cmd "\
-            +"data/APDTest.out "+shotdir+"/"
+            +"data/APDTest_10G.out "+shotdir+"/"
         d=subprocess.run([cmd],check=False,shell=True,stdout=subprocess.PIPE)
         self.add_message("Data copy finished.")
 
@@ -618,7 +618,7 @@ class APDCAM10G_GUI_class:
         self.APDCAM_samplerates = []
         self.APDCAM_samplerate_names = []
         self.var_clocksource = tk.StringVar()
-        self.var_offset = tk.IntVar()
+        self.var_offset = tk.StringVar()
         self.var_callight = tk.IntVar()
         
         
@@ -836,7 +836,13 @@ class APDCAM10G_GUI_class:
             self.GUI_status.GUI.add_message("Error reading offsets: {:s}".format(err))
         else:
             # Assuming all offsets are the same, using the first one
-            self.var_offset = d[0]
+            self.var_offset.set(str(d[0]))
+        err,d = self.GUI_status.APDCAM_reg.getCallight()
+        if (err != ""):
+            self.GUI_status.GUI.add_message("Error reading calibration light: {:s}".format(err))
+        else:
+            self.var_callight.set(d)
+        
         
     def commErrorResponse(self,err):
         if (err != ""):
@@ -849,11 +855,11 @@ class APDCAM10G_GUI_class:
     def set_offset(self,event):
         if (self.GUI_status.APDCAM_connected):
             self.GUI_status.APDCAM_reg.setOffsets([int(self.var_offset.get())]*128)
-        print()
     
     def callight_change(self,value):
         if (self.GUI_status.APDCAM_connected):
-            self.GUI_status.APDCAM_reg.setCallight(int(self.var_offset.get()))
+            print(self.var_callight.get())
+            self.GUI_status.APDCAM_reg.setCallight(self.var_callight.get())
         
     def clocksource_change(self,value):
         if (self.GUI_status.APDCAM_connected):
@@ -1031,7 +1037,10 @@ def gui():
     app = APDCAM_GUI_class(master=root)
     root.title(string='APDCAM graphical interface')
     thisdir = os.path.dirname(os.path.realpath(__file__))
-    root.iconbitmap(os.path.join(thisdir,'flap_apdcam_icon.ico'))
+    if (os.name == 'nt'):
+        root.iconbitmap(os.path.join(thisdir,'flap_apdcam_icon.ico'))
+    else:
+        root.iconphoto(True, tk.PhotoImage(os.path.join(thisdir,'flap_apdcam_icon.gif')))
     app.mainloop()
     
 #apdcam10g_control_gui()

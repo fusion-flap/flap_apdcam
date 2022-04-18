@@ -1,0 +1,405 @@
+#ifndef __ADCREGS_H__
+
+#define __ADCREGS_H__
+
+
+#define ADC_BOARD_VERSION 1
+
+// ADC Board Register Table
+// <Register_Name> <Type>
+// <Type>
+//  R    - Read Only
+//  W    - Write Only
+//  R/W  - Read and write
+//  R/PW - Read and protected write
+
+// BOARDVER R
+#define ADC_REG_BOARD_VERSION     0x00
+#define ADC_REG_BOARD_VERSION_LEN 0x01
+
+// VERSION R
+#define ADC_REG_MC_VERSION     0x01
+#define ADC_REG_MC_VERSION_LEN 0x02
+
+// SERIAL R/PW
+#define ADC_REG_SERIAL     0x03
+#define ADC_REG_SERIAL_LEN 0x02
+
+// XCVERSION R
+#define ADC_REG_FPGA_VERSION     0x05
+#define ADC_REG_FPGA_VERSION_LEN 0x02
+
+// INSPACKETCNT R
+#define ADC_REG_PDI_INS_PACKET_CNT     0x07
+#define ADC_REG_PDI_INS_PACKET_CNT_LEN 0x01
+
+// STATUS1 R
+#define ADC_REG_STATUS1     0x08
+#define ADC_REG_STATUS1_LEN 0x01
+
+// STATUS2 R
+#define ADC_REG_STATUS2     0x09
+#define ADC_REG_STATUS2_LEN 0x01
+
+// TEMPERATURE R
+#define ADC_REG_BOARD_TEMP     0x0A
+#define ADC_REG_BOARD_TEMP_LEN 0x01
+
+// CONTROL R/W
+#define ADC_REG_CONTROL     0x0B
+#define ADC_REG_CONTROL_LEN 0x01
+
+// DSLVCLKMUL R/W
+#define ADC_REG_DSLVCLKMUL     0x0C
+#define ADC_REG_DSLVCLKMUL_LEN 0x01
+
+// DSLVCLKDIV R/W
+#define ADC_REG_DSLVCLKDIV     0x0D
+#define ADC_REG_DSLVCLKDIV_LEN 0x01
+
+//DVDD and AVDD voltages in mV
+// DVDD33 R
+#define ADC_REG_DVDD33     0x0E
+#define ADC_REG_DVDD33_LEN 0x02
+
+// DVDD25 R
+#define ADC_REG_DVDD25     0x10
+#define ADC_REG_DVDD25_LEN 0x02
+
+// AVDD33 R
+#define ADC_REG_AVDD33     0x12
+#define ADC_REG_AVDD33_LEN 0x02
+
+// AVDD18 R
+#define ADC_REG_AVDD18     0x14
+#define ADC_REG_AVDD18_LEN 0x02
+
+// Enables/disables all channel1
+// CHENABLE1 R/W
+#define ADC_REG_CHENABLE1     0x16
+#define ADC_REG_CHENABLE1_LEN 0x01
+
+// Enables/disables all channel2
+// CHENABLE2 R/W
+#define ADC_REG_CHENABLE2     0x17
+#define ADC_REG_CHENABLE2_LEN 0x01
+
+// Enables/disables all channel3
+// CHENABLE3 R/W
+#define ADC_REG_CHENABLE3     0x18
+#define ADC_REG_CHENABLE3_LEN 0x01
+
+// Enables/disables all channel4
+// CHENABLE4 R/W
+#define ADC_REG_CHENABLE4     0x19
+#define ADC_REG_CHENABLE4_LEN 0x01
+
+// Enables/disables all channels
+#define ADC_REG_CHENABLE_ALL     0x16
+#define ADC_REG_CHENABLE_ALL_LEN 0x04
+#define ADC_REG_CHENABLE     ADC_REG_CHENABLE_ALL
+#define ADC_REG_CHENABLE_LEN ADC_REG_CHENABLE_ALL_LEN
+
+// Set internal ring buffer size
+// RINGBUFSIZE R/W
+#define ADC_REG_RINGBUFSIZE     0x1A
+#define ADC_REG_RINGBUFSIZE_LEN 0x02
+
+// Set/Get bit resolution
+// RESOLUTION R/W
+#define ADC_REG_RESOLUTION     0x1C
+#define ADC_REG_RESOLUTION_LEN 0x01
+
+// BPSCH1 R
+#define ADC_REG_BPS_CH1     0x1D
+#define ADC_REG_BPS_CH1_LEN 0x01
+
+// BPSCH2 R
+#define ADC_REG_BPS_CH2     0x1E
+#define ADC_REG_BPS_CH2_LEN 0x01
+
+// BPSCH3 R
+#define ADC_REG_BPS_CH3     0x1F
+#define ADC_REG_BPS_CH3_LEN 0x01
+
+// BPSCH4 R
+#define ADC_REG_BPS_CH4     0x20
+#define ADC_REG_BPS_CH4_LEN 0x01
+
+#define ADC_REG_BYTES_PER_SAMPLE     0x1D
+#define ADC_REG_BYTES_PER_SAMPLE_LEN 0x04
+
+
+// SATAWORDS R
+#define ADC_REG_SATAWORDS     0x21
+#define ADC_REG_SATAWORDS_LEN 0x01
+
+// R/W
+#define ADC_REG_22     0x22
+#define ADC_REG_22_LEN 0x01
+// R
+#define ADC_REG_23     0x23
+#define ADC_REG_23_LEN 0x01
+
+// Factory reset
+// RESETFACTORY W
+#define ADC_REG_FACTORY_RESET     0x25
+#define ADC_REG_FACTORY_RESET_LEN 0x01
+
+// FACTORYWRITE R/W
+#define ADC_REG_FACTORY_WRITE     0x26
+#define ADC_REG_FACTORY_WRITE_LEN 0x02
+
+// AD1TEST R/W
+#define ADC_REG_AD1TEST     0x28
+#define ADC_REG_AD1TEST_LEN 0x01
+
+// AD2TEST R/W
+#define ADC_REG_AD2TEST     0x29
+#define ADC_REG_AD2TEST_LEN 0x01
+
+// AD3TEST R/W
+#define ADC_REG_AD3TEST     0x2A
+#define ADC_REG_AD3TEST_LEN 0x01
+
+// AD4TEST R/W
+#define ADC_REG_AD4TEST     0x2B
+#define ADC_REG_AD4TEST_LEN 0x01
+
+// ADC test mode
+#define ADC_REG_TEST_MODE     0x28
+#define ADC_REG_TEST_MODE_LEN 0x04
+
+// R/W
+#define ADC_REG_2C     0x2C
+#define ADC_REG_2C_LEN 0x01
+
+// R/W
+#define ADC_REG_2E     0x2E
+#define ADC_REG_2E_LEN 0x01
+
+// R/W
+#define ADC_REG_2F     0x2F
+#define ADC_REG_2F_LEN 0x01
+
+// ANALOGOUT11 R/W
+#define ADC_REG_AD1_AO1     0x30
+#define ADC_REG_AD1_AO1_LEN 0x02
+
+#define ADC_REG_AD1_AO     0x30
+#define ADC_REG_AD1_AO_LEN 0x10
+
+// ANALOGOUT21 R/W
+#define ADC_REG_AD2_AO1     0x40
+#define ADC_REG_AD2_AO1_LEN 0x02
+
+#define ADC_REG_AD2_AO     0x40
+#define ADC_REG_AD2_AO_LEN 0x10
+
+// ANALOGOUT31 R/W
+#define ADC_REG_AD3_AO1     0x50
+#define ADC_REG_AD3_AO1_LEN 0x02
+
+#define ADC_REG_AD3_AO     0x50
+#define ADC_REG_AD3_AO_LEN 0x10
+
+// ANALOGOUT41 R/W
+#define ADC_REG_AD4_AO1     0x60
+#define ADC_REG_AD4_AO1_LEN 0x02
+
+#define ADC_REG_AD4_AO     0x60
+#define ADC_REG_AD4_AO_LEN 0x10
+
+#define ADC_REG_AD_AO     0x30
+#define ADC_REG_AD_AO_LEN 0x40
+#define ADC_REG_OFFSET     ADC_REG_AD_AO
+#define ADC_REG_OFFSET_LEN ADC_REG_AD_AO_LEN
+
+
+// MAXVAL11 R/W
+
+#define ADC_REG_INT_TRIG     0x70
+#define ADC_REG_INT_TRIG_LEN 0x40
+// Inernal trigger levels
+#define ADC_REG_INT_TRG_LEVEL     ADC_REG_INT_TRIG
+#define ADC_REG_INT_TRG_LEVEL_LEN ADC_REG_INT_TRIG_LEN
+
+#if 0
+// Acquired samples per channel
+#define ADC_REG_AQRD_SAMPLE 0xB0
+#define ADC_REG_AQRD_SAMPLE_LEN 0x10
+#endif
+
+// R
+#define ADC_REG_B0     0xB0
+#define ADC_REG_B0_LEN 0x04
+
+// R
+#define ADC_REG_B4     0xB4
+#define ADC_REG_B4_LEN 0x04
+
+// R
+#define ADC_REG_B8     0xB8
+#define ADC_REG_B8_LEN 0x04
+
+// R
+#define ADC_REG_BC     0xBC
+#define ADC_REG_BC_LEN 0x04
+
+// Overload level
+// OVDLEVEL R/W
+#define ADC_REG_OVERLOAD_LEVEL     0xC0
+#define ADC_REG_OVERLOAD_LEVEL_LEN 0x02
+
+// Overload status
+// OVDSTATUS R/W
+#define ADC_REG_OVERLOAD_STATUS     0xC2
+#define ADC_REG_OVERLOAD_STATUS_LEN 0x01
+
+// Overload time
+// OVDTIME R/W
+#define ADC_REG_OVERLOAD_TIME     0xC3
+#define ADC_REG_OVERLOAD_TIME_LEN 0x02
+
+#if 0
+// Trigger delay
+#define ADC_REG_TRIGGER_DELAY     0xC5
+#define ADC_REG_TRIGGER_DELAY_LEN 0x04
+#endif
+
+// R/W
+#define ADC_REG_C5     0xC5
+#define ADC_REG_C5_LEN 0x04
+
+// R
+#define ADC_REG_C9     0xC9
+#define ADC_REG_C9_LEN 0x07
+
+// COEFF_01 R/W
+#define ADC_REG_FILTER_COEFF_01     0xD0
+#define ADC_REG_FILTER_COEFF_01_LEN 0x02
+
+// COEFF_02 R/W
+#define ADC_REG_FILTER_COEFF_02     0xD2
+#define ADC_REG_FILTER_COEFF_02_LEN 0x02
+
+// COEFF_03 R/W
+#define ADC_REG_FILTER_COEFF_03     0xD4
+#define ADC_REG_FILTER_COEFF_03_LEN 0x02
+
+// COEFF_04 R/W
+#define ADC_REG_FILTER_COEFF_04     0xD6
+#define ADC_REG_FILTER_COEFF_04_LEN 0x02
+
+// COEFF_05 R/W
+#define ADC_REG_FILTER_COEFF_05     0xD8
+#define ADC_REG_FILTER_COEFF_05_LEN 0x02
+
+// COEFF_06 R/W
+#define ADC_REG_FILTER_COEFF_06     0xDA
+#define ADC_REG_FILTER_COEFF_06_LEN 0x02
+
+// COEFF_07 R/W
+#define ADC_REG_FILTER_COEFF_07     0xDC
+#define ADC_REG_FILTER_COEFF_07_LEN 0x02
+
+// COEFF_08/FILTER_DIV R/W
+#define ADC_REG_FILTER_COEFF_08     0xDE
+#define ADC_REG_FILTER_COEFF_08_LEN 0x02
+
+// Filter coefficients
+#define ADC_REG_FILTER_COEFF     0xD0
+#define ADC_REG_FILTER_COEFF_LEN 0x10
+
+// R
+#define ADC_REG_E0     0xE0
+#define ADC_REG_E0_LEN 0x0F
+
+// FACTCALTABLE R/PW
+#define ADC_REG_CALIBRATION_TABLE     0x100
+#define ADC_REG_CALIBRATION_TABLE_LEN 0x100
+
+
+#if 0
+//ADC1 old regs, moved to C&C
+// ADC_PLL_MULT
+#define ADC_REG_ADCCLKMUL 0x0C
+#define ADC_REG_ADCCLKMUL_LEN 0x01
+
+// ADC_PLL_DIV
+#define ADC_REG_ADCCLKDIV 0x0D
+#define ADC_REG_ADCCLKDIV_LEN 0x01
+
+// STREAM_PLL_MULT
+#define ADC_REG_STREAMCLKMUL 0x0E
+#define ADC_REG_STREAMCLKMUL_LEN 0x01
+
+// STREAM_PLL_DIV
+#define ADC_REG_STREAMCLKDIV 0x0F
+#define ADC_REG_STREAMCLKDIV_LEN 0x01
+
+// STREAM:CTRL
+#define ADC_REG_STREAMCONTROL 0x10
+#define ADC_REG_STREAMCONTROL_LEN 0x01
+
+//
+#define ADC_REG_SAMPLECNT 0x11
+#define ADC_REG_SAMPLECNT_LEN 0x04
+
+// SampleDiv_x_7
+#define ADC_REG_ADSAMPLEDIV 0x1C
+#define ADC_REG_ADSAMPLEDIV_LEN 0x02
+
+// Trigger
+#define ADC_REG_TRIGGER 0x1E
+#define ADC_REG_TRIGGER_LEN 0x01
+
+//  ADC_REG_EXTCLKMUL
+#define ADC_REG_EXTCLKMUL 0x2E
+#define ADC_REG_EXTCLKMUL_LEN 0x01
+
+//  ADC_REG_EXTCLKDIV
+#define ADC_REG_EXTCLKDIV 0x2F
+#define ADC_REG_EXTCLKDIV_LEN 0x01
+
+
+// Acquired samples per channel
+#define ADC_REG_AQRD_SAMPLE 0xB0
+#define ADC_REG_AQRD_SAMPLE_LEN 0x10
+
+// Trigger delay
+#define ADC_REG_TRIGGER_DELAY 0xC5
+#define ADC_REG_TRIGGER_DELAY_LEN 0x04
+
+/* ****** ADV Calibration table ****** */
+#define ADC_REG_CALIBRATION_TABLE 0x100
+#define ADC_REG_CALIBRATION_TABLE_LEN 0xA2
+
+// SerialNo
+#define ADC_REG_SERIALNO 0x100
+#define ADC_REG_SERIALNO_LEN 0x06
+// INT16 adcLowerLimit
+#define ADC_REG_LOWER_LIMIT 0x106
+#define ADC_REG_LOWER_LIMIT_LEN 0x02
+// INT16 adcUpperLimit
+#define ADC_REG_UPPER_LIMIT 0x108
+#define ADC_REG_UPPER_LIMIT_LEN 0x02
+// float voltageCalibration[4]
+#define ADC_REG_VOLTAGE_CALIBRATION 0x10A
+#define ADC_REG_VOLTAGE_CALIBRATION_LEN 0x10
+// INT16 adcOffset[8] in 0.1 mV
+#define ADC_REG_ADC_OFFSET_01MV 0x11A
+#define ADC_REG_ADC_OFFSET_01MV_LEN 0x40
+// INT16 dacOffset[8] in 0.1 mV
+#define ADC_REG_DAC_OFFSET_01MV 0x15A
+#define ADC_REG_DAC_OFFSET_01MV_LEN 0x40
+// float dacConversion[2]
+#define ADC_REG_DAC_CONVERSION 0x19A
+#define ADC_REG_DAC_CONVERSION_LEN 0x08
+// INT16 adcOffset[8]
+#define ADC_REG_ADC_OFFSET 0x1A2
+#define ADC_REG_ADC_OFFSET_LEN 0x40
+
+#endif
+
+#endif  /* __ADCREGS_H__ */

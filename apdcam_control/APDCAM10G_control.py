@@ -10,6 +10,7 @@ import copy
 import subprocess
 import xml.etree.ElementTree as ET
 import socket
+import os
 
 #from .apdcamXml import *
 
@@ -1235,10 +1236,9 @@ class APDCAM10G_regCom:
         """
         
         ip = self.getIP()
-        net = ip.split(b'.')
-        net = net[0]+b'.'+net[1]+b'.'+net[2]+b'.'
-        cmd = b"ip -f inet address show | grep "+net
-        cmd = cmd.decode('ascii')
+        net = ip.split('.')
+        net = net[0]+'.'+net[1]+'.'+net[2]+'.'
+        cmd = "ip -f inet address show | grep "+net
         d=subprocess.run([cmd],check=False,shell=True,stdout=subprocess.PIPE)
         if (len(d.stdout) == 0):
             return "Cannot find interface for APDCAM. Is the camera on?"
@@ -1439,28 +1439,36 @@ class APDCAM10G_regCom:
             err,offsets = self.readPDI(self.status.ADC_address[i_adc],self.codes_ADC.ADC_REG_DAC1,numberOfBytes=64,arrayData=True)
             if (err != ""):
                 return "Error in setOffsets, ADC {:d}: {:s}".format(i_adc+1,err),None
+            offsets = offsets[0]
             for i in range(32):
                 dac_addr = adcmap[i]-1
-                data.append(int.from_bytes(offsets[dac_addr * 2:dac_addr * 2 + 2]), 'little')
+                data.append(int.from_bytes(offsets[dac_addr * 2:dac_addr * 2 + 2], 'little'))
         return "",data
     
     def setCallight(self,value):
         """ Set the calibration light.
         """    
         err = self.writePDI(self.codes_PC.PC_CARD,self.codes_PC.PC_REG_CALLIGHT,value,numberOfBytes=2,arrayData=False)
-        return err        
+        return err  
+
+    def getCallight(self):
+        """ Get the current calibration  light setting.
+        Returns error text and number
+        """
+        err, d = self.readPDI(self.codes_PC.PC_CARD,self.codes_PC.PC_REG_CALLIGHT,numberOfBytes=2,arrayData=False)
+        return err,d[0]
         
     def measure(self,numberOfSamples=100000, channelMasks=[0xffffffff,0xffffffff, 0xffffffff, 0xffffffff], \
                 sampleDiv=None, datapath="data", bits=None, waitForResult=True, externalTriggerPolarity=None,\
                 internalTrigger=False, triggerDelay = 0):
-        """ This method measures by calling APDTest it will be replaced by another method in the
+        """ This method measures by calling APDTest_10G. It will be replaced by another method in the
         APDCAM_data class as soon as Python measures fast.
         externalTriggerPolarity: None: no external trigger
                                     0: Positive edge
                                     1: Negative edge
         internalTrigger: True enables
         triggerDelay:  Trigger with this delay [microsec]
-        waitForResult: <=0 : Do not wait for APDTest to stop
+        waitForResult: <=0 : Do not wait for APDTest_10G to stop
                         > 0 : Wait this much seconds
                         
         Returns, error, warning
@@ -1546,7 +1554,7 @@ class APDCAM10G_regCom:
         except:
             return "Error opening file "+cmdfile,""
         
-        ip = self.getIP().decode('ascii')
+        ip = self.getIP()
         interface = self.interface.decode('ascii')
         chnum = 0
         for i in range(n_adc):
@@ -1587,21 +1595,18 @@ class APDCAM10G_regCom:
         self.measurePara.triggerDelay = triggerDelay
         
         time.sleep(1)
-        cmd = "killall -KILL APDTest 2> /dev/null ; cd "+datapath+" ; rm Channel*.dat 2> /dev/null ; APDTest "+cmdfile_name+" >APDTest.out 2>&1 &"
-        #time.sleep(1)
-        #cmd = "cd "+datapath+" ; rm Channel*.dat 2> /dev/null ; APDTest "+cmdfile_name+" &"
-#       print(cmd)
+        thisdir = os.path.dirname(os.path.realpath(__file__))
+        apdtest_prog = 'APDTest_10G'
+        apdtest = os.path.join(thisdir,'APDTest_10G','APDTest_10G')
+        cmd = "killall -KILL "+apdtest_prog+" 2> /dev/null ; cd "+datapath+" ; rm Channel*.dat 2> /dev/null ; "+apdtest+" "+cmdfile_name+" >APDTest_10G.out 2>&1 &"
         d = subprocess.run([cmd],check=False,shell=True)
-        #d=subprocess.run([cmd],check=False,shell=True,stdout=subprocess.PIPE)
-        #print(d.stdout)
-    
         sleeptime = 0.1
         maxcount = int(10/sleeptime)+1
         err = ""
         started = False
         for i in range(maxcount):
             try:
-                f = open(datapath+"/"+"APDTest.out","rt")
+                f = open(datapath+"/"+"APDTest_10G.out","rt")
             except:
                 time.sleep(sleeptime)
                 continue
@@ -1628,23 +1633,23 @@ class APDCAM10G_regCom:
         return err,warning
    
     def measurementStatus(self,datapath="data"):
-        """ Check whether the APDTest program is still running.
+        """ Check whether the APDTest_10G program is still running.
             Returns error,status,warning
             status is "Finished" or "Running"
         """
         
         err = ""
         warning = ""
-        cmd =  "ps ax |grep APDTest | grep -v grep"
+        cmd =  "ps ax |grep APDTest_10G | grep -v grep"
         d=subprocess.run([cmd],check=False,shell=True,stdout=subprocess.PIPE)
         if (len(d.stdout) == 0):
-            # APDTest is not running
+            # APDTest_10G is not running
             run_stat = "Finished"
         else:
             run_stat = "Running"
         # Reading the output
         try:
-            f = open(datapath+"/"+"APDTest.out","rt")
+            f = open(datapath+"/"+"APDTest_10G.out","rt")
         except:
             err = "Measurement did not start."
             return err,run_stat,warning
@@ -1675,7 +1680,7 @@ class APDCAM10G_regCom:
         return "Timeout",""
             
     def abortMeasurement(self):
-        cmd = "killall APDTest"
+        cmd = "killall APDTest_10G"
         d = subprocess.run([cmd],check=False,shell=True)
 
         

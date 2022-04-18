@@ -1,0 +1,1242 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stddef.h>
+#include "InternalFunctions.h"
+#include "LowlevelFunctions.h"
+#include "helper.h"
+#include "GECCommands.h"
+#include "ADCRegs.h"
+#include "CCRegs.h"
+#include "PCRegs.h"
+
+//#define ENABLE_CALTABLE
+
+#define MIN_ADC_ADDRESS   8
+#define MAX_ADC_ADDRESS  15
+
+
+bool EnumerateADCBoards(CAPDClient *client, ApdCam10G_t *device)
+{
+	if (client == NULL || device == NULL)
+		return false;
+
+	bool retVal = true;
+	device->numADCBoards = 0;
+	for (int addr = MIN_ADC_ADDRESS; addr <= MAX_ADC_ADDRESS && device->numADCBoards < APD_MAX_ADC_NUM; ++addr)
+	{
+		uint8_t boardVersion;
+		if (GetADCBoardVersion(client, addr, &boardVersion) == false)
+		{
+			retVal = false;
+			continue;
+		}
+
+		if (boardVersion != ADC_BOARD_VERSION)
+			continue;
+
+		uint16_t serialNo;
+		if (GetADCSerial(client, addr, &serialNo) == false)
+		{
+			retVal = false;
+			continue;
+		}
+
+		device->ADC[device->numADCBoards].boardAddress = addr;
+		device->ADC[device->numADCBoards].boardVersion = boardVersion;
+		device->ADC[device->numADCBoards].boardSerial = serialNo;
+
+		++device->numADCBoards;
+	}
+
+	return retVal;
+}
+
+
+bool GetADCBoardVersion(CAPDClient *client, unsigned char address, unsigned char *boardVersion)
+{
+	if (ReadPDI(client, address, ADC_REG_BOARD_VERSION, boardVersion, ADC_REG_BOARD_VERSION_LEN) == false)
+		return false;
+
+	*boardVersion = (*boardVersion >> 5) & 0x07;
+
+	return true;
+}
+
+
+bool GetMCVersion(CAPDClient *client, unsigned char address, UINT16 *mcVersion)
+{
+	return ReadPDI(client, address, ADC_REG_MC_VERSION, (unsigned char*)mcVersion, ADC_REG_MC_VERSION_LEN);
+}
+
+
+bool GetADCSerial(CAPDClient *client, unsigned char address, UINT16 *serial)
+{
+	return ReadPDI(client, address, ADC_REG_SERIAL, (unsigned char*)serial, ADC_REG_SERIAL_LEN);
+}
+
+
+bool GetFPGAVersion(CAPDClient *client, unsigned char address, UINT16 *fpgaVersion)
+{
+	return ReadPDI(client, address, ADC_REG_FPGA_VERSION, (unsigned char*)fpgaVersion, ADC_REG_FPGA_VERSION_LEN);
+}
+
+
+bool GetSampleCount(CAPDClient *client, uint8_t streamNum, uint64_t *sampleCount)
+{
+	if (streamNum < 1 || streamNum > 4)
+		return false;
+
+	uint8_t sCounts[CC_REG_VAR_SAMPLE_COUNTER_LEN];
+
+	if (GetCCReg(client, CC_VARIABLES_TABLE, sCounts, CC_REG_VAR_SAMPLE_COUNTER, CC_REG_VAR_SAMPLE_COUNTER_LEN) == false)
+		return false;
+
+	--streamNum;
+	uint8_t msb_sc[8] = {0};
+	memcpy(msb_sc + 2, sCounts + streamNum * CC_REG_VAR_SAMPLE_COUNTER_x_LEN, CC_REG_VAR_SAMPLE_COUNTER_x_LEN);
+	*sampleCount = MSB_TO_HOST_64(msb_sc, uint64_t);
+
+	return true;
+}
+
+
+bool GetSampleCounts(CAPDClient *client, uint64_t *sampleCounts)
+{
+	uint8_t sCounts[CC_REG_VAR_SAMPLE_COUNTER_LEN];
+
+	if (sampleCounts == NULL)
+		return false;
+
+	if (GetCCReg(client, CC_VARIABLES_TABLE, sCounts, CC_REG_VAR_SAMPLE_COUNTER, CC_REG_VAR_SAMPLE_COUNTER_LEN) == false)
+		return false;
+
+	for (int streamNum = 0; streamNum < 4; ++streamNum)
+	{
+		uint8_t msb_sc[8] = {0};
+		memcpy(msb_sc + 2, sCounts + streamNum * CC_REG_VAR_SAMPLE_COUNTER_x_LEN, CC_REG_VAR_SAMPLE_COUNTER_x_LEN);
+		sampleCounts[streamNum] = MSB_TO_HOST_64(msb_sc, uint64_t);
+	}
+
+	return true;
+}
+
+// done so far
+
+bool GetControl(CAPDClient *client, unsigned char address, unsigned char *control)
+{
+	return ReadPDI(client, address, ADC_REG_CONTROL, (unsigned char*)control, ADC_REG_CONTROL_LEN);
+}
+
+#if 0
+bool GetStatus1(CAPDClient *client, unsigned char address, unsigned char *status1)
+{
+	return ReadPDI(client, address, ADC_REG_STATUS1, (unsigned char*)status1, ADC_REG_STATUS1_LEN);
+}
+
+
+bool GetStatus2(CAPDClient *client, unsigned char address, unsigned char *status2)
+{
+	return ReadPDI(client, address, ADC_REG_STATUS2, (unsigned char*)status2, ADC_REG_STATUS2_LEN);
+}
+
+
+bool SetADCControl(CAPDClient *client, unsigned char address, unsigned char adcControl)
+{
+	bool retVal = WritePDI(client, address, ADC_REG_CONTROL, (unsigned char*)&adcControl, ADC_REG_CONTROL_LEN);
+	Sleep(20);
+	return retVal;
+}
+
+
+bool GetADCControl(CAPDClient *client, unsigned char address, unsigned char *adcControl)
+{
+	return ReadPDI(client, address, ADC_REG_CONTROL, (unsigned char*)adcControl, ADC_REG_CONTROL_LEN);
+}
+#endif
+
+
+/* Channel settings */
+// Set channel 1
+bool SetChannel_1(CAPDClient *client, unsigned char address, unsigned char channelMask_1)
+{
+	return WritePDI(client, address, ADC_REG_CHENABLE1, (unsigned char*)&channelMask_1, ADC_REG_CHENABLE1_LEN);
+}
+
+// Set channel 2
+bool SetChannel_2(CAPDClient *client, unsigned char address, unsigned char channelMask_2)
+{
+	return WritePDI(client, address, ADC_REG_CHENABLE2, (unsigned char*)&channelMask_2, ADC_REG_CHENABLE2_LEN);
+}
+
+// Set channel 3
+bool SetChannel_3(CAPDClient *client, unsigned char address, unsigned char channelMask_3)
+{
+	return WritePDI(client, address, ADC_REG_CHENABLE3, (unsigned char*)&channelMask_3, ADC_REG_CHENABLE3_LEN);
+}
+
+// Set channel 4
+bool SetChannel_4(CAPDClient *client, unsigned char address, unsigned char channelMask_4)
+{
+	return WritePDI(client, address, ADC_REG_CHENABLE4, (unsigned char*)&channelMask_4, ADC_REG_CHENABLE4_LEN);
+}
+
+
+// Set all channel
+bool SetChannels(CAPDClient *client, unsigned char address, unsigned char channelMask_1, unsigned char channelMask_2, unsigned char channelMask_3, unsigned char channelMask_4)
+{
+	unsigned char channelMaskArray[4];
+	channelMaskArray[0] = channelMask_1;
+	channelMaskArray[1] = channelMask_2;
+	channelMaskArray[2] = channelMask_3;
+	channelMaskArray[3] = channelMask_4;
+
+	return WritePDI(client, address, ADC_REG_CHENABLE, (unsigned char*)&channelMaskArray[0], ADC_REG_CHENABLE_LEN);
+}
+
+
+bool GetChannels(CAPDClient *client, unsigned char address, unsigned char *channelMask_1, unsigned char *channelMask_2, unsigned char *channelMask_3, unsigned char *channelMask_4)
+{
+	unsigned char channelMaskArray[4];
+
+	if (ReadPDI(client, address, ADC_REG_CHENABLE, (unsigned char*)&channelMaskArray[0], ADC_REG_CHENABLE_LEN))
+	{
+		*channelMask_1 = channelMaskArray[0];
+		*channelMask_2 = channelMaskArray[1];
+		*channelMask_3 = channelMaskArray[2];
+		*channelMask_4 = channelMaskArray[3];
+
+		return true;
+	}
+
+	return false;
+}
+
+
+// Sets hardware ringbuffer size
+bool SetRingbufferSize(CAPDClient *client, unsigned char address, UINT16 bufferSize)
+{
+	return WritePDI(client, address, ADC_REG_RINGBUFSIZE, (unsigned char*)&bufferSize, ADC_REG_RINGBUFSIZE_LEN);
+}
+
+
+// Returns hardware ringbuffer size
+bool GetRingbufferSize(CAPDClient *client, unsigned char address, UINT16 *bufferSize)
+{
+	return ReadPDI(client, address, ADC_REG_RINGBUFSIZE, (unsigned char*)bufferSize, ADC_REG_RINGBUFSIZE_LEN);
+}
+
+
+bool SetResolution(CAPDClient *client, unsigned char address, int bitNum)
+{
+	unsigned char resolution = 0;
+	switch (bitNum)
+	{
+		case  8: resolution = 2;
+			 break;
+		case 12: resolution = 1;
+			 break;
+		case 14: resolution = 0;
+			 break;
+		default: return false;
+	}
+
+	return WritePDI(client, address, ADC_REG_RESOLUTION, &resolution, ADC_REG_RESOLUTION_LEN);
+}
+
+
+bool GetResolution(CAPDClient *client, unsigned char address, int *bitNum)
+{
+	unsigned char resolution = 0;
+
+	if (ReadPDI(client, address, ADC_REG_RESOLUTION, &resolution, ADC_REG_RESOLUTION_LEN) == false)
+		return false;
+
+	switch (resolution)
+	{
+		case 0: *bitNum = 14;
+			break;
+		case 1: *bitNum = 12;
+			break;
+		case 2: *bitNum =  8;
+			break;
+		default: return false;
+	}
+
+	return true;
+}
+
+
+// ADC test mode
+bool SetTestMode(CAPDClient *client, UINT32 mode)
+{
+	bool retVal = WritePDI(client, 8, ADC_REG_TEST_MODE, (unsigned char*)&mode, ADC_REG_TEST_MODE_LEN);
+	retVal &= WritePDI(client, 9, ADC_REG_TEST_MODE, (unsigned char*)&mode, ADC_REG_TEST_MODE_LEN);
+	retVal &= WritePDI(client, 10, ADC_REG_TEST_MODE, (unsigned char*)&mode, ADC_REG_TEST_MODE_LEN);
+	retVal &= WritePDI(client, 11, ADC_REG_TEST_MODE, (unsigned char*)&mode, ADC_REG_TEST_MODE_LEN);
+	Sleep(20);
+	return retVal;
+}
+
+
+// Returns test mode settings
+bool GetTestMode(CAPDClient *client, UINT32 *mode)
+{
+	bool retVal = ReadPDI(client, ADC_BOARD, ADC_REG_TEST_MODE, (unsigned char*)mode, ADC_REG_TEST_MODE_LEN);
+	return retVal;
+}
+
+
+//
+bool FactoryReset(CAPDClient *client, unsigned char address)
+{
+	bool retVal = false;
+	unsigned char dummy;
+	retVal = WritePDI(client, address, ADC_REG_FACTORY_RESET, (unsigned char*)&dummy, ADC_REG_FACTORY_RESET_LEN);
+	Sleep(20);
+	return retVal;
+}
+
+bool GetBytesPerSample(CAPDClient *client, unsigned char address, unsigned int *counters)
+{
+	bool retVal = ReadPDI(client, address, ADC_REG_BYTES_PER_SAMPLE, (unsigned char*)counters, ADC_REG_BYTES_PER_SAMPLE_LEN);
+	return retVal;
+}
+
+
+// Offsets
+bool SetDACOffset(CAPDClient *client, INT16 *offsets, int first, int no)
+{
+	bool retVal = false;
+	if (first < 0 || 32 <= first) return retVal;
+	if (first + no >= 32) return retVal;
+	retVal = WritePDI(client, ADC_BOARD, ADC_REG_OFFSET + first*sizeof(INT16), (unsigned char*)&offsets, no*sizeof(INT16));
+	Sleep(20);
+	return retVal;
+}
+
+bool GetDACOffset(CAPDClient *client, INT16 *offsets, int first, int no)
+{
+	bool retVal = false;
+	if (first < 0 || 32 <= first) return retVal;
+	if (first + no >= 32) return retVal;
+	retVal = ReadPDI(client, ADC_BOARD, ADC_REG_OFFSET + first*sizeof(INT16), (unsigned char*)offsets, no*sizeof(INT16));
+	return retVal;
+}
+
+bool SetInternalTriggerLevels(CAPDClient *client, UINT16 *levels)
+{
+	bool retVal = true;
+	for (int i = 0; i < 8; i++)
+	{
+		retVal &= WritePDI(client, ADC_BOARD, ADC_REG_INT_TRG_LEVEL, (unsigned char*)(levels+4*i), ADC_REG_INT_TRG_LEVEL_LEN/8);
+		Sleep(20);
+	}
+	return retVal;
+}
+
+bool GetInternalTriggerLevels(CAPDClient *client, UINT16 *levels)
+{
+	bool retVal = ReadPDI(client, ADC_BOARD, ADC_REG_INT_TRG_LEVEL, (unsigned char*)levels, ADC_REG_INT_TRG_LEVEL_LEN);
+	return retVal;
+}
+
+
+// Overload level
+bool SetOverloadLevel(CAPDClient *client, unsigned char address, UINT16 level)
+{
+	bool retVal = WritePDI(client, address, ADC_REG_OVERLOAD_LEVEL, (unsigned char*)&level, ADC_REG_OVERLOAD_LEVEL_LEN);
+	Sleep(20);
+	return retVal;
+}
+
+bool GetOverloadLevel(CAPDClient *client, unsigned char address, UINT16 *level)
+{
+	bool retVal = ReadPDI(client, address, ADC_REG_OVERLOAD_LEVEL, (unsigned char*)level, ADC_REG_OVERLOAD_LEVEL_LEN);
+	return retVal;
+}
+
+// Overload status
+bool SetOverloadStatus(CAPDClient *client, unsigned char address, unsigned char status)
+{
+	bool retVal = WritePDI(client, address, ADC_REG_OVERLOAD_STATUS, (unsigned char*)&status, ADC_REG_OVERLOAD_STATUS_LEN);
+	Sleep(20);
+	return retVal;
+}
+
+bool GetOverloadStatus(CAPDClient *client, unsigned char address, unsigned char *status)
+{
+	bool retVal = ReadPDI(client, address, ADC_REG_OVERLOAD_STATUS, (unsigned char*)status, ADC_REG_OVERLOAD_STATUS_LEN);
+	return retVal;
+}
+
+// Overload time
+bool SetOverloadTime(CAPDClient *client, unsigned char address, UINT16 time)
+{
+	bool retVal = WritePDI(client, address, ADC_REG_OVERLOAD_TIME, (unsigned char*)&time, ADC_REG_OVERLOAD_TIME_LEN);
+	Sleep(20);
+	return retVal;
+}
+
+bool GetOverloadTime(CAPDClient *client, unsigned char address, UINT16 *time)
+{
+	bool retVal = ReadPDI(client, address, ADC_REG_OVERLOAD_TIME, (unsigned char*)time, ADC_REG_OVERLOAD_TIME_LEN);
+	return retVal;
+}
+
+// Filter coefficients
+bool SetFilterCoefficients(CAPDClient *client, unsigned char address, UINT16 *coefficints)
+{
+	bool retVal = WritePDI(client, address, ADC_REG_FILTER_COEFF, (unsigned char*)coefficints, ADC_REG_FILTER_COEFF_LEN);
+	Sleep(20);
+	return retVal;
+}
+
+bool GetSetFilterCoefficients(CAPDClient *client, unsigned char address, UINT16 *coefficints)
+{
+	bool retVal = ReadPDI(client, address, ADC_REG_FILTER_COEFF, (unsigned char*)coefficints, ADC_REG_FILTER_COEFF_LEN);
+	return retVal;
+}
+
+
+// Calibration table operations
+// The output buffer must be 7 byte or longer.
+bool RetrieveADCSerialNo(CAPDClient *client, unsigned char boardVersion, char *serial_no, int len, UINT32 ip_h, UINT16 port_h)
+{
+#ifdef ENABLE_CALTABLE
+	if (len <= (ADC_REG_SERIALNO_LEN + 1)) return false;
+	bool retVal = ReadPDI(client, boardVersion, ADC_REG_SERIALNO, (unsigned char*)serial_no, ADC_REG_SERIALNO_LEN, ip_h, port_h);
+	serial_no[ADC_REG_SERIALNO_LEN] = 0;
+	return retVal;
+#else
+	serial_no[0] = 0;
+	return false;
+#endif
+}
+
+bool StoreADCOffsets_01mV(CAPDClient *client, INT16 *adcOffsets, int first, int no)
+{
+#ifdef ENABLE_CALTABLE
+	bool retVal = false;
+	if (first < 0 || 32 <= first) return retVal;
+	if (first + no >= 32) return retVal;
+
+	retVal = WritePDI(client, ADC_BOARD, ADC_REG_ADC_OFFSET_01MV + first*sizeof(INT16), (unsigned char*)adcOffsets, no*sizeof(INT16));
+	Sleep(20);
+	return retVal;
+#else
+	return false;
+#endif
+}
+
+
+// Returns 'no' number of calibration data from the index - defined in the 'first' parameter.
+// The correct size of output buffer is up to the caller. The best practice is use INT16[32] for buffer
+bool RetrieveADCOffsets_01mV(CAPDClient *client, INT16 *adcOffsets, int first, int no)
+{
+#ifdef ENABLE_CALTABLE
+	bool retVal = false;
+	if (first < 0 || 32 <= first) return retVal;
+	if (first + no >= 32) return retVal;
+
+	retVal = ReadPDI(client, ADC_BOARD, ADC_REG_ADC_OFFSET_01MV + first*sizeof(INT16), (unsigned char*)adcOffsets, no*sizeof(INT16));
+	return retVal;
+#else
+	return false;
+#endif
+}
+
+
+bool StoreDACOffsets_01mV(CAPDClient *client, INT16 *dacOffsets, int first, int no)
+{
+#ifdef ENABLE_CALTABLE
+	bool retVal = false;
+	if (first < 0 || 32 <= first) return retVal;
+	if (first + no >= 32) return retVal;
+
+	retVal = WritePDI(client, ADC_BOARD, ADC_REG_DAC_OFFSET_01MV + first*sizeof(INT16), (unsigned char*)dacOffsets, no*sizeof(INT16));
+	Sleep(20);
+	return retVal;
+#else
+	return false;
+#endif
+}
+
+
+// Returns 'no' number of calibration data from the index - defined in the 'first' parameter.
+// The correct size of output buffer is up to the caller. The best practice is use INT16[32] for buffer
+bool RetrieveDACOffsets_01mV(CAPDClient *client, INT16 *dacOffsets, int first, int no)
+{
+#ifdef ENABLE_CALTABLE
+	bool retVal = false;
+	if (first < 0 || 32 <= first) return retVal;
+	if (first + no >= 32) return retVal;
+
+	retVal = ReadPDI(client, ADC_BOARD, ADC_REG_DAC_OFFSET_01MV + first*sizeof(INT16), (unsigned char*)dacOffsets, no*sizeof(INT16));
+	return retVal;
+#else
+	return false;
+#endif
+}
+
+bool StoreADCOffsets(CAPDClient *client, INT16 *adcOffsets, int first, int no)
+{
+#ifdef ENABLE_CALTABLE
+	bool retVal = false;
+	if (first < 0 || 32 <= first) return retVal;
+	if (first + no >= 32) return retVal;
+
+	retVal = WritePDI(client, ADC_BOARD, ADC_REG_ADC_OFFSET + first*sizeof(INT16), (unsigned char*)adcOffsets, no*sizeof(INT16));
+	Sleep(20);
+	return retVal;
+#else
+	return false;
+#endif
+}
+
+
+// Returns 'no' number of calibration data from the index - defined in the 'first' parameter.
+// The correct size of output buffer is up to the caller. The best practice is use INT16[32] for buffer
+bool RetrieveADCOffsets(CAPDClient *client, INT16 *adcOffsets, int first, int no)
+{
+#ifdef ENABLE_CALTABLE
+	bool retVal = false;
+	if (first < 0 || 32 <= first) return retVal;
+	if (first + no >= 32) return retVal;
+
+	retVal = ReadPDI(client, ADC_BOARD, ADC_REG_ADC_OFFSET + first*sizeof(INT16), (unsigned char*)adcOffsets, no*sizeof(INT16));
+	return retVal;
+#else
+	return false;
+#endif
+}
+
+
+/*
+ *
+ * 10GB P&C commands
+ *
+ */
+bool GetPCSerial(CAPDClient *client, uint16_t *serial)
+{
+	*serial = 0;
+	return ReadPDI(client, PC_BOARD, PC_REG_BOARD_SERIAL, (unsigned char*)serial, PC_REG_BOARD_SERIAL_LEN);
+}
+
+
+bool GetPCFWVersion(CAPDClient *client, unsigned char *ver)
+{
+	bool retVal = false;
+
+	retVal = ReadPDI(client, PC_BOARD, PC_REG_FW_VERSION, (unsigned char*)ver, PC_REG_FW_VERSION_LEN);
+
+	return retVal;
+}
+
+
+// unsigned short binValues[4]
+// The function returns binary values. Use AFD_INPUT_HV_CALIB to convert values to Volt.
+bool GetAllHVMonitor(CAPDClient *client, unsigned short *binValues)
+{
+	bool retVal = ReadPDI(client, PC_BOARD, PC_REG_HV1_MONITOR, (unsigned char*)binValues, PC_REG_ALL_HV_MONITORS_LEN);
+	Sleep(20);
+	for (int i = 0; i < 4; i++) binValues[i] &= 0x0FFF;
+	return retVal;
+}
+
+
+// doubles values[16]
+// The read values are multilied by 10. The values return in degree
+bool GetAllTempSensors(CAPDClient *client, double *values)
+{
+	short binValues[16];
+	bool retVal = ReadPDI(client, PC_BOARD, PC_REG_TEMP_SENSOR_1, (unsigned char*)binValues, PC_REG_ALL_TEMP_SENSORS_LEN);
+	for (int i = 0; i < 16; i++)
+	{
+		values[i] = binValues[i]/10.0;
+	}
+	return retVal;
+}
+
+
+bool SetHV1(CAPDClient *client, int binValue)
+{
+	binValue &= 0x0FFF;
+	bool retVal = WritePDI(client, PC_BOARD, PC_REG_HV1_SET, (unsigned char*)&binValue, PC_REG_HV_SET_LEN);
+	Sleep(20);
+	return retVal;
+}
+
+
+bool GetHV1(CAPDClient *client, int *binValue)
+{
+	bool retVal = ReadPDI(client, PC_BOARD, PC_REG_HV1_SET, (unsigned char*)binValue, PC_REG_HV_SET_LEN);
+	Sleep(20);
+	*binValue &= 0x0FFF;
+	return retVal;
+}
+
+
+bool SetHV2(CAPDClient *client, int binValue)
+{
+	binValue &= 0x0FFF;
+	bool retVal = WritePDI(client, PC_BOARD, PC_REG_HV2_SET, (unsigned char*)&binValue, PC_REG_HV_SET_LEN);
+	Sleep(20);
+	return retVal;
+}
+
+
+bool GetHV2(CAPDClient *client, int *binValue)
+{
+	bool retVal = ReadPDI(client, PC_BOARD, PC_REG_HV2_SET, (unsigned char*)binValue, PC_REG_HV_SET_LEN);
+	Sleep(20);
+	*binValue &= 0x0FFF;
+	return retVal;
+}
+
+
+bool SetHV3(CAPDClient *client, int binValue)
+{
+	binValue &= 0x0FFF;
+	bool retVal = WritePDI(client, PC_BOARD, PC_REG_HV3_SET, (unsigned char*)&binValue, PC_REG_HV_SET_LEN);
+	Sleep(20);
+	return retVal;
+}
+
+
+bool GetHV3(CAPDClient *client, int *binValue)
+{
+	bool retVal = ReadPDI(client, PC_BOARD, PC_REG_HV3_SET, (unsigned char*)binValue, PC_REG_HV_SET_LEN);
+	Sleep(20);
+	*binValue &= 0x0FFF;
+	return retVal;
+}
+
+
+bool SetHV4(CAPDClient *client, int binValue)
+{
+	binValue &= 0x0FFF;
+	bool retVal = WritePDI(client, PC_BOARD, PC_REG_HV4_SET, (unsigned char*)&binValue, PC_REG_HV_SET_LEN);
+	Sleep(20);
+	return retVal;
+}
+
+
+bool GetHV4(CAPDClient *client, int *binValue)
+{
+	bool retVal = ReadPDI(client, PC_BOARD, PC_REG_HV4_SET, (unsigned char*)binValue, PC_REG_HV_SET_LEN);
+	Sleep(20);
+	*binValue &= 0x0FFF;
+	return retVal;
+}
+
+
+bool SetHVState(CAPDClient *client, int state)
+{
+	int internalState = state ? 0x03:0x00;
+	bool retVal = WritePDI(client, PC_BOARD, PC_REG_HV_ON, (unsigned char*)&internalState, PC_REG_HV_ON_LEN);
+	Sleep(20);
+	return retVal;
+}
+
+
+bool GetHVState(CAPDClient *client, int *state)
+{
+	bool retVal = ReadPDI(client, PC_BOARD, PC_REG_HV_ON, (unsigned char*)state, PC_REG_HV_ON_LEN);
+	Sleep(20);
+	return retVal;
+}
+
+
+bool EnableHV(CAPDClient *client, bool enable)
+{
+	unsigned char value;
+	value = enable ? 0xAB : 0x00;
+	bool retVal = WritePDI(client, PC_BOARD, PC_REG_HV_ENABLE, (unsigned char*)&value, PC_REG_HV_ENABLE_LEN);
+	Sleep(20);
+	return retVal;
+}
+
+
+bool SetCalibLight(CAPDClient *client, int current)
+{
+	current &= 0x0FFF;
+	bool retVal = WritePDI(client, PC_BOARD, PC_REG_CALIB_LIGHT, (unsigned char*)&current, PC_REG_CALIB_LIGHT_LEN);
+	Sleep(20);
+	return retVal;
+}
+
+
+bool GetCalibLight(CAPDClient *client, int *current)
+{
+	bool retVal = ReadPDI(client, PC_BOARD, PC_REG_CALIB_LIGHT, (unsigned char*)current, PC_REG_CALIB_LIGHT_LEN);
+	*current &= 0x0FFF;
+	return retVal;
+}
+
+
+bool SetShutterMode(CAPDClient *client, int mode)
+{
+	mode &= 0x0001;
+	bool retVal = WritePDI(client, PC_BOARD, PC_REG_SHMODE, (unsigned char*)&mode, PC_REG_SHMODE_LEN);
+	Sleep(20);
+	return retVal;
+}
+
+
+bool GetShutterMode(CAPDClient *client, int *mode)
+{
+	bool retVal = ReadPDI(client, PC_BOARD, PC_REG_SHMODE, (unsigned char*)mode, PC_REG_SHMODE_LEN);
+	*mode &= 0x00000001;
+	return retVal;
+}
+
+
+bool SetShutterState(CAPDClient *client, int state)
+{
+	state &= 0x0001;
+	bool retVal = WritePDI(client, PC_BOARD, PC_REG_SHSTATE, (unsigned char*)&state, PC_REG_SHSTATE_LEN);
+	Sleep(20);
+	return retVal;
+}
+
+
+bool GetShutterState(CAPDClient *client, int *state)
+{
+	bool retVal = ReadPDI(client, PC_BOARD, PC_REG_SHSTATE, (unsigned char*)state, PC_REG_SHSTATE_LEN);
+	*state &= 0x00000001;
+	return retVal;
+}
+
+
+bool SetAnalogPower(CAPDClient *client, int state)
+{
+	state &= 0x0001;
+	bool retVal = WritePDI(client, PC_BOARD, 0x0064, (unsigned char*)&state, 0x01);
+	Sleep(20);
+	return retVal;
+}
+
+
+bool GetAnalogPower(CAPDClient *client, int *state)
+{
+	bool retVal = ReadPDI(client, PC_BOARD, 0x0064, (unsigned char*)state, 0x01);
+	*state &= 0x00000001;
+	return retVal;
+}
+
+
+#if 0
+// Returns the board id (1 for ADC, 2 for PC), The offset of requsted register in the factory table, and data length.
+// The offset contents the offset of factory table too.
+bool GetFactoryRegIdentity(ADT_FACTORY_DATA dataType, int *boardId, int *regOffset, int *len)
+{
+	*boardId = dataType < AFD_PC_TABLE_VERSION ? ADC_BOARD : PC_BOARD;
+	*regOffset = -1;
+	*len = -1;
+
+	bool retVal = true;
+
+	switch (dataType)
+	{
+// ADC registers
+	case AFD_PRODUCT_CODE: *regOffset = ADC_REG_SERIALNO; *len = ADC_REG_SERIALNO_LEN; break;
+	case AFD_ADC_TABLE_VERSION: *regOffset = ADC_REG_TABLE_VERSION; *len = ADC_REG_TABLE_VERSION_LEN; break;
+	case AFD_ADC_TABLE_STATUS: *regOffset = ADC_REG_TABLE_STATUS; *len = ADC_REG_TABLE_STATUS_LEN; break;
+	case AFD_ADC_LOW_LIMIT: *regOffset = ADC_REG_LOWER_LIMIT; *len = ADC_REG_LOWER_LIMIT_LEN; break;
+	case AFD_ADC_HIGH_LIMIT: *regOffset = ADC_REG_UPPER_LIMIT; *len = ADC_REG_UPPER_LIMIT_LEN; break;
+	case AFD_ADC_BLOCK_CAL: *regOffset = ADC_REG_ADC_BLOCK_CALIBRATION; *len = ADC_REG_ADC_BLOCK_CALIBRATION_LEN; break;
+	case AFD_ADC_OFFSET: *regOffset = ADC_REG_ADC_OFFSET; *len = ADC_REG_ADC_OFFSET_LEN; break;
+	case AFD_DAC_OFFSET: *regOffset = ADC_REG_DAC_OFFSET; *len = ADC_REG_DAC_OFFSET_LEN; break;
+	case AFD_DAC_BLOCK_CAL: *regOffset = ADC_REG_DAC_BLOCK_CALIBRATION; *len = ADC_REG_DAC_BLOCK_CALIBRATION_LEN; break;
+	case AFD_ANALOF_BW1: *regOffset = ADC_REG_ANALOG_BW1; *len = ADC_REG_ANALOG_BW1_LEN; break;
+	case AFD_ANALOG_BW2: *regOffset = ADC_REG_ANALOG_BW2; *len = ADC_REG_ANALOG_BW2_LEN; break;
+	case AFD_ANALOG_CONVERSION: *regOffset = ADC_REG_ANALOG_CONVERSION; *len = ADC_REG_ANALOG_CONVERSION_LEN; break;
+	case AFD_MAX_OFFSET: *regOffset = ADC_REG_MAX_OFFSET; *len = ADC_REG_MAX_OFFSET_LEN; break;
+	case AFD_DETECTOR_ID: *regOffset = ADC_REG_DETECTOR_ID; *len = ADC_REG_DETECTOR_ID_LEN; break;
+// PC registers
+	case AFD_PC_TABLE_VERSION: *regOffset = PC_REG_TABLE_VERSION; *len = PC_REG_TABLE_VERSION_LEN; break;
+	case AFD_PC_TABLE_STATUS: *regOffset = PC_REG_TABLE_STATUS; *len = PC_REG_TABLE_STATUS_LEN; break;
+	case AFD_INPUT_HV_CALIB: *regOffset = PC_REG_INPUT_HV_CALIB; *len = PC_REG_INPUT_HV_CALIB_LEN; break;
+	case AFD_OUTPUT_HV_CALIB: *regOffset = PC_REG_OUTPUT_HV_CALIB; *len = PC_REG_OUTPUT_HV_CALIB_LEN; break;
+	case AFD_TEMP_CALIB: *regOffset = PC_REG_TEMP_CALIB; *len = PC_REG_TEMP_CALIB_LEN; break;
+	case AFD_MIN_HV: *regOffset = PC_REG_MIN_HV; *len = PC_REG_MIN_HV_LEN; break;
+	case AFD_GAIN_TABLE: *regOffset = PC_REG_GAIN_TABLE; *len = PC_REG_GAIN_TABLE_LEN; break;
+	case AFD_GAIN_VOLTS: *regOffset = PC_REG_GAIN_VOLTS; *len = PC_REG_GAIN_VOLTS_LEN; break;
+	case AFD_GAIN_TEMPS: *regOffset = PC_REG_GAIN_TEMPS; *len = PC_REG_GAIN_TEMPS_LEN; break;
+	case AFD_OUTPUT_HV_CALIB_2: *regOffset = PC_REG_OUTPUT_HV_CALIB_2; *len = PC_REG_OUTPUT_HV_CALIB_2_LEN; break;
+	default:
+		retVal = false;
+	}
+	return retVal;
+}
+
+
+bool SetFactoryData(CAPDClient *client, ADT_FACTORY_DATA dataType, FACTORY_DATA* pFactoryData)
+{
+	int boardId, regOffset, len;
+	bool retVal = GetFactoryRegIdentity(dataType, &boardId, &regOffset, &len);
+	if (!retVal) return false;
+
+	retVal = EnableFactoryWrite(client, boardId, true);
+	if (!retVal) return false;
+
+	retVal = WritePDI(client, boardId, regOffset, (unsigned char*)pFactoryData, len);
+	EnableFactoryWrite(client, boardId, false);
+
+	return retVal;
+}
+
+
+bool GetFactoryData(CAPDClient *client, ADT_FACTORY_DATA dataType, FACTORY_DATA* pFactoryData)
+{
+	int boardId, regOffset, len;
+	bool retVal = GetFactoryRegIdentity(dataType, &boardId, &regOffset, &len);
+	if (!retVal) return false;
+
+	retVal = ReadPDI(client, boardId, regOffset, (unsigned char*)pFactoryData, len);
+	return retVal;
+}
+#endif
+
+
+
+/*
+ *
+ * 10Gb C&C commands
+ *
+ */
+bool GetCCReg(CAPDClient *client, int acktype, unsigned char *value, int firstreg, int length, UINT32 ipAddress_h, UINT16 ipPort_h, int timeout)
+{
+/*
+ * Include space for the ACK Type field
+ */
+#define MAX_ACK_DATA_LENGTH	(768 + 2)
+	if (length > MAX_ACK_DATA_LENGTH)
+		return false;
+
+	unsigned char buffer[MAX_ACK_DATA_LENGTH];
+
+	if (ReadCC(client, acktype, buffer, ipAddress_h, ipPort_h, timeout) == false)
+		return false;
+
+	if (acktype != MSB_TO_HOST_16(buffer, uint16_t))
+		return false;
+
+	/*
+	 * Skip ACK Type
+	 */
+	unsigned char const *data = buffer + 2 + firstreg;
+	for (int i = 0; i < length; ++i)
+	{
+		value[i] = data[i];
+	}
+
+	return true;
+}
+
+
+bool GetFlashPage(CAPDClient *client, int PgAddress, unsigned char *value, UINT32 ipAddress_h, UINT16 ipPort_h, int timeout)
+{
+/*
+ * Include space for the page address field
+ */
+#define MAX_FLREAD_DATA_LENGTH	(1024 + 2)
+int length = 1024;
+
+	if (length > MAX_FLREAD_DATA_LENGTH) {
+		printf("Invalid data length request.\n");
+		return false;
+	}
+
+	unsigned char buffer[MAX_FLREAD_DATA_LENGTH];
+
+	if (ReadFlashPage(client, PgAddress, buffer, ipAddress_h, ipPort_h, timeout) == false) {
+		printf("ReadFlashPage returned error.\n");
+		return false;
+	}
+	if (PgAddress != MSB_TO_HOST_16(buffer, uint16_t)){
+		printf("Returned page address different from requested.\n");
+		//return false;
+	}
+		
+
+	unsigned char const *data = buffer+2 ;
+	for (int i = 0; i < length; ++i)
+	{
+		value[i] = data[i];
+	}
+
+	return true;
+}
+
+bool StartFirmwareUpdate(CAPDClient *client, unsigned char *  date, UINT32 ipAddress_h, UINT16 ipPort_h, int timeout)
+{
+	unsigned char buffer[20];
+
+	if (StartFUP(client, date, buffer, ipAddress_h, ipPort_h, timeout) == false)
+		return false;
+	// Checking ACK type	
+	if ((buffer[0] != 8) && (buffer[1] != 1)) 
+	        return false;
+	// Checking checksum	
+        printf("FUP checksum: %2x %2x %2x %2x\n",buffer[2],buffer[3], buffer[4], buffer[5]);
+	if ((buffer[2] | buffer[3] | buffer[4] | buffer[5]) == 0) {
+		return true;
+	} else {
+	return false;
+	}
+}
+
+bool GetCCDeviceType(CAPDClient *client, uint16_t *deviceType, UINT32 ipAddress_h, UINT16 ipPort_h, int timeout)
+{
+	unsigned char buffer[CC_DEVICE_TYPE_LEN];
+
+	if (GetCCReg(client, CC_SETTINGS_TABLE, buffer, CC_DEVICE_TYPE, CC_DEVICE_TYPE_LEN, ipAddress_h, ipPort_h, timeout) == false)
+		return false;
+
+	*deviceType = MSB_TO_HOST_16(buffer, uint16_t);
+
+	return true;
+}
+
+
+bool GetCCStreamSerial(CAPDClient *client, uint32_t *serial)
+{
+	unsigned char buffer[CC_STREAM_SERIAL_LEN];
+
+	if (GetCCReg(client, CC_SETTINGS_TABLE, buffer, CC_STREAM_SERIAL, CC_STREAM_SERIAL_LEN) == false)
+		return false;
+
+	*serial = MSB_TO_HOST_32(buffer, uint32_t);
+
+	return true;
+}
+
+
+bool SetBasicPLL(CAPDClient *client, unsigned char mul, unsigned char div0, unsigned char div1)
+{
+	bool retVal = false;
+
+	if (mul < 20 || mul > 50)
+		return retVal;
+	if (div0 < 8 || div0 > 100)
+		return retVal;
+	if (div1 < 8 || div1 > 100)
+		return retVal;
+
+	unsigned char data[] = {mul, div0, div1, 58, 66};
+
+	retVal = CCControl(client, OP_PROGRAMBASICPLL, sizeof(data), data);
+
+	retVal &= CCControl(client, OP_SAVESETTINGS);
+
+	return retVal;
+}
+
+
+bool GetBasicPLL(CAPDClient *client, unsigned char *mul, unsigned char *div0, unsigned char *div1)
+{
+	unsigned char data[CC_REG_BASICPLL_LEN];
+
+	if (GetCCReg(client, CC_SETTINGS_TABLE, data, CC_REG_BASICPLL, CC_REG_BASICPLL_LEN) == false)
+		return false;
+
+	*mul = data[0];
+	*div0 = data[1];
+	*div1 = data[2];
+
+	return true;
+}
+
+
+bool SetExtDCM(CAPDClient *client, unsigned char mul, unsigned char div)
+{
+	bool retVal = false;
+
+	if (mul < 2 || mul > 33)
+		return retVal;
+	if (div < 1 || div > 32)
+		return retVal;
+
+	unsigned char data[] = {mul, div};
+
+	retVal = CCControl(client, OP_PROGRAMEXTDCM, sizeof(data), data);
+
+	retVal &= CCControl(client, OP_SAVESETTINGS);
+
+	return retVal;
+}
+
+
+bool GetExtDCM(CAPDClient *client, unsigned char *mul, unsigned char *div)
+{
+	unsigned char data[CC_REG_EXTDCM_LEN];
+
+	if (GetCCReg(client, CC_SETTINGS_TABLE, data, CC_REG_EXTDCM, CC_REG_EXTDCM_LEN) == false)
+		return false;
+
+	*mul = data[0];
+	*div = data[1];
+
+	return true;
+}
+
+
+bool SetSampleDiv(CAPDClient *client, UINT16 sampleDiv)
+{
+	bool retVal = false;
+
+	sampleDiv = htons(sampleDiv);
+
+	retVal = CCControl(client, OP_PROGRAMSAMPLEDIVIDER, sizeof(sampleDiv), (unsigned char*)&sampleDiv);
+
+	retVal &= CCControl(client, OP_SAVESETTINGS);
+
+	return retVal;
+}
+
+
+bool GetSampleDiv(CAPDClient *client, UINT16 *sampleDiv)
+{
+	UINT16 msb_sampleDiv;
+
+	if (GetCCReg(client, CC_SETTINGS_TABLE, (unsigned char*)&msb_sampleDiv, CC_REG_SAMPLEDIV, CC_REG_SAMPLEDIV_LEN) == false)
+		return false;
+
+	*sampleDiv = ntohs(msb_sampleDiv);
+
+	return true;
+}
+
+
+bool SetClockControl(CAPDClient *client, unsigned char adClockSource, unsigned char extClockMode, unsigned char sampleSource)
+{
+	bool retVal = false;
+
+	if ((adClockSource != 0 || adClockSource != 1) && (extClockMode != 0 || extClockMode != 1) && (sampleSource != 0 || sampleSource != 1))
+		return false;
+
+	unsigned char data = (sampleSource << 4) | (extClockMode << 3 ) | (adClockSource << 2);
+
+	retVal = CCControl(client, OP_SETCLOCKCONTROL, sizeof(data), &data);
+
+	retVal &= CCControl(client, OP_SAVESETTINGS);
+
+	return retVal;
+}
+
+
+bool GetClockContol(CAPDClient *client, unsigned char *adClockSource, unsigned char *extClockMode, unsigned char *sampleSource)
+{
+	unsigned char data;
+	if (GetCCReg(client, CC_SETTINGS_TABLE, &data, CC_REG_CLOCK_CONTROL, CC_REG_CLOCK_CONTROL_LEN) == false)
+		return false;
+
+	if (adClockSource)
+		*adClockSource = (data >> 2 ) & 0x01;
+
+	if (extClockMode)
+		*extClockMode = (data >> 3 ) & 0x01;
+
+	if (sampleSource)
+		*sampleSource = (data >> 4 ) & 0x01;
+
+	return true;
+}
+
+
+bool SetClockEnable(CAPDClient *client, unsigned char eioSampleOut, unsigned char controlSampleOut,
+					unsigned char eioClockOut, unsigned char controlClockOut)
+{
+	bool retVal = false;
+
+	if ((eioSampleOut != 0 || eioSampleOut != 1) && (controlSampleOut != 0 || controlSampleOut != 1)
+	    && (eioClockOut != 0 || eioClockOut != 1) && (controlClockOut != 0 || controlClockOut != 1))
+		return false;
+
+	unsigned char data = (eioSampleOut << 3) | (controlSampleOut << 2) | (eioClockOut << 1) | (controlClockOut);
+
+	retVal = CCControl(client, OP_SETCLOCKENABLE, sizeof(data), &data);
+
+	retVal &= CCControl(client, OP_SAVESETTINGS);
+
+	return retVal;
+}
+
+
+bool GetClockEnable(CAPDClient *client, unsigned char *eioSampleOut, unsigned char *controlSampleOut,
+					unsigned char *eioClockOut, unsigned char *controlClockOut)
+{
+	unsigned char data;
+
+	if (GetCCReg(client, CC_SETTINGS_TABLE, &data, CC_REG_CLOCK_ENABLE, CC_REG_CLOCK_ENABLE_LEN) == false)
+		return false;
+
+	if (eioSampleOut)
+		*eioSampleOut = (data >> 3) & 0x01;
+
+
+	if (controlSampleOut)
+		*controlSampleOut = (data >> 2) & 0x01;
+
+	if (eioClockOut)
+		*eioClockOut = (data >> 1 ) & 0x01;
+
+	if (controlClockOut)
+		*controlClockOut = data & 0x01;
+
+	return true;
+}
+
+
+bool SetCCStreamControl(CAPDClient *client, unsigned char streamControl)
+{
+	if (CCControl(client, OP_SETSTREAMCONTROL, sizeof(streamControl), &streamControl))
+		return CCControl(client, OP_SAVESETTINGS);
+
+	return false;
+}
+
+
+bool GetCCStreamControl(CAPDClient *client, unsigned char *streamControl)
+{
+	return GetCCReg(client, CC_SETTINGS_TABLE, streamControl, CC_REG_STREAM_CONTROL, CC_REG_STREAM_CONTROL_LEN);
+}
+
+
+bool SetCCSampleCount(CAPDClient *client, uint64_t sampleCount)
+{
+	bool retVal = false;
+
+	uint64_t cc_sampleCount = htonll(sampleCount);
+
+	retVal = CCControl(client, OP_SETSAMPLECOUNT, 6, ((unsigned char*)&cc_sampleCount) + 2000);
+
+	retVal &= CCControl(client, OP_SAVESETTINGS);
+
+	return retVal;
+}
+
+
+bool GetCCSampleCount(CAPDClient *client, uint64_t *sampleCount)
+{
+	uint64_t cc_sampleCount = 0;
+	if (GetCCReg(client, CC_SETTINGS_TABLE, ((unsigned char *)&cc_sampleCount) + 2, CC_REG_SAMPLECOUNT, CC_REG_SAMPLECOUNT_LEN) == false)
+		return false;
+
+	*sampleCount = ntohll(cc_sampleCount);
+
+	return true;
+}
+
+
+bool SetTrigger(CAPDClient *client, ADT_TRIGGER_CONTROL triggerControl, uint32_t triggerDelay)
+{
+	uint8_t data[OP_SETTRIGGER_LEN] = {triggerControl.trigger_control};
+
+	CHAR_TO_TYPE(data + 1, uint32_t) = htonl(triggerDelay);
+
+	bool retVal = false;
+	retVal = CCControl(client, OP_SETTRIGGER, sizeof(data), data);
+
+	retVal &= CCControl(client, OP_SAVESETTINGS);
+
+	return retVal;
+}
+
+
+bool SetTrigger(CAPDClient *client, ADT_TRIGGER_MODE triggerSource, ADT_TRIGGER_EDGE triggerEdge, uint32_t delay)
+{
+	bool IT = triggerSource == TRM_INTERNAL;
+	bool ETR = (triggerEdge == TRE_RISING || triggerEdge == TRE_BOTH);
+	bool ETF = (triggerEdge == TRE_FALLING || triggerEdge == TRE_BOTH);
+	bool DT = 1;
+
+	ADT_TRIGGER_CONTROL triggerControl;
+	triggerControl.Disable_Trigger_Event = DT;
+	triggerControl.Enable_Internal_Trigger = IT;
+	triggerControl.Enable_Falling_Edge = ETF;
+	triggerControl.Enable_Rising_Edge = ETR;
+
+	return SetTrigger(client, triggerControl, delay);
+}
+
+
+bool GetTrigger(CAPDClient *client, ADT_TRIGGER_CONTROL *triggerControl, uint32_t *delay)
+{
+	uint8_t data[CC_REG_TRIGGER_LEN];
+
+	if (GetCCReg(client, CC_SETTINGS_TABLE, data, CC_REG_TRIGGER, CC_REG_TRIGGER_LEN) == false)
+		return false;
+
+	if (triggerControl)
+		triggerControl->trigger_control = data[0];
+
+	if (delay)
+		*delay = MSB_TO_HOST_32(data + 1, uint32_t);
+
+	return true;
+}
+
+
+bool GetTrigger(CAPDClient *client, ADT_TRIGGER_MODE *triggerSource, ADT_TRIGGER_EDGE *triggerEdge, uint32_t *delay)
+{
+	ADT_TRIGGER_CONTROL tc;
+
+	if (GetTrigger(client, &tc, delay) == false)
+		return false;
+
+	if (triggerSource)
+		*triggerSource = tc.Enable_Internal_Trigger ? TRM_INTERNAL : TRM_EXTERNAL;
+
+	if (triggerEdge)
+	{
+		bool ETR = tc.Enable_Rising_Edge;
+		bool ETF = tc.Enable_Falling_Edge;
+
+		if (ETR && ETF)
+			*triggerEdge = TRE_BOTH;
+		else if (ETR)
+			*triggerEdge = TRE_RISING;
+		else if (ETF)
+			*triggerEdge = TRE_FALLING;
+		else
+			*triggerEdge = TRE_NONE;
+	}
+
+	return true;
+}
+
+
+bool ClearTrigger(CAPDClient *client)
+{
+	return CCControl(client, OP_CLEARTRIGGERSTATUS);
+}
+
+
+bool SetMulticastUDPStream(CAPDClient *client, uint8_t streamNum, uint16_t octet, uint32_t ip_h, uint16_t port)
+{
+	uint8_t set[OP_SETMULTICASTUDPSTREAM_LEN] = {0};
+
+	set[0] = streamNum;
+	CHAR_TO_TYPE(set + 1, uint16_t) = htons(octet);
+	CHAR_TO_TYPE(set + 3, uint32_t) = htonl(ip_h);
+	CHAR_TO_TYPE(set + 7, uint16_t) = htons(port);
+
+	return CCControl(client, OP_SETMULTICASTUDPSTREAM, sizeof(set), set);
+}
+
+
+bool SetUDPStream(CAPDClient *client, uint8_t streamNum, uint16_t octet, uint8_t mac[6], uint32_t ip_h, uint16_t port)
+{
+	uint8_t set[OP_SETUDPSTREAM_LEN] = {0};
+
+	set[0] = streamNum;
+	CHAR_TO_TYPE(set + 1, uint16_t) = htons(octet);
+	memcpy(set + 3, mac, sizeof(mac));
+	CHAR_TO_TYPE(set + 9, uint32_t) = htonl(ip_h);
+	CHAR_TO_TYPE(set + 13, uint16_t) = htons(port);
+
+	return CCControl(client, OP_SETUDPSTREAM, sizeof(set), set);
+}

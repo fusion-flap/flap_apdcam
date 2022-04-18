@@ -45,15 +45,18 @@ def apdcam_get_config(xml):
             mask3 = int(xml.get_element('ADCSettings', 'ChannelMask3')['Value'],16)
             mask4 = int(xml.get_element('ADCSettings', 'ChannelMask4')['Value'],16)
             chmask = mask1 + (mask2<<32) + (mask3<<64) + (mask4<<96)
-            retval['Bias 1'] = float(xml.get_element('APDCAM', 'DetectorBias1')['Value'])
-            retval['Bias 2'] = float(xml.get_element('APDCAM', 'DetectorBias2')['Value'])   
-            retval['Detector temp 1'] = float(xml.get_element('APDCAM', 'DetectorTemp1')['Value'])
-            retval['Detector temp 2'] = float(xml.get_element('APDCAM', 'DetectorTemp2')['Value'])
         if (camera_family == 'APDCAM'):
             chmask = int(xml.get_element('ADCSettings','ChannelMask')['Value'],16)
     except ValueError as e:
         raise e
     # These are optional
+    try:
+        retval['Bias 1'] = float(xml.get_element('APDCAM', 'DetectorBias1')['Value'])
+        retval['Bias 2'] = float(xml.get_element('APDCAM', 'DetectorBias2')['Value'])   
+        retval['Detector temp 1'] = float(xml.get_element('APDCAM', 'DetectorTemp1')['Value'])
+        retval['Detector temp 2'] = float(xml.get_element('APDCAM', 'DetectorTemp2')['Value'])
+    except ValueError:
+        pass
     try:
        retval['Camera type'] = xml.get_element('APDCAM', 'CameraType')['Value']
     except ValueError:

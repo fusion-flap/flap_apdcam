@@ -108,7 +108,7 @@ class APDCAM_Plot_class:
                 self.camera_version_select_widg = tk.OptionMenu(camera_settings_frame,self.var_camera_version,("n.a"),command=self.camera_version_select)
                 self.camera_version_select_widg.grid(row=0,column=3,sticky='w')
             else:
-                w = tk.Label(camera_settings_frame,text='      Camera version: {:d}'.format(camera_version),bg=plot_background).grid(row=0,column=2)
+                w = tk.Label(camera_settings_frame,text='      Camera version: {:s}'.format(camera_version),bg=plot_background).grid(row=0,column=2)
         row0 = 1            
                 
         general_settings_frame = tk.LabelFrame(self.plotControl_widg,bd=4, padx=2, pady=2,relief=tk.GROOVE,text='Data',bg=plot_background)
@@ -559,8 +559,9 @@ class APDCAM_Plot_class:
             if (not self.rawplot_options_autoscale):
                 options['Y range'] = [float(self.var_rawplot_options_yrange1.get()),float(self.var_rawplot_options_yrange2.get())]
             try:
-                self.data.plot(plot_type=plot_type,axes=['Time'],plot_id=self.act_plotID,
-                               options=options)
+                plot_id = self.data.plot(plot_type=plot_type,axes=['Time'],plot_id=self.act_plotID,
+                                         options=options
+                                         )
             except ValueError as e:
                 self.add_message("Error: {:s}".format(str(e)))
                 return
@@ -573,8 +574,9 @@ class APDCAM_Plot_class:
             if (not self.rawplot_options_autoscale):
                 options['Y range'] = [float(self.var_rawplot_options_yrange1.get()),float(self.var_rawplot_options_yrange2.get())]
             try:
-                self.data.plot(plot_type=plot_type,axes=['Row','Column','Time'],plot_id=self.act_plotID,
-                               options=options)
+                plot_id = self.data.plot(plot_type=plot_type,axes=['Row','Column','Time'],plot_id=self.act_plotID,
+                                         options=options
+                                         )
             except ValueError as e:
                 self.add_message("Error: {:s}".format(str(e)))
                 return                
@@ -585,9 +587,10 @@ class APDCAM_Plot_class:
             if (not self.rawplot_options_autoscale):
                 options['Z range'] = [float(self.var_rawplot_options_yrange1.get()),float(self.var_rawplot_options_yrange2.get())]
             try:
-                self.data.plot(plot_type=plot_type,
-                               summing={'Time':'Mean'},axes=['Row','Column'],plot_id=self.act_plotID,
-                               options=options)
+                plot_id = self.data.plot(plot_type=plot_type,
+                                         summing={'Time':'Mean'},axes=['Row','Column'],plot_id=self.act_plotID,
+                                         options=options
+                                         )
             except (ValueError,TypeError) as e:
                 self.add_message("Error: {:s}".format(str(e)))
                 return                
@@ -599,9 +602,10 @@ class APDCAM_Plot_class:
                 options['Z range'] = [float(self.var_rawplot_options_yrange1.get()),float(self.var_rawplot_options_yrange2.get())]
             options['Wait'] = 0.01
             try:
-                self.data.plot(plot_type=plot_type,
-                               axes=['Row','Column','Time'],plot_id=self.act_plotID,
-                               options=options)
+                plot_id = self.data.plot(plot_type=plot_type,
+                                         axes=['Row','Column','Time'],plot_id=self.act_plotID,
+                                         options=options
+                                         )
             except (ValueError,TypeError) as e:
                 self.add_message("Error: {:s}".format(str(e)))
                 return                
@@ -611,6 +615,7 @@ class APDCAM_Plot_class:
         plt.show()
         plt.pause(0.05)
         self.plotID_list[plt.gcf().number] = flap.get_plot_id()
+        self.act_plotID = flap.get_plot_id()
         self.add_message("Plot done for {:s}.".format(self.data.data_title))  
 
     def spectrplot(self):
@@ -683,9 +688,9 @@ class APDCAM_Plot_class:
             if (not self.spectrplot_options_autoscale):
                 options['Y range'] = plotrange
             try:
-                psdata.plot(plot_type=plot_type,axes=['Frequency'],plot_id=self.act_plotID,
-                           options=options
-                           )
+                plot_id = psdata.plot(plot_type=plot_type,axes=['Frequency'],plot_id=self.act_plotID,
+                                      options=options
+                                      )
             except ValueError as e:
                 self.add_message("Error: {:s}".format(str(e)))
                 return
@@ -698,9 +703,9 @@ class APDCAM_Plot_class:
             if (not self.spectrplot_options_autoscale):
                 options['Y range'] = plotrange
             try:
-                psdata.plot(plot_type=plot_type,axes=['Row','Column','Frequency'],plot_id=self.act_plotID,
-                            options=options
-                            )
+                plot_id = psdata.plot(plot_type=plot_type,axes=['Row','Column','Frequency'],plot_id=self.act_plotID,
+                                      options=options
+                                      )
             except ValueError as e:
                 self.add_message("Error: {:s}".format(str(e)))
                 return                
@@ -711,10 +716,10 @@ class APDCAM_Plot_class:
             if (not self.spectrplot_options_autoscale):
                 options['Z range'] = plotrange
             try:
-                psdata.plot(plot_type=plot_type,
-                            suming={'Frequency':'Mean'},axes=['Row','Column'],plot_id=self.act_plotID,
-                            options=options
-                            )
+                plot_id = psdata.plot(plot_type=plot_type,
+                                      suming={'Frequency':'Mean'},axes=['Row','Column'],plot_id=self.act_plotID,
+                                      options=options
+                                      )
             except (ValueError,TypeError) as e:
                 self.add_message("Error: {:s}".format(str(e)))
                 return                
@@ -726,10 +731,10 @@ class APDCAM_Plot_class:
                 options['Z range'] = plotrange
             options['Wait'] = 0.01
             try:
-                psdata.plot(plot_type=plot_type,
-                            axes=['Row','Column','Frequency'],plot_id=self.act_plotID,
-                            options=options
-                            )
+                plot_id = psdata.plot(plot_type=plot_type,
+                                      axes=['Row','Column','Frequency'],plot_id=self.act_plotID,
+                                      options=options
+                                      )
             except (ValueError,TypeError) as e:
                 self.add_message("Error: {:s}".format(str(e)))
                 return                
@@ -739,6 +744,7 @@ class APDCAM_Plot_class:
         plt.show()
         plt.pause(0.05)
         self.plotID_list[plt.gcf().number] = flap.get_plot_id()
+        self.act_plotID = flap.get_plot_id()
         self.add_message("Plot done for {:s}.".format(self.data.data_title))  
     
     def getdata(self):
@@ -814,6 +820,9 @@ def plot_gui():
     w.grid(row=1,column=0)
     root.title(string='flap_apdcam plot graphical interface')
     thisdir = os.path.dirname(os.path.realpath(__file__))
-    root.iconbitmap(os.path.join(thisdir,'flap_apdcam_icon.ico'))
+    if (os.name == 'nt'):
+        root.iconbitmap(os.path.join(thisdir,'flap_apdcam_icon.ico'))
+    else:
+        root.iconphoto(True, tk.PhotoImage(os.path.join(thisdir,'flap_apdcam_icon.gif')))    
     pgui.create_widgets(parent=w)
     GUI_frame_widg.mainloop()

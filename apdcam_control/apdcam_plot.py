@@ -210,7 +210,7 @@ class APDCAM_Plot_class:
         self.spectrum_option_logfres = tk.Radiobutton(spectrplot_options_widg,text='Log. freqency resolution',padx=20,variable=self.var_spectrplot_options_logfres,
                                                    command=self.spectrplot_options_logfres_func,value=1
                                                    )
-        val = flap.config.interpret_config_value(flap.config.get('PS','Logarithmic',default=True))
+        val = flap.config.interpret_config_value(flap.config.get('PS','Logarithmic',default='True'))
         if (type(val) == bool):
             self.spectrplot_options_logfres = val
         else:
@@ -230,7 +230,7 @@ class APDCAM_Plot_class:
         self.spectrplot_frange2_widg = tk.Entry(spectrplot_frange_frame_widg,width=10,textvariable=self.var_spectrplot_options_frange2,bg=plot_background)
         self.spectrplot_frange2_widg .grid(row=0,column=3,sticky='w')
 
-        val = flap.config.interpret_config_value(flap.config.get('PS','Range',default=[1e3,1e6]))
+        val = flap.config.interpret_config_value(flap.config.get('PS','Range',default='[1e3,1e6]'))
         if (type(val) is list):
             try:
                 f1 = float(val[0])
@@ -272,7 +272,7 @@ class APDCAM_Plot_class:
         self.spectrum_option_logx = tk.Radiobutton(spectrplot_plotoptions_widg,text='Log x',padx=20,variable=self.var_spectrplot_options_logx,
                                                    command=self.spectrplot_options_logx_func,value=1
                                                    )
-        val = flap.config.interpret_config_value(flap.config.get('Plot','Log x',default=True))
+        val = flap.config.interpret_config_value(flap.config.get('Plot','Log x',default='True'))
         if (type(val) == bool):
             self.spectrplot_options_logx = val
         else:
@@ -286,7 +286,7 @@ class APDCAM_Plot_class:
         self.spectrum_option_logy = tk.Radiobutton(spectrplot_plotoptions_widg,text='Log y',padx=20,variable=self.var_spectrplot_options_logy,
                                                    command=self.spectrplot_options_logy_func,value=1
                                                    )
-        val = flap.config.interpret_config_value(flap.config.get('Plot','Log y',default=True))
+        val = flap.config.interpret_config_value(flap.config.get('Plot','Log y',default='True'))
         if (type(val) == bool):
             self.spectrplot_options_logy = val
         else:
@@ -717,7 +717,7 @@ class APDCAM_Plot_class:
                 options['Z range'] = plotrange
             try:
                 plot_id = psdata.plot(plot_type=plot_type,
-                                      suming={'Frequency':'Mean'},axes=['Row','Column'],plot_id=self.act_plotID,
+                                      summing={'Frequency':'Mean'},axes=['Row','Column'],plot_id=self.act_plotID,
                                       options=options
                                       )
             except (ValueError,TypeError) as e:
@@ -730,14 +730,14 @@ class APDCAM_Plot_class:
             if (not self.spectrplot_options_autoscale):
                 options['Z range'] = plotrange
             options['Wait'] = 0.01
-            try:
-                plot_id = psdata.plot(plot_type=plot_type,
-                                      axes=['Row','Column','Frequency'],plot_id=self.act_plotID,
-                                      options=options
-                                      )
-            except (ValueError,TypeError) as e:
-                self.add_message("Error: {:s}".format(str(e)))
-                return                
+#            try:
+            plot_id = psdata.plot(plot_type=plot_type,
+                                  axes=['Row','Column','Frequency'],plot_id=self.act_plotID,
+                                  options=options
+                                  )
+            # except (ValueError,TypeError) as e:
+            #     self.add_message("Error: {:s}".format(str(e)))
+            #     return                
         else:
             self.add_message("'{:s}' plot not implemented yet.".format(plot_type)) 
             return

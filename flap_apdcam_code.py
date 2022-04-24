@@ -2,21 +2,24 @@
 """
 Created on Sat Dec  8 23:23:49 2018
 
-@author: Zoletnik
-
 This is the flap module for APDCAM
+
+@author: Sandor Zoletnik, Centre for Energy Research  
+         zoletnik.sandor@ek-cer.hu
 """
 
 import os.path
-import flap
 from decimal import *
 import numpy as np
 import copy
 import os
 import fnmatch
 
-if (flap.VERBOSE):
-    print("Importing flap_apdcam")
+import flap
+
+from .apdcam_control.apdcam10g_channel_map import apdcam10g_channel_map
+from .apdcam_control.apdcam_channel_map import apdcam_channel_map
+from .apdcam_control.apdcam_types_versions import *
 
 
 def apdcam_get_config(xml):
@@ -96,46 +99,6 @@ def apdcam_get_config(xml):
         raise e
     return retval
 
-def apdcam_types_versions():
-    """
-    Returns the possible camera types and versions. 
-    
-
-    Returns
-    -------
-    camera_types: list of strings
-        The list of possible camera types
-    camera_version: list of lists
-        For each camera type lists the possible version numbers
-    """
-    
-    camera_types = [#APDCAM-10G:
-                    'APDCAM-10G_4x32',   # 4x32 pixel
-                    'APDCAM-10G_8x8',    # 8x8 pixel
-                    'APDCAM-10G_4x16',   # 4x16 pixel, subarray of 4x32
-                    'APDCAM-10G_8x16',   # 8x16 pixel, 8 pixel in one S8550 array
-                    'APDCAM-10G_8x16A',  # 8x16 pixel, 8 pixxels in two S8550 arrays
-                    #APDCAM-1G: 
-                    'APDCAM-1G',         # Standard APDCAM-1G (Horizontal array)
-                    'APDCAM-1G_90',      #APDCAM-1G with sensor rotated 90 degree CCW
-                    'APDCAM-1G_180',     #APDCAM-1G with sensor rotated 180 degree CCW
-                    'APDCAM-1G_270'      # APDCAM-1G with sensor rotated 270 degree CCW
-                    ]
-    camera_versions = [#APDCAM-10G:
-                        [1,0,2],   # 4x32 pixel
-                        [1,0,2],   # 8x8 pixel
-                        [1,0,2],   # 4x16 pixel, subarray of 4x32
-                        [1,0,2],   # 8x16 pixel, 8 pixel in one S8550 array
-                        [1]    ,   # 8x16 pixel, 8 pixxels in two S8550 arrays
-                        #APDCAM-1G: 
-                        [],        # Standard APDCAM-1G (Horizontal array)
-                        [],        #APDCAM-1G with sensor rotated 90 degree CCW
-                        [],        #APDCAM-1G with sensor rotated 180 degree CCW
-                        []         # APDCAM-1G with sensor rotated 270 degree CCW
-                      ]   
-    return camera_types, camera_versions
-    
-
 def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, coordinates=None, data_source=None,
                     ):
     """ 
@@ -213,7 +176,6 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
     t = apdcam_get_config(xml)
     fnames = os.listdir(datapath)
     if (camera_family == 'APDCAM-10G'):
-        from .apdcam_control.apdcam10g_channel_map import apdcam10g_channel_map
         camera_type = _options['Camera type']
         if (camera_type is None): 
             try:
@@ -221,7 +183,7 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
             except KeyError:
                 raise ValueError("The camera type was neither found in the xml file nor was it given as an option.")
         if (camera_type[:11].lower() != 'apdcam-10g_' ):
-            raise ValueError("Invalid camera type '{:s}'.".format(camera_type))
+            raise ValueError("Invalid camera type '{:s}'. Data is from APDCAM-10G.".format(camera_type))
         camera_version = _options['Camera version']
         if (camera_version is None):
             try:
@@ -230,9 +192,10 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
                 camera_version = 1
         chmap = apdcam10g_channel_map(camera_type=camera_type[11:],camera_version=camera_version)
     elif (camera_family == 'APDCAM'):
-        from .apdcam_control.apdcam_channel_map import apdcam_channel_map
         if (_options['Camera type'] is not None): 
             camera_type = _options['Camera type']
+            if (camera_type[:11].lower() != 'apdcam-1g_' ):
+                raise ValueError("Invalid camera type '{:s}'. Data is from APDCAM-1G".format(camera_type))
             if (camera_type == 'APDCAM-1G'):
                 sensor_angle = 0
             else:

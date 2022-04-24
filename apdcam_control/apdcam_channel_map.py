@@ -2,7 +2,10 @@
 """
 Created on Sun Feb 27 12:51:00 2022
 
-@author: Zoletnik
+APD pixel to ADC channel maps for various APDCAM devices
+ 
+@author: Sandor Zoletnik, Centre for Energy Research  
+         zoletnik.sandor@ek-cer.hu
 """
 import numpy as np
 

@@ -2,7 +2,10 @@
 """
 Created on Mon Jul 30 15:13:45 2018
 
-@author: Zoletnik
+APDCAM measurement config file writing
+
+@author: Sandor Zoletnik, Centre for Energy Research  
+         zoletnik.sandor@ek-cer.hu
 """
 
 import xml.etree.ElementTree as ET

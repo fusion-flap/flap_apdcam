@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 Created on Tue Jun 12 19:34:00 2018
+
 APDCAM-10G register access functions
-@author: Sandor Zoletnik"""
+
+@author: Sandor Zoletnik, Centre for Energy Research  
+         zoletnik.sandor@ek-cer.hu
+"""
 
 import threading
 import time
@@ -11,8 +15,6 @@ import subprocess
 import xml.etree.ElementTree as ET
 import socket
 import os
-
-#from .apdcamXml import *
 
 def DAC_ADC_channel_mapping():
     """ returns the ADC channel numbers (1...32) for each of the 32 DAC channel numbers     
@@ -1457,6 +1459,153 @@ class APDCAM10G_regCom:
         """
         err, d = self.readPDI(self.codes_PC.PC_CARD,self.codes_PC.PC_REG_CALLIGHT,numberOfBytes=2,arrayData=False)
         return err,d[0]
+    
+    def getHV(self,n): 
+        """
+        Get the HV value for one HV generator.
+
+        Parameters
+        ----------
+        n : int
+            The HV generator number (1...).
+
+        Returns
+        -------
+        err: string
+            
+        value: float
+            The HV in Volts
+
+        """
+        err = self.readStatus()
+        if (err != ""):
+            return err, None
+        return err, self.status.HV_act[n - 1]
+        
+    def setHV(self,n,value):
+        """ Set a detector voltage
+        
+        Parameters
+        ----------
+        n: int
+            The HV generator number (1...)
+        value: int or float
+            The HV value in Volts.
+        
+        Returns
+        ------------
+        error text or ""
+        """
+        
+        d = int(value/self.HV_conversion[n-1])
+
+        err = self.writePDI(self.APDCAM_reg.codes_PC.PC_CARD,
+                            self.APDCAM_reg.codes_PC.PC_REG_HV1SET+(n-1)*2,
+                            d,
+                            numberOfBytes=2,
+                            arrayData=False
+                            )
+        return err
+    
+    def enableHV(self):
+        """
+        Enables the HV for the detectors.
+
+        Returns
+        -------
+        err : string
+            error text or ""
+        """
+        d = 0xAB
+        err = self.GUI_status.APDCAM_reg.writePDI(self.GUI_status.APDCAM_reg.codes_PC.PC_CARD,
+                                                  self.GUI_status.APDCAM_reg.codes_PC.PC_REG_HVENABLE,
+                                                  d,
+                                                  numberOfBytes=1,
+                                                  arrayData=False
+                                                  )
+        return err
+
+    def disableHV(self):
+        """
+        Disables the HV for the detectors.
+
+        Returns
+        -------
+        err : string
+            error text or ""
+        """
+        d = 0
+        err = self.GUI_status.APDCAM_reg.writePDI(self.GUI_status.APDCAM_reg.codes_PC.PC_CARD,
+                                                  self.GUI_status.APDCAM_reg.codes_PC.PC_REG_HVENABLE,
+                                                  d,
+                                                  numberOfBytes=1,
+                                                  arrayData=False
+                                                  )
+        return err
+
+    def HVOn(self,n):
+        """
+        Switches on one detector HV on.
+
+        Parameters
+        ----------
+        n : int
+            The HV generator number (1...)
+
+        Returns
+        -------
+        None.
+
+        """
+
+        err, d = self.readPDI(self.APDCAM_reg.codes_PC.PC_CARD,
+                                                       self.GUI_status.APDCAM_reg.codes_PC.PC_REG_HVON,
+                                                       1,
+                                                       arrayData=False
+                                                       )
+        if (err != ""):
+            return err
+        d = d[0]
+        d = d | 2**(n-1)
+        err = self.writePDI(self.APDCAM_reg.codes_PC.PC_CARD,
+                            self.GUI_status.APDCAM_reg.codes_PC.PC_REG_HVON,
+                            d,
+                            numberOfBytes=1,
+                            arrayData=False
+                            )
+        return err
+
+    def HVOff(self,n):
+        """
+        Switches on one detector HV off.
+
+        Parameters
+        ----------
+        n : int
+            The HV generator number (1...)
+
+        Returns
+        -------
+        None.
+
+        """
+
+        err, d = self.readPDI(self.APDCAM_reg.codes_PC.PC_CARD,
+                                                       self.GUI_status.APDCAM_reg.codes_PC.PC_REG_HVON,
+                                                       1,
+                                                       arrayData=False
+                                                       )
+        if (err != ""):
+            return err
+        d = d[0]
+        d = d & (2**(n-1) ^ 0xff)
+        err = self.writePDI(self.APDCAM_reg.codes_PC.PC_CARD,
+                            self.GUI_status.APDCAM_reg.codes_PC.PC_REG_HVON,
+                            d,
+                            numberOfBytes=1,
+                            arrayData=False
+                            )
+        return err
         
     def measure(self,numberOfSamples=100000, channelMasks=[0xffffffff,0xffffffff, 0xffffffff, 0xffffffff], \
                 sampleDiv=None, datapath="data", bits=None, waitForResult=True, externalTriggerPolarity=None,\

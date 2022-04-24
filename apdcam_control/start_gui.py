@@ -3,7 +3,8 @@
 """
 Created on Mon Apr 18 22:50:29 2022
 
-@author: apdcam
+@author: Sandor Zoletnik, Centre for Energy Research  
+         zoletnik.sandor@ek-cer.hu
 """
 import flap_apdcam
 flap_apdcam.gui()

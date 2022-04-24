@@ -20,14 +20,12 @@ import os
 
 import matplotlib.pyplot as plt
 
-import flap
-import flap_apdcam
-flap_apdcam.register()
+# from ..flap_apdcam import register
+# register()
 
 from .APDCAM10G_control import *
-from .apdcam_plot import * #APDCAM_Plot_class
+from .apdcam_plot import * 
 
-#from .read_config
         
 class APDCAM_GUI_config_class:
     """
@@ -447,8 +445,6 @@ class GUI_shotControl_class :
                 err,APD_settings = self.GUI_status.GUI_top.GUI_APDCAM_widg.read_settings()
                 numberOfSamples = round(meas_length*APD_settings.samplerate*1E6)
                 chmask = copy.deepcopy(self.GUI_status.config.channel_masks)
-                chmask.append(0xffffffff)
-                chmask.append(0xffffffff)
                 
                 if (test_shot_trigger):
                     externalTriggerPolarity = 0
@@ -458,14 +454,15 @@ class GUI_shotControl_class :
                 self.add_message("Starting APDCAM.")
                 self.GUI_status.Update_APDCAM = False
                 time.sleep(0.5)
-                err, warning = apd.measure(numberOfSamples=numberOfSamples,\
-                                  channelMasks=chmask,\
-                                  sampleDiv=APD_settings.sampleDiv,\
-                                  datapath="data",\
-                                  bits=14,\
-                                  waitForResult=False,\
-                                  externalTriggerPolarity=externalTriggerPolarity,\
-                                  triggerDelay=(meas_start_time - self.GUI_status.config.triggerTime)*1e6)
+                err, warning = apd.measure(numberOfSamples=numberOfSamples,
+                                           channelMasks=chmask,
+                                           sampleDiv=APD_settings.sampleDiv,
+                                           datapath="data",
+                                           bits=14,
+                                           waitForResult=False,
+                                           externalTriggerPolarity=externalTriggerPolarity,
+                                           triggerDelay=(meas_start_time - self.GUI_status.config.triggerTime)*1e6
+                                           )
                 if (err != ""):
                     err = "Error starting APDCAM: "+err
                     self.add_message(err) 

@@ -2,7 +2,11 @@
 """
 Created on Sun Feb 27 21:59:55 2022
 
-@author: Zoletnik
+Test program for APDCAM channel map configuration
+Only for creating new channel maps.
+
+@author: Sandor Zoletnik, Centre for Energy Research  
+         zoletnik.sandor@ek-cer.hu
 """
 import numpy as np
 

@@ -4,17 +4,18 @@ Created on Wed Apr 13 22:23:47 2022
 
 GUI for plotting APDCAM data
 
-@author: Sandor Zoletnik zoletnik.sandor@ek-cer.hu
+@author: Sandor Zoletnik, Centre for Energy Research  
+         zoletnik.sandor@ek-cer.hu
 """
 import tkinter as tk
 from tkinter import messagebox
 from tkinter.ttk import *
 import os
 
+import flap
+
 import matplotlib.pyplot as plt
-import flap
-import flap
-import flap_apdcam
+from .apdcam_types_versions import *
 
 class APDCAM_Plot_class:
     """
@@ -43,7 +44,7 @@ class APDCAM_Plot_class:
         self.data = None
         self.var_camera_type = tk.StringVar()
         self.var_camera_version = tk.StringVar()
-        self.camera_type_list, self.camera_version_list_list = flap_apdcam.apdcam_types_versions()
+        self.camera_type_list, self.camera_version_list_list = apdcam_types_versions()
         self.camera_version_list = None
         self.var_rawplot_options_allpoints = tk.IntVar()
         self.rawplot_options_allpoints = False
@@ -102,13 +103,13 @@ class APDCAM_Plot_class:
                 self.camera_select_widg = tk.OptionMenu(camera_settings_frame,self.var_camera_type,*tuple(self.camera_type_list),command=self.camera_type_select)
                 self.camera_select_widg.grid(row=0,column=1,sticky='w')
             else:
-                w = tk.Label(camera_settings_frame,text='Camera type:'+camera_type,bg=plot_background).grid(row=0,column=0)
+                w = tk.Label(camera_settings_frame,text='Camera type:'+str(camera_type),bg=plot_background).grid(row=0,column=0)
             if (camera_version is None):
                 w = tk.Label(camera_settings_frame,text='      Camera version:',bg=plot_background).grid(row=0,column=2,sticky='e')
                 self.camera_version_select_widg = tk.OptionMenu(camera_settings_frame,self.var_camera_version,("n.a"),command=self.camera_version_select)
                 self.camera_version_select_widg.grid(row=0,column=3,sticky='w')
             else:
-                w = tk.Label(camera_settings_frame,text='      Camera version: {:s}'.format(camera_version),bg=plot_background).grid(row=0,column=2)
+                w = tk.Label(camera_settings_frame,text='      Camera version: {:s}'.format(str(camera_version)),bg=plot_background).grid(row=0,column=2)
         row0 = 1            
                 
         general_settings_frame = tk.LabelFrame(self.plotControl_widg,bd=4, padx=2, pady=2,relief=tk.GROOVE,text='Data',bg=plot_background)
@@ -806,7 +807,6 @@ class APDCAM_Plot_class:
         
                
 def plot_gui():  
-    flap_apdcam.register()
      
     global root
     root = tk.Tk()

@@ -27,7 +27,7 @@ def apdcam_control_example(camera_type = 'APDCAM-10G_8x16A'):
     apdcam = apdcam_control.APDCAM10G_regCom()
     # Connecting to the camera with the default address
     print("Connecting...")
-    ret = apdcam.connect(ip="10.123.14.102")
+    ret = apdcam.connect(ip="10.123.13.102")
     if (ret != ""):
         print("{:s}".format(ret))
         apdcam.close()

@@ -13,6 +13,8 @@ Example of controlling APDCAM-10G
          zoletnik.sandor@ek-cer.hu
 """
 
+import matplotlib.pyplot as plt
+
 import flap
 import flap_apdcam
 import flap_apdcam.apdcam_control as apdcam_control
@@ -25,26 +27,33 @@ def apdcam_control_example(camera_type = 'APDCAM-10G_8x16A'):
     apdcam = apdcam_control.APDCAM10G_regCom()
     # Connecting to the camera with the default address
     print("Connecting...")
-    ret = apdcam.connect()
+    ret = apdcam.connect(ip="10.123.14.102")
     if (ret != ""):
         print("{:s}".format(ret))
         apdcam.close()
         return
     
-    err = apdcam.readStatus()
-    print("Connected. Number of channels: {:d}.".format(len(apdcam.status.ADC_address)))
+    ret = apdcam.readStatus()
+    if (ret != ""):
+        print("Error reding status:{:s}".format(ret))
+        apdcam.close()
+        return
+        
+    print("Connected. Number of channels: {:d}.".format(len(apdcam.status.ADC_address) * 32))
     
     # Enabling HV
     ret = apdcam.enableHV()
     if (ret != ""):
         print("Error enabling HV.")
+        apdcam.close()
         return
     
     # Switching on detector HVs. It is assumed that the value is already set.
     for i in range(4):
-        ret = apdcam.HVon(i + 1)
+        ret = apdcam.HVOn(i + 1)
         if (ret != ""):
             print("Error switching on HV{:d}.".format(i + 1))
+            apdcam.close()
             return
     
     #Setting up measurement parameters
@@ -77,15 +86,24 @@ def apdcam_control_example(camera_type = 'APDCAM-10G_8x16A'):
     if (warning != ''):
         print("Warning in APDCAM measurement: {:S}".format(warning))
     if (err != ""):
-        print("Error in APDCAM measurement: {:S}".format(err))
+        print("Error in APDCAM measurement: {:s}".format(err))
+        apdcam.close()
         return
-    
+   
+    # Disabling HV
+    ret = apdcam.disableHV()
+    if (ret != ""):
+        print("Error disabling HV.")
+        apdcam.close()
+        return
+
     apdcam.close()
     
     # Reading a single pixel, data in digits
     datapath = 'data'
     signal=flap.get_data('APDCAM',name='APD-1-1',options={'Datapath':datapath,'Camera type':camera_type})
     # Plotting it vs time
+    plt.close('all')
     signal.plot()
     
 

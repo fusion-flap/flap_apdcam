@@ -1517,12 +1517,12 @@ class APDCAM10G_regCom:
             error text or ""
         """
         d = 0xAB
-        err = self.GUI_status.APDCAM_reg.writePDI(self.GUI_status.APDCAM_reg.codes_PC.PC_CARD,
-                                                  self.GUI_status.APDCAM_reg.codes_PC.PC_REG_HVENABLE,
-                                                  d,
-                                                  numberOfBytes=1,
-                                                  arrayData=False
-                                                  )
+        err = self.writePDI(self.codes_PC.PC_CARD,
+                            self.codes_PC.PC_REG_HVENABLE,
+                            d,
+                            numberOfBytes=1,
+                            arrayData=False
+                            )
         return err
 
     def disableHV(self):
@@ -1535,12 +1535,12 @@ class APDCAM10G_regCom:
             error text or ""
         """
         d = 0
-        err = self.GUI_status.APDCAM_reg.writePDI(self.GUI_status.APDCAM_reg.codes_PC.PC_CARD,
-                                                  self.GUI_status.APDCAM_reg.codes_PC.PC_REG_HVENABLE,
-                                                  d,
-                                                  numberOfBytes=1,
-                                                  arrayData=False
-                                                  )
+        err = self.writePDI(self.codes_PC.PC_CARD,
+                            self.codes_PC.PC_REG_HVENABLE,
+                            d,
+                            numberOfBytes=1,
+                            arrayData=False
+                            )
         return err
 
     def HVOn(self,n):
@@ -1558,17 +1558,17 @@ class APDCAM10G_regCom:
 
         """
 
-        err, d = self.readPDI(self.APDCAM_reg.codes_PC.PC_CARD,
-                                                       self.GUI_status.APDCAM_reg.codes_PC.PC_REG_HVON,
-                                                       1,
-                                                       arrayData=False
-                                                       )
+        err, d = self.readPDI(self.codes_PC.PC_CARD,
+                              self.codes_PC.PC_REG_HVON,
+                              1,
+                              arrayData=False
+                              )
         if (err != ""):
             return err
         d = d[0]
         d = d | 2**(n-1)
-        err = self.writePDI(self.APDCAM_reg.codes_PC.PC_CARD,
-                            self.GUI_status.APDCAM_reg.codes_PC.PC_REG_HVON,
+        err = self.writePDI(self.codes_PC.PC_CARD,
+                            self.codes_PC.PC_REG_HVON,
                             d,
                             numberOfBytes=1,
                             arrayData=False
@@ -1590,17 +1590,17 @@ class APDCAM10G_regCom:
 
         """
 
-        err, d = self.readPDI(self.APDCAM_reg.codes_PC.PC_CARD,
-                                                       self.GUI_status.APDCAM_reg.codes_PC.PC_REG_HVON,
-                                                       1,
-                                                       arrayData=False
-                                                       )
+        err, d = self.readPDI(self.codes_PC.PC_CARD,
+                              self.codes_PC.PC_REG_HVON,
+                              1,
+                              arrayData=False
+                              )
         if (err != ""):
             return err
         d = d[0]
         d = d & (2**(n-1) ^ 0xff)
-        err = self.writePDI(self.APDCAM_reg.codes_PC.PC_CARD,
-                            self.GUI_status.APDCAM_reg.codes_PC.PC_REG_HVON,
+        err = self.writePDI(self.codes_PC.PC_CARD,
+                            self.codes_PC.PC_REG_HVON,
                             d,
                             numberOfBytes=1,
                             arrayData=False
@@ -1708,7 +1708,9 @@ class APDCAM10G_regCom:
         chnum = 0
         for i in range(n_adc):
             chnum += bin(chmask[i]).count("1")
-        buflen = numberOfSamples*chnum*2
+            
+        numberOfSamples_plus = numberOfSamples + 10000    
+        buflen = numberOfSamples_plus * chnum * 2
         min_buflen = 2e8
         if (buflen > min_buflen):
             buflen = round(min_buflen/float(buflen)*100)
@@ -1720,12 +1722,12 @@ class APDCAM10G_regCom:
             f.write("Open "+ip+"\n")
             f.write("Stop\n")
             f.write("Stream-Interface "+interface+"\n")
-            s = "Allocate "+str(round(numberOfSamples))+" "+str(bits)+" " 
+            s = "Allocate "+str(round(numberOfSamples_plus))+" "+str(bits)+" " 
             for i in range(4):
                 s = s+"0x{:X} ".format(chmask[i])
             s = s+"{:d}".format(buflen)
             f.write(s+"\n")
-            f.write("Arm 0 "+str(round(numberOfSamples))+" 0 1\n")
+            f.write("Arm 0 "+str(round(numberOfSamples_plus))+" 0 1\n")
             f.write("Start\n")
             f.write("Wait 1000000\n")
             f.write("Save\n")

@@ -9,5 +9,8 @@ Example of startting APDCAM GUI
 """
 
 import flap_apdcam.apdcam_control as apdcam_control
+import flap_apdcam
+
+flap_apdcam.register()
 
 apdcam_control.gui()

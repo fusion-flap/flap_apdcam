@@ -15,6 +15,7 @@ import subprocess
 import xml.etree.ElementTree as ET
 import socket
 import os
+import numpy as np
 
 def DAC_ADC_channel_mapping():
     """ returns the ADC channel numbers (1...32) for each of the 32 DAC channel numbers     
@@ -333,6 +334,10 @@ class APDCAM10G_ADCcodes_v1 :
     ADC_REG_COEFF_INT = 0xDA
     ADC_REG_BPSCH1 = 0x1D
     ADC_REG_ERRORCODE = 0x24
+    
+    INT_TRIG_POSITIVE = 0
+    NT_TRIG_NEGATIVE = 1
+    
 
 class APDCAM_PCcodes_v1 :
     """ Register addresses and other defines for the APDCAM control board
@@ -1606,7 +1611,63 @@ class APDCAM10G_regCom:
                             arrayData=False
                             )
         return err
+    
+    def setInternalTrigger(self,channel=None,enable=True,level=None,polarity=None):
+        """
+        Sets the internal trigger for one channel, but does not enable internal trigger globally.
+
+        Parameters
+        ----------
+        channel : int
+            The ADC channel.
+        level : int
+            The level in 14 bit resolution.
+        polarity : TYPE
+            The polarity. Either self.codes_ADC.INT_TRIG_POSITIVE or self.codes_ADC.INT_TRIG_NEGATIVE
+        enable: boolean, optional
+            If True enables trigger on this channel. The default is True
+
+        Returns
+        -------
+        err
+            Error text or "".
+
+        """
         
+        if ((channel is None) or (level is None) or (polarity is None)):
+            return "Parameters not set."
+        adc_no = (channel - 1) // 32
+        ch_num = (channel - 1) % 32
+        d = 2 ** 15  # Enable
+        if (polarity == self.codes_ADC.INT_TRIG_POSITIVE):
+            pass
+        elif (polarity == self.codes_ADC.INT_TRIG_NEGATIVE):
+            d += 2 ** 14
+        else:
+            return "Invalid trigger polarity"
+        if (level >= 2 ** 14):
+            return "Invalid trigger level"
+        
+        err = self.writePDI(self.status.ADC_address[adc_no],self.codes_ADC.ADC_REG_MAXVAL11,d,numberOfBytes=2,arrayData=False)
+        if (err != ""):
+            return "Error setting internal trigger"
+        
+    def clearAllInternalTrigger(self):
+        """
+        Clears all internal trigger settings but does not disable internal trigger.
+
+        Returns
+        -------
+        str
+            DESCRIPTION.
+
+        """
+        d = np.zeros(64,bytes())
+        for adc in self.status.ADC_address:
+           err = self.writePDI(adc,self.codes_ADC.ADC_REG_MAXVAL11,d,numberOfBytes=64,arrayData=True)
+           if (err != ""):
+               return "Error clearing internal trigger"
+           
     def measure(self,numberOfSamples=100000, channelMasks=[0xffffffff,0xffffffff, 0xffffffff, 0xffffffff], \
                 sampleDiv=None, datapath="data", bits=None, waitForResult=True, externalTriggerPolarity=None,\
                 internalTrigger=False, triggerDelay = 0):
@@ -1871,10 +1932,22 @@ class APDCAM10G_regCom:
             trig = -1
         else:
             trig = float(self.measurePara.triggerDelay)/1e6
+
         m.addElement(section="ADCSettings",element="Trigger", \
                      value= float(trig),\
                      unit = 's',\
-                     comment="Trigger: <0: manual,otherwise external with this delay")
+                     value_type='float',
+                     comment="Trigger: <0: manual,otherwise external or internal with this delay")
+        if (self.measurePara.internalTrigger):
+            inttrig = 1
+        else:
+            inttrig = 0
+        m.addElement(section="ADCSettings",element="InernalTrigger",
+             value= inttrig,
+             unit = '',
+             value_type = 'int',
+             comment="Internal trigger: 0: Disabled, 1: Enabled"
+             )
         try:
             m.writeFile()
         except: return "Error writing file "+fn

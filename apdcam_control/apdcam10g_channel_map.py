@@ -2,7 +2,8 @@
 """
 Created on Sun Feb 27 12:51:00 2022
 
-@author: Zoletnik
+@author: Sandor Zoletnik, Centre for Energy Research  
+         zoletnik.sandor@ek-cer.hu
 """
 import numpy as np
 
@@ -273,3 +274,4 @@ def apdcam10g_channel_map(camera_type=None,camera_version=1):
         np.arange(64,dtype=int)  
     else:
         raise ValueError('Unknown camera type:"{:s}"'.format(camera_type))
+        

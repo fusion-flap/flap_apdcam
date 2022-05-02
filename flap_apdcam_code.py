@@ -194,7 +194,7 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
     elif (camera_family == 'APDCAM'):
         if (_options['Camera type'] is not None): 
             camera_type = _options['Camera type']
-            if (camera_type[:11].lower() != 'apdcam-1g_' ):
+            if (camera_type[:9].lower() != 'apdcam-1g' ):
                 raise ValueError("Invalid camera type '{:s}'. Data is from APDCAM-1G".format(camera_type))
             if (camera_type == 'APDCAM-1G'):
                 sensor_angle = 0

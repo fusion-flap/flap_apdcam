@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-This is the graphical user interface for measuring with APDCAM-10G
+
+    This is the graphical user interface for measuring with APDCAM-10G
 and plotting data using the flap environment
 
-Author: S. Zoletnik  zoletnik.sandor@ek-cer.hu
-    
- """
+@author: Sandor Zoletnik, Centre for Energy Research  
+         zoletnik.sandor@ek-cer.hu """
  
  
 import tkinter as tk
@@ -17,6 +17,7 @@ import pathlib
 import configparser
 import subprocess
 import os
+import re
 
 import matplotlib.pyplot as plt
 
@@ -25,6 +26,8 @@ import matplotlib.pyplot as plt
 
 from .APDCAM10G_control import *
 from .apdcam_plot import * 
+from .apdcam10g_channel_map import apdcam10g_channel_map
+from .apdcam_channel_list import apdcam_channel_list
 
         
 class APDCAM_GUI_config_class:
@@ -230,10 +233,98 @@ class APDCAM_GUI_class(tk.Frame):
         self.state.config.APDCAMAddress = self.readConfigElement("General","Address","10.123.13.102","string")
         self.state.config.camera_type = self.readConfigElement("General","CameraType","","string")
         self.state.config.camera_version = self.readConfigElement("General","CameraVersion","1","int")
+        try:
+            if (self.state.config.camera_type.lower()[:11] != 'apdcam-10g_'):
+                self.state.GUI.add_message("Unknown camera type '{:s}'. Should be APDCAM-10G_xxx.",self.state.config.camera_type)
+            self.channel_map = apdcam10g_channel_map(camera_type=self.state.config.camera_type[11:],
+                                                     camera_version=self.state.config.camera_version
+                                                     )
+        except ValueError as e:
+            self.state.GUI.add_message(str(e))
         self.state.config.APDCAMStartTime = self.readConfigElement("Trigger","APDCAMStartTime",0,"float")       
         self.state.config.triggerTime = self.readConfigElement("Trigger","TriggerTime",0,"float")                  
-        self.state.config.channel_masks = [0xffffffff,0xffffffff,0xffffffff,0xffffffff]        
+        self.state.config.channel_masks = [0xffffffff,0xffffffff,0xffffffff,0xffffffff] 
                         
+        
+    def set_internal_trigger(self):
+        """
+        Read internal trigger settings from the configuration file and apply to the camera if it is connected.
+        The configuration file entries are of the form:
+            InternalTrigger_<channel> = (<Enable>,<polarity>,<level>)
+              where <channel> is either APD-<row>-<column>
+                                 or     ADC<channel>
+                    <Enable> is ENABLE or DISABLE (or abbreviation, in lower or upper case)
+                    <Polarity> is POSITIVE or NEGATIVE (or abbreviation, in lower or upper case)
+                    <level> is level in digits (14 bits). The level is in units of the output signal, not the ADC data
+                                                          (Output signal is written into the data files.)
+
+        The internal trigger is not enabled globally, just the channel settings are done.
+        
+        Returns
+        -------
+        None.
+
+        """
+        if (not self.GUI_status.APDCAM_on):
+            raise ("Camera not connected, cannot set internal trigger.")
+        chlist = apdcam_channel_list(self.chmap)
+        valid_entry = '(ENABLE | DISABLE, POSITIVE | NEGATIVE,<level>)'
+        for ch in chlist:
+            err,val = self.config_get(self.state.config.configFile,"Trigger","InternalTrigger_"+ch)
+            if (err != ""):
+                entry = None
+                while (True):
+                    m = re.re.search("^\(.*\)$",val)
+                    if (m is None):
+                        self.state.GUI.add_message("Invalid internal trigger description for channel '{:s}: {:s}".format(ch,val))
+                        break
+                    m = m[1:-1]
+                    m_split = m.split(',')
+                    if (len(m_split) != 3):
+                        self.state.GUI.add_message("Invalid internal trigger description for channel '{:s}: {:s}".format(ch,val))
+                        break
+                    if (m_split[0].lower() == 'enable'[:len(m_split[0])]):
+                        en = True
+                    elif (m_split[0].lower() == 'disable'[:len(m_split[0])]):
+                        en = False
+                    else:
+                        self.state.GUI.add_message("Invalid internal trigger description for channel '{:s}: {:s}".format(ch,val))
+                        break
+                    if (m_split[1].lower() == 'positive'[:len(m_split[1])]):
+                        pol = self.status.APDCAM_reg.codes_ADC.INT_TRIG_POSITIVE
+                    elif (m_split[1].lower() == 'negative'[:len(m_split[1])]):
+                        pol = self.status.APDCAM_reg.codes_ADC.INT_TRIG_NEGATIVE
+                    else:
+                        self.state.GUI.add_message("Invalid internal trigger description for channel '{:s}: {:s}".format(ch,val))
+                        break
+                    try:
+                       val = int(m_split[2])
+                    except ValueError:
+                        self.state.GUI.add_message("Invalid internal trigger description for channel '{:s}: {:s}".format(ch,val))
+                        break
+                    entry = {'Enable':en,'Polarity':pol,'Value':val}
+                    break
+                if (entry is not None):
+                    if (ch[:3].lower() == 'adc' ):
+                        chnum = int(ch[3:])
+                    else:
+                        ch_split = ch[5:].split('-')
+                        row = int(ch_split[0])
+                        column = int(ch_split[1])
+                        chnum = self.chmap(row - 1,column - 1)
+                    
+                    self.status.APDCAM_reg.setInternalTrigger(channel=chnum,
+                                                              level=entry['Value'],
+                                                              polarity=entry['Polarity'],
+                                                              enable=entry['Enable']
+                                                              )
+                else:
+                    self.state.GUI.add_message("Valid entry format: {:s}".format(valid_entry))
+                break    
+        
+
+
+
     def set_defaults(self):   
         """
         Calls set_defaults() in all the widgets
@@ -322,9 +413,9 @@ class GUI_shotControl_class :
         w = tk.Label(shotSettingsFrame,text='Measurement ID:').grid(row=1,column=1)
         self.shotID_widg = tk.Entry(shotSettingsFrame,width=15,textvariable=self.var_shotID)
         self.shotID_widg.grid(row=1,column=2)
-        optionList = ('SW Trigger','HW Trigger')
+        optionList = ('SW Trigger','External Trigger','Internal Trigger')
         self.var_shot_mode.set(optionList[0])
-        self.shot_mode_widg = tk.OptionMenu(shotSettingsFrame,self.var_shot_mode,*optionList)
+        self.shot_mode_widg = tk.OptionMenu(shotSettingsFrame,self.var_shot_mode,*optionList,command=self.trigmode_change)
         self.shot_mode_widg.grid(row=1,column=3)                                    
         self.shot_mode_widg["width"] = 17
         
@@ -347,6 +438,9 @@ class GUI_shotControl_class :
         self.message_widg.insert(tk.END,txt+"\n")
         self.message_widg.see(tk.END)
         
+    def trigmode_change(self):
+        if (self.var_shot_mode.get() == 'Internal Trigger'):
+            self.GUI_status.GUI.set_internal_trigger()
         
     def runMeasurement(self) :
         """ This is a separate thread which runs the measurement sequence
@@ -357,11 +451,9 @@ class GUI_shotControl_class :
         # The APDCAM control class instance
         apd = self.GUI_status.APDCAM_reg
     
-        shotmode = self.var_shot_mode.get()
-        test_shot_trigger = False
-        if (shotmode == 'Test w. trigger'):
+        shotmode_str = self.var_shot_mode.get()
+        if (shotmode_str == 'SW Trigger'):
             shotmode = 'Test'
-            test_shot_trigger = True
             
         meas_start_time = float(0)
             
@@ -446,10 +538,14 @@ class GUI_shotControl_class :
                 numberOfSamples = round(meas_length*APD_settings.samplerate*1E6)
                 chmask = copy.deepcopy(self.GUI_status.config.channel_masks)
                 
-                if (test_shot_trigger):
+                if (shotmode_str == 'External Trigger'):
                     externalTriggerPolarity = 0
                 else:    
                     externalTriggerPolarity = None
+                if (shotmode_str == 'Internal Trigger'):
+                    internal_trigger = True
+                else:
+                    internal_trigger = False
                     
                 self.add_message("Starting APDCAM.")
                 self.GUI_status.Update_APDCAM = False
@@ -461,6 +557,7 @@ class GUI_shotControl_class :
                                            bits=14,
                                            waitForResult=False,
                                            externalTriggerPolarity=externalTriggerPolarity,
+                                           internalTrigger=internal_trigger,
                                            triggerDelay=(meas_start_time - self.GUI_status.config.triggerTime)*1e6
                                            )
                 if (err != ""):
@@ -475,7 +572,7 @@ class GUI_shotControl_class :
                 APDCAM_started = True
                         
             # Stopping waiting loop if measurement time has passed
-            if ((externalTriggerPolarity is None) and (-time_to_shot > meas_start_time+meas_length+2)) :
+            if ((externalTriggerPolarity is None) and not internal_trigger and (-time_to_shot > meas_start_time+meas_length+2)) :
                 self.add_message("Measurement time is over.")
                 break
 

@@ -97,7 +97,7 @@ class APDCAM_GUI_class(tk.Frame):
         self.GUI_shotControl_widg = \
             GUI_shotControl_class(GUI_status=self.state)
         self.GUI_APDCAM_widg = APDCAM10G_GUI_class(GUI_status=self.state)
-        self.GUI_APDCAM_widg1 = APDCAM10G_GUI_class(GUI_status=self.state)
+#        self.GUI_APDCAM_widg1 = APDCAM10G_GUI_class(GUI_status=self.state)
         self.APDCAM_plot_widg = APDCAM_Plot_class(root=root)
         self.state.config.APDCAM_Plot = self.APDCAM_plot_widg
 
@@ -265,20 +265,20 @@ class APDCAM_GUI_class(tk.Frame):
         None.
 
         """
-        if (not self.GUI_status.APDCAM_on):
-            raise ("Camera not connected, cannot set internal trigger.")
-        chlist = apdcam_channel_list(self.chmap)
+        # if (not self.GUI_APDCAM_widg.GUI_status.APDCAM_connected):
+        #     raise ("Camera not connected, cannot set internal trigger.")
+        chlist = apdcam_channel_list(self.channel_map)
         valid_entry = '(ENABLE | DISABLE, POSITIVE | NEGATIVE,<level>)'
         for ch in chlist:
             err,val = self.config_get(self.state.config.configFile,"Trigger","InternalTrigger_"+ch)
-            if (err != ""):
+            if (err == ""):
                 entry = None
                 while (True):
-                    m = re.re.search("^\(.*\)$",val)
+                    m = re.search("^\(.*\)$",val)
                     if (m is None):
                         self.state.GUI.add_message("Invalid internal trigger description for channel '{:s}: {:s}".format(ch,val))
                         break
-                    m = m[1:-1]
+                    m = m.group(0)[1:-1]
                     m_split = m.split(',')
                     if (len(m_split) != 3):
                         self.state.GUI.add_message("Invalid internal trigger description for channel '{:s}: {:s}".format(ch,val))
@@ -291,9 +291,10 @@ class APDCAM_GUI_class(tk.Frame):
                         self.state.GUI.add_message("Invalid internal trigger description for channel '{:s}: {:s}".format(ch,val))
                         break
                     if (m_split[1].lower() == 'positive'[:len(m_split[1])]):
-                        pol = self.status.APDCAM_reg.codes_ADC.INT_TRIG_POSITIVE
+                        
+                        pol = self.GUI_APDCAM_widg.GUI_status.APDCAM_reg.codes_ADC.INT_TRIG_POSITIVE
                     elif (m_split[1].lower() == 'negative'[:len(m_split[1])]):
-                        pol = self.status.APDCAM_reg.codes_ADC.INT_TRIG_NEGATIVE
+                        pol = self.GUI_APDCAM_widg.GUI_status.APDCAM_reg.codes_ADC.INT_TRIG_NEGATIVE
                     else:
                         self.state.GUI.add_message("Invalid internal trigger description for channel '{:s}: {:s}".format(ch,val))
                         break
@@ -311,13 +312,13 @@ class APDCAM_GUI_class(tk.Frame):
                         ch_split = ch[5:].split('-')
                         row = int(ch_split[0])
                         column = int(ch_split[1])
-                        chnum = self.chmap(row - 1,column - 1)
+                        chnum = self.channel_map(row - 1,column - 1)
                     
-                    self.status.APDCAM_reg.setInternalTrigger(channel=chnum,
-                                                              level=entry['Value'],
-                                                              polarity=entry['Polarity'],
-                                                              enable=entry['Enable']
-                                                              )
+                    self.GUI_APDCAM_widg.GUI_status.APDCAM_reg.setInternalTrigger(channel=chnum,
+                                                                                  level=entry['Value'],
+                                                                                  polarity=entry['Polarity'],
+                                                                                  enable=entry['Enable']
+                                                                                  )
                 else:
                     self.state.GUI.add_message("Valid entry format: {:s}".format(valid_entry))
                 break    
@@ -438,9 +439,9 @@ class GUI_shotControl_class :
         self.message_widg.insert(tk.END,txt+"\n")
         self.message_widg.see(tk.END)
         
-    def trigmode_change(self):
+    def trigmode_change(self,event):
         if (self.var_shot_mode.get() == 'Internal Trigger'):
-            self.GUI_status.GUI.set_internal_trigger()
+            self.GUI_status.GUI_top.set_internal_trigger()
         
     def runMeasurement(self) :
         """ This is a separate thread which runs the measurement sequence

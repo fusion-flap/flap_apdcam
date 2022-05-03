@@ -336,7 +336,7 @@ class APDCAM10G_ADCcodes_v1 :
     ADC_REG_ERRORCODE = 0x24
     
     INT_TRIG_POSITIVE = 0
-    NT_TRIG_NEGATIVE = 1
+    INT_TRIG_NEGATIVE = 1
     
 
 class APDCAM_PCcodes_v1 :
@@ -969,7 +969,7 @@ class APDCAM10G_regCom:
         return err,data
    # end of readPDI 
   
-    def writePDI(self,cardAddress=None,registerAddress=None,data = None,numberOfBytes=None,\
+    def writePDI(self,cardAddress=None,registerAddress=None,data=None,numberOfBytes=None,\
              arrayData=None,byteOrder=None,waitTime=None, noReadBack=False):       
         """Writes data through the Parallel Data Interface (PDI). Can do multiple writes in succession.
             Waits a given time after each write. Accepts data either as array of bytes or integer, as defined by the
@@ -1619,9 +1619,10 @@ class APDCAM10G_regCom:
         Parameters
         ----------
         channel : int
-            The ADC channel.
+            The ADC channel. (1...)
         level : int
-            The level in 14 bit resolution.
+            The level in 14 bit resolution. This is the scale of the ADC sigals. The final output signlas from the measurement 
+            are 16384 - signal. Valid range: 0...16383
         polarity : TYPE
             The polarity. Either self.codes_ADC.INT_TRIG_POSITIVE or self.codes_ADC.INT_TRIG_NEGATIVE
         enable: boolean, optional
@@ -1636,21 +1637,27 @@ class APDCAM10G_regCom:
         
         if ((channel is None) or (level is None) or (polarity is None)):
             return "Parameters not set."
-        adc_no = (channel - 1) // 32
-        ch_num = (channel - 1) % 32
-        d = 2 ** 15  # Enable
+        adc_no = int((channel - 1) // 32)
+        ch_num = int((channel - 1) % 32)
+        if (enable):
+            d = 2 ** 15  # Enable
+        else:
+            d = 0
         if (polarity == self.codes_ADC.INT_TRIG_POSITIVE):
             pass
         elif (polarity == self.codes_ADC.INT_TRIG_NEGATIVE):
             d += 2 ** 14
         else:
             return "Invalid trigger polarity"
-        if (level >= 2 ** 14):
+        if ((level >= 2 ** 14) or (level < 0)):
             return "Invalid trigger level"
+        d += level
         
-        err = self.writePDI(self.status.ADC_address[adc_no],self.codes_ADC.ADC_REG_MAXVAL11,d,numberOfBytes=2,arrayData=False)
+        err = self.writePDI(self.status.ADC_address[adc_no],self.codes_ADC.ADC_REG_MAXVAL11 + ch_num * 2,int(d),numberOfBytes=2,arrayData=False)
         if (err != ""):
-            return "Error setting internal trigger"
+            return "Error setting internal trigger:"+err
+        return ""
+        
         
     def clearAllInternalTrigger(self):
         """
@@ -1662,11 +1669,13 @@ class APDCAM10G_regCom:
             DESCRIPTION.
 
         """
-        d = np.zeros(64,bytes())
+        d = bytearray(64)
+                                          
         for adc in self.status.ADC_address:
            err = self.writePDI(adc,self.codes_ADC.ADC_REG_MAXVAL11,d,numberOfBytes=64,arrayData=True)
            if (err != ""):
                return "Error clearing internal trigger"
+        return ""
            
     def measure(self,numberOfSamples=100000, channelMasks=[0xffffffff,0xffffffff, 0xffffffff, 0xffffffff], \
                 sampleDiv=None, datapath="data", bits=None, waitForResult=True, externalTriggerPolarity=None,\

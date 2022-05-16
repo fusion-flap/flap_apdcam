@@ -444,7 +444,7 @@ class GUI_shotControl_class :
         self.add_message = self.add_message_func
         
     def set_defaults(self) :
-        self.var_meas_length.set("1.0")
+        self.var_meas_length.set("0.1")
     
     def start(self):
         pass

@@ -1559,7 +1559,8 @@ class APDCAM10G_regCom:
 
         Returns
         -------
-        None.
+        error: string
+               "" if no error, otherwise error message
 
         """
 
@@ -1591,7 +1592,8 @@ class APDCAM10G_regCom:
 
         Returns
         -------
-        None.
+        error: string
+               "" if no error, otherwise error message
 
         """
 
@@ -1615,6 +1617,7 @@ class APDCAM10G_regCom:
     def setInternalTrigger(self,channel=None,enable=True,level=None,polarity=None):
         """
         Sets the internal trigger for one channel, but does not enable internal trigger globally.
+        Use setTrigger to set up the global trigger scheme.
 
         Parameters
         ----------
@@ -1657,6 +1660,63 @@ class APDCAM10G_regCom:
         if (err != ""):
             return "Error setting internal trigger:"+err
         return ""
+        
+    def setTrigger(self,externalTriggerPolarity=None,internalTrigger=False,triggerDelay = 0):
+        """
+        Sets the trigger scheme in the camera.
+
+        Parameters
+        ----------
+        externalTriggerPolarity: None: no external trigger
+                                    0: Positive edge
+                                    1: Negative edge
+        internalTrigger: True enables internal trigger
+        triggerDelay:  Trigger with this delay [microsec]
+
+        Returns
+        -------
+        error: string
+               "" if no error, otherwise error message
+
+        """
+
+        print("Set trigger entered",flush=True)        
+        if (triggerDelay < 0):
+            td = int(0)
+        else:
+            td = int(triggerDelay)
+        d = 0x40
+        if (externalTriggerPolarity != None):
+            if (externalTriggerPolarity == 0):
+                d = d | 0x01
+            else:
+                d = d | 0x02
+        if (internalTrigger):
+            d = d | 0x04
+        userData = bytes([d]) + td.to_bytes(4,'big',signed=False) 
+        err = self.sendCommand(self.codes_CC.OP_SETTRIGGER,userData,sendImmediately=True)
+        if (err != ""):
+            return err
+        n_adc = len(self.status.ADC_address)
+        reg = [self.codes_ADC.ADC_REG_CONTROL] * n_adc           
+        err,ret = self.readPDI(self.status.ADC_address,
+                               reg,
+                               numberOfBytes=[1]*n_adc,
+                               arrayData=[False]*n_adc
+                               )
+        for i in range(len(ret)):
+            if (internalTrigger):
+                ret[i] |= 0x20
+            else:
+                ret[i] &= 0xff - 0x20
+        err = self.writePDI(self.status.ADC_address,
+                            reg,
+                            ret,
+                            numberOfBytes=[1]*n_adc,
+                            arrayData=[False]*n_adc,
+                            noReadBack=False
+                            )
+        return err
         
         
     def clearAllInternalTrigger(self):
@@ -1745,20 +1805,9 @@ class APDCAM10G_regCom:
             else:
                return "Invalid bit resolution setting in ADCs." ,""
                 
-
-        if (triggerDelay < 0):
-            triggerDelay = 0
-        d = 0x40
-        if (externalTriggerPolarity != None):
-            if (externalTriggerPolarity == 0):
-                d = d | 0x01
-            else:
-                d = d | 0x02
-        if (internalTrigger):
-            d = d | 0x04
-        td = round(triggerDelay)        
-        userData = bytes([d]) + td.to_bytes(4,'big',signed=False) 
-        err = self.sendCommand(self.codes_CC.OP_SETTRIGGER,userData,sendImmediately=True)
+        err = self.setTrigger(externalTriggerPolarity=externalTriggerPolarity,
+                              internalTrigger=internalTrigger,triggerDelay=triggerDelay
+                              )
         if (err != ""):
             return err,""
         

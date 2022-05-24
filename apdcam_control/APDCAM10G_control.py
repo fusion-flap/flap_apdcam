@@ -1458,6 +1458,26 @@ class APDCAM10G_regCom:
         err = self.writePDI(self.codes_PC.PC_CARD,self.codes_PC.PC_REG_CALLIGHT,value,numberOfBytes=2,arrayData=False)
         return err  
 
+    def setShutter(self,value):
+        """
+        Set the shutter state.        
+
+        Parameters
+        ----------
+        value : int
+            0: Close
+            1: Open
+
+        Returns
+        -------
+        err : string
+            "" o error text.
+        """
+        
+        err = self.writePDI(self.codes_PC.PC_CARD,self.codes_PC.PC_REG_SHSTATE,value,numberOfBytes=1,arrayData=False)
+        return err  
+
+
     def getCallight(self):
         """ Get the current calibration  light setting.
         Returns error text and number
@@ -1626,7 +1646,7 @@ class APDCAM10G_regCom:
         level : int
             The level in 14 bit resolution. This is the scale of the ADC sigals. The final output signlas from the measurement 
             are 16384 - signal. Valid range: 0...16383
-        polarity : TYPE
+        polarity : int
             The polarity. Either self.codes_ADC.INT_TRIG_POSITIVE or self.codes_ADC.INT_TRIG_NEGATIVE
         enable: boolean, optional
             If True enables trigger on this channel. The default is True

@@ -39,7 +39,7 @@ plt.pause(1)
 # Reading all pixels, data in volts
 signal=flap.get_data('APDCAM',name='APD-*',options={'Datapath':datapath,'Camera type':camera_type, 'Scaling':'Volt'})
 # Plotting all signals on fixed scale between 0 and maximum
-print("Plotting all signals, be patient.")
+print("Plotting all signals, be patient.",flush=True)
 plt.figure(figsize=(20,20))
 yrange = [0,np.amax(signal.data) * 1.05]
 signal.plot(plot_type='grid xy',axes=['Row','Column','Time'],options={'Y range':yrange})

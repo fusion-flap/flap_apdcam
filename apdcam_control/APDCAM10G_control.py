@@ -1680,7 +1680,46 @@ class APDCAM10G_regCom:
         if (err != ""):
             return "Error setting internal trigger:"+err
         return ""
+
+    def setInternalTriggerADC(self,enable=True):
+        """
+        Enable/Disable trigger output in all ADC blocks.
+
+        Parameters
+        ----------
+        enable : boolean, optional
+            True: Enable trigger. 
+            False: Disable trigger.
+                   The default is True.
+
+        Returns
+        -------
+        err : string
+            "" or error message.
+
+        """
+        n_adc = len(self.status.ADC_address)
+        reg = [self.codes_ADC.ADC_REG_CONTROL] * n_adc           
+        err,ret = self.readPDI(self.status.ADC_address,
+                               reg,
+                               numberOfBytes=[1]*n_adc,
+                               arrayData=[False]*n_adc
+                               )
+        for i in range(len(ret)):
+            if (enable):
+                ret[i] |= 0x20
+            else:
+                ret[i] &= 0xff - 0x20
+        err = self.writePDI(self.status.ADC_address,
+                            reg,
+                            ret,
+                            numberOfBytes=[1]*n_adc,
+                            arrayData=[False]*n_adc,
+                            noReadBack=False
+                            )
+        return err
         
+    
     def setTrigger(self,externalTriggerPolarity=None,internalTrigger=False,triggerDelay = 0):
         """
         Sets the trigger scheme in the camera.
@@ -1716,27 +1755,7 @@ class APDCAM10G_regCom:
         err = self.sendCommand(self.codes_CC.OP_SETTRIGGER,userData,sendImmediately=True)
         if (err != ""):
             return err
-        n_adc = len(self.status.ADC_address)
-        reg = [self.codes_ADC.ADC_REG_CONTROL] * n_adc           
-        err,ret = self.readPDI(self.status.ADC_address,
-                               reg,
-                               numberOfBytes=[1]*n_adc,
-                               arrayData=[False]*n_adc
-                               )
-        for i in range(len(ret)):
-            if (internalTrigger):
-                ret[i] |= 0x20
-            else:
-                ret[i] &= 0xff - 0x20
-        err = self.writePDI(self.status.ADC_address,
-                            reg,
-                            ret,
-                            numberOfBytes=[1]*n_adc,
-                            arrayData=[False]*n_adc,
-                            noReadBack=False
-                            )
-        return err
-        
+        return  self.setInternalTriggerADC(enable=internalTrigger)        
         
     def clearAllInternalTrigger(self):
         """
@@ -1758,13 +1777,19 @@ class APDCAM10G_regCom:
            
     def measure(self,numberOfSamples=100000, channelMasks=[0xffffffff,0xffffffff, 0xffffffff, 0xffffffff], \
                 sampleDiv=None, datapath="data", bits=None, waitForResult=True, externalTriggerPolarity=None,\
-                internalTrigger=False, triggerDelay = 0):
+                internalTrigger=False, internalTriggerADC=None,  triggerDelay=0):
         """ This method measures by calling APDTest_10G. It will be replaced by another method in the
         APDCAM_data class as soon as Python measures fast.
         externalTriggerPolarity: None: no external trigger
                                     0: Positive edge
                                     1: Negative edge
-        internalTrigger: True enables
+        internalTrigger: True enables internal trigger, False disables.
+                         If internalTriggerADC is None internal trigger enable in the ADCs
+                         follows this setting.
+        internalTriggerADC: None or boolean
+                            None: Internal trigger Enable/Disable follows internalTrigger
+                            True: Internal trigger in ADCs is enables
+                            False: Internal trigger in ADCs disables
         triggerDelay:  Trigger with this delay [microsec]
         waitForResult: <=0 : Do not wait for APDTest_10G to stop
                         > 0 : Wait this much seconds
@@ -1829,6 +1854,9 @@ class APDCAM10G_regCom:
                               )
         if (err != ""):
             return err,""
+        
+        if (internalTriggerADC is not None):
+            self.setInternalTriggerADC(self,enable=internalTriggerADC)
         
         err = self.syncADC()
         if (err != ""):

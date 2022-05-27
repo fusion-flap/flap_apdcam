@@ -1700,13 +1700,12 @@ class APDCAM10G_regCom:
 
         """
 
-        print("Set trigger entered",flush=True)        
         if (triggerDelay < 0):
             td = int(0)
         else:
             td = int(triggerDelay)
         d = 0x40
-        if (externalTriggerPolarity != None):
+        if (externalTriggerPolarity is not None):
             if (externalTriggerPolarity == 0):
                 d = d | 0x01
             else:

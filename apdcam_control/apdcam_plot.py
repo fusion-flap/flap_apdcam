@@ -11,6 +11,7 @@ import tkinter as tk
 from tkinter import messagebox
 from tkinter.ttk import *
 import os
+import threading
 
 import flap
 
@@ -534,7 +535,10 @@ class APDCAM_Plot_class:
             self.spectrplot_yscale1_widg['state'] = tk.NORMAL
             self.spectrplot_yscale2_widg['state'] = tk.NORMAL           
 
-
+    def start_rawplot(self):
+        self.rawplotThread = threading.Thread(target=self.rawplot)
+        self.rawplotThread.start()
+        
     def rawplot(self):
         """
         Callback function for raw signal plots.
@@ -544,6 +548,12 @@ class APDCAM_Plot_class:
         None.
 
         """
+        # plt.figure()
+        # plt.plot([1,2,4])
+        # plt.ion()
+        # plt.show()
+        # plt.pause(5)
+        # return
         if (self.data is None):
             self.add_message("Cannot plot, load data first.")  
             return
@@ -805,6 +815,11 @@ class APDCAM_Plot_class:
         self.message_widg.insert(tk.END,"\n"+txt)
         self.message_widg.see(tk.END)
         
+def plt_loop():
+    global root
+    plt.pause(0.05)
+    root.after(150,plt_loop)
+    root.mainloop()
                
 def plot_gui():  
      
@@ -825,4 +840,7 @@ def plot_gui():
     else:
         root.iconphoto(True, tk.PhotoImage(os.path.join(thisdir,'flap_apdcam_icon.gif')))    
     pgui.create_widgets(parent=w)
-    GUI_frame_widg.mainloop()
+    # GUI_frame_widg.after(0,plt_loop)
+    # GUI_frame_widg.mainloop()
+    root.after(150,plt_loop)
+    root.mainloop()

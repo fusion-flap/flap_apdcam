@@ -1856,8 +1856,8 @@ class APDCAM10G_regCom:
             return err,""
         
         if (internalTriggerADC is not None):
-            self.setInternalTriggerADC(self,enable=internalTriggerADC)
-        
+            self.setInternalTriggerADC(enable=internalTriggerADC)
+    
         err = self.syncADC()
         if (err != ""):
             return err,""
@@ -1895,7 +1895,7 @@ class APDCAM10G_regCom:
             f.write(s+"\n")
             f.write("Arm 0 "+str(round(numberOfSamples_plus))+" 0 1\n")
             f.write("Start\n")
-            f.write("Wait 1000000\n")
+            f.write("Wait 10000000\n")
             f.write("Save\n")
             # This clears the sample counter
             f.write("CCCONTROL 276 6 0 0 0 0 0 0\n")

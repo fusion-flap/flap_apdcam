@@ -842,5 +842,5 @@ def plot_gui():
     pgui.create_widgets(parent=w)
     # GUI_frame_widg.after(0,plt_loop)
     # GUI_frame_widg.mainloop()
-    root.after(150,plt_loop)
+#    root.after(150,plt_loop)
     root.mainloop()

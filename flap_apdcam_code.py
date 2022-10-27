@@ -235,7 +235,7 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
                 adc_list.append(chmap[ir,ic])
                 adc_list.append(chmap[ir,ic])
     else:
-        for ir in range(nrow):
+        for ir in range(len(chmap)):
                 ch_names.append('APD-{:d}'.format(ir + 1))
                 ch_names.append('ADC{:d}'.format(chmap[ir]))
                 if (camera_family == 'APDCAM-10G'):
@@ -244,8 +244,8 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
                     fn = 'Channel{:02d}.dat'.format(chmap[ir] - 1)
                 fnames.append(fn)
                 fnames.append(fn)
-                adc_list.append(chmap[ir,ic])
-                adc_list.append(chmap[ir,ic])
+                adc_list.append(chmap[ir])
+                adc_list.append(chmap[ir])
         
     if type(data_name) is not list:
         chspec = [data_name]
@@ -260,8 +260,10 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
         
     
     fnames_proc = [fnames[i] for i in ch_index]
-    col_proc = [col_list[i] for i in ch_index]
-    row_proc = [row_list[i] for i in ch_index]
+    if (len(col_list) != 0):
+        col_proc = [col_list[i] for i in ch_index]
+    if (len(row_list) != 0):
+        row_proc = [row_list[i] for i in ch_index]
     adc_proc = [adc_list[i] for i in ch_index]
     
     # Determining the dimension of the output data array
@@ -371,7 +373,7 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
                 data_arr = data_arr / (2.**t['bits'] - 1) * 2
         else:
             if (camera_family == 'APDCAM-10G'):
-                data_arr = (2**t['bits'] - 1) - data_arr
+                data_arr = (2.**t['bits'] - 1) - data_arr
 
     coord = []
     c_mode = flap.CoordinateMode(equidistant=True)

@@ -875,6 +875,11 @@ class APDCAM10G_GUI_class:
         self.offset_widg.bind('<Return>',self.set_offset)
         self.offset_widg.grid(row=3,column=4,sticky='w')
         
+        self.APDCAM_reset_widg = tk.Button(self.frame_widg,text='FACTORY RESET',\
+                                           command=self.APDCAM_reset)
+        self.APDCAM_reset_widg.grid(row=1,column=2,sticky='s')            
+
+        
     def set_defaults(self) :
         self.GUI_status.APDCAM_on = False
         self.GUI_status.APDCAM_connected = False
@@ -962,7 +967,14 @@ class APDCAM10G_GUI_class:
             self.GUI_status.GUI.add_message("Error reading calibration light: {:s}".format(err))
         else:
             self.var_callight.set(d)
-        
+    
+    def APDCAM_reset(self):
+        if (not self.GUI_status.APDCAM_connected):
+            return
+        v= tk.messagebox.askokcancel("Warning", "Do you really want to reset factory defaults?\n After reset camera will be at 10.123.13.102", default=tk.messagebox.OK)
+        if (v == False):
+            return
+        self.GUI_status.APDCAM_reg.FactoryReset(True)
         
     def commErrorResponse(self,err):
         if (err != ""):

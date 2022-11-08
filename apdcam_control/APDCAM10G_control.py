@@ -618,7 +618,6 @@ class APDCAM10G_regCom:
 #        if (err != ""):
 #            self.close()
 #            return err
-       
         return ""
         
     def close(self):
@@ -673,13 +672,28 @@ class APDCAM10G_regCom:
     
     
     def sendCommand(self,opCode,userData,sendImmediately=True):
-        # Will create DDToIP command and add to existing UDP command package
-        # Will immadiately send UDP if SendImmadiately is not 0
-        # If opCode is None then will add no data just send if sendImmediately is set True
-        # returns "" If no error
-        #      "Too much data": Too much data, cannot fit into present UDP packet
-        #      "No data to send"
-        #      Other error text relating to network
+        """
+        Will create DDToIP command and add to existing UDP command package
+        Will immadiately send UDP if SendImmadiately is not False
+        If opCode is None then will add no data just send if sendImmediately is set True
+        
+        Parameters
+        ----------
+        opCode: int or bytes 
+            The operation code OP_... (see class APDCAM10G_codes_...)
+        userData: bytearray
+            The user data for the operation. Set None of no data.
+        sendImmediately: bool
+            If True send immediately
+        
+        Return values
+        -------------
+        str
+            "" If no error
+            "Too much data": Too much data, cannot fit into present UDP packet
+            "No data to send"
+            Other error text relating to network
+        """
         import socket
         
         self.lock.acquire()
@@ -844,7 +858,59 @@ class APDCAM10G_regCom:
                 return err
             if (d == None):
                 return ""
-            
+    
+    def FactoryReset(self,reset_bool):
+        """
+        Do factory reset for all components of the camera.
+
+        Parameters
+        ----------
+        reset_bool : bool
+            Does reset only if this is True.
+
+        Returns
+        -------
+        str
+            Error string or ""
+
+        """
+        if (self.commSocket is None):
+            return "Not connected."
+        if (not (reset_bool)):
+            return
+        # Read the SATA state is it will be changed by the factory reset in V1
+        err,dual_SATA_state = self.getDualSATA()
+        if (err != ""):
+            return err
+        # Reset the ADCs
+        n_adc = len(self.status.ADC_address)
+        reg = [self.codes_ADC.ADC_REG_RESET]*n_adc
+        data = [0xcd]*n_adc
+        err = self.writePDI(self.status.ADC_address,reg,data,\
+                            numberOfBytes=[1]*n_adc,arrayData=[False]*n_adc,noReadBack=True)
+        if (err != ""):
+            return err
+        time.sleep(2)
+        data = [0]*n_adc
+        err = self.writePDI(self.status.ADC_address,reg,data,\
+                            numberOfBytes=[1]*n_adc,arrayData=[False]*n_adc,noReadBack=True)
+        if (err != ""):
+            return err
+        #Reset the control card
+        err = self.writePDI(self.codes_PC.PC_ADDRESS,self.codes_PC.PC_REG_RESET,0xcd,\
+                            numberOfBytes=1,arrayData=False,noReadBack=True)
+        time.sleep(2)
+        err = self.writePDI(self.codes_PC.PC_ADDRESS,self.codes_PC.PC_REG_RESET,0,\
+                            numberOfBytes=1,arrayData=False,noReadBack=True)
+        
+        err = self.sendCommand(self.codes_CC.OP_RESET,bytearray([0,0x07,0xd0]),sendImmediately=True)
+        if (err != ""):
+           return err
+        time.sleep(3)
+        err = self.setDualSATA(dual_SATA_state=dual_SATA_state)
+        if (err != ""):
+            err = "Could not set dual SATA setting to original state after reset. Camera was not on default address?"
+        return ""
 
 
     def readPDI(self,cardAddress=None,registerAddress=None,numberOfBytes=None,arrayData=None,byteOrder=None,waitTime=None):       
@@ -1369,9 +1435,69 @@ class APDCAM10G_regCom:
         self.lock.release()
         return err
 
-    def setADCDualSATA(self):
+    def getDualSATA(self):
         """
-            Returns an error text. 
+        Reads the dual SATA state from the communications card.
+        Does not check dual SATA setting in the ADCs.
+        
+        Return value
+        ------------
+        str
+            error text or "" if no error
+        bool
+           True if dual SATA
+           False if not dual SATA
+        """
+        
+        if (self.commSocket is None):
+            return "Not connected.", None
+        err = self.readCCdata(dataType=self.codes_CC.CC_DATATYPE_SATACONTROL)
+        if (err != ""):
+            return err, None
+        sata_state = self.status.CC_settings[self.codes_CC.CC_REGISTER_SATACONTROL]
+        if (sata_state & 0x01 == 1):
+            return "",True
+        else:
+            return "",False
+               
+    def setDualSATA(self, dual_SATA_state=True):
+        """
+            Sets the dual SATA state of the whole system, 10G card and ADCs
+            
+            Parameters
+            ----------
+            dual_SATA_state: bool
+                True: set dual SATA
+                False: clear dual SATA
+            Return value
+            ------------
+            str:
+                Returns an error text or "" of no error 
+        """
+        if (self.commSocket is None):
+            return "Not connected."
+        if (dual_SATA_state):
+            d = bytearray([0x01])
+        else:
+            d = bytearray([0x00])
+        err = self.sendCommand(self.codes_CC.OP_SETSATACONTROL,d,sendImmediately=True)
+        if (err != ""):
+           return err
+        return self.setADCDualSATA(self,dual_SATA_state=dual_SATA_state)      
+        
+    def setADCDualSATA(self,dual_SATA_state=True):
+        """
+            Sets the dual SATA state in all ADCs.
+            
+            Parameters
+            ----------
+            dual_SATA_state: bool
+                True: set dual SATA bits
+                False: clear dual SATA bits
+            Return value
+            ------------
+            str:
+                Returns an error text or "" of no error 
         """
         self.lock.acquire()
         while (1):
@@ -1382,15 +1508,19 @@ class APDCAM10G_regCom:
             if (err != ""):
                 break
             for i in range(n_adc):
-                data[i] |= 0x03 
+                if (dual_SATA_state):
+                    data[i] |= 0x03
+                else:
+                    data[i] &= 0xfd
             err = self.writePDI(self.status.ADC_address,reg,data,\
                                 numberOfBytes=[1]*n_adc,arrayData=[False]*n_adc,noReadBack=False)
             if (err != ""):
                 break
             
-            err,data = self.readPDI(self.status.ADC_address,reg,l,arrayData=[False]*n_adc)
-            if (err != ""):
-                break
+            # Don't need to read back, it is done in writePDI anyway
+            # err,data = self.readPDI(self.status.ADC_address,reg,l,arrayData=[False]*n_adc)
+            # if (err != ""):
+            #     break
             #print("Control regs (setADCDualSATA): {:b},{:b}".format(data[0],data[1]))
             break
         self.lock.release()

@@ -516,7 +516,7 @@ class APDCAM10G_regCom:
     CLK_INTERNAL = 0
     CLK_EXTERNAL = 1
     def __init__(self):
-        self.APDCAM_IP = b"10.123.13.102"
+        self.APDCAM_IP = "10.123.13.102"
         self.commPort = 9997 # this is the receiving port
         self.answerTimeout = 100 # ms
         self.commSocket = None
@@ -532,7 +532,7 @@ class APDCAM10G_regCom:
         self.repeatNumber=5 # Number of times a read/write operation is repeated before an error is indicated
         self.CAMTIMER = APDCAM_timer()
         
-    def connect(self,ip=b"10.123.13.102"):
+    def connect(self,ip="10.123.13.102"):
         """ Connect to the camera and start the answrer reading socket
         Returns and error message or ""
         """
@@ -545,12 +545,12 @@ class APDCAM10G_regCom:
         self.APDCAM_IP = ip
         err = APDCAM10G_regCom.startReceiveAnswer(self)
         if (err != "") :
-            return "Error connecting to camera: "+err
             self.close()
+            return "Error connecting to camera: "+err
         err = APDCAM10G_regCom.readStatus(self,dataOnly=True)
         if (err != ""):
-            return "Error connecting to camera: "+err
             self.close()
+            return "Error connecting to camera: "+err
         #Extracting camera information
         d = self.status.CC_settings 
         self.status.firmware = d[APDCAM10G_codes_v1.CC_REGISTER_FIRMWARE:APDCAM10G_codes_v1.CC_REGISTER_FIRMWARE+14]
@@ -642,11 +642,12 @@ class APDCAM10G_regCom:
         try:
             self.commSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         except socket.error as se:
+            self.commSocket = Null
             return se.args[1]
         try:
             self.commSocket.bind((b'0.0.0.0', self.commPort))
         except socket.error as se :
-            pass
+            self.commSocket = None
             return se.args[1]
         self.commSocket.setblocking(1)  # non blocking receive
         self.commSocket.settimeout(self.answerTimeout/1000.)  
@@ -897,12 +898,17 @@ class APDCAM10G_regCom:
         if (err != ""):
             return err
         #Reset the control card
-        err = self.writePDI(self.codes_PC.PC_ADDRESS,self.codes_PC.PC_REG_RESET,0xcd,\
+        err = self.writePDI(self.codes_PC.PC_CARD,self.codes_PC.PC_REG_RESET,0xcd,\
                             numberOfBytes=1,arrayData=False,noReadBack=True)
+        if (err != ""):
+            return err
+
         time.sleep(2)
-        err = self.writePDI(self.codes_PC.PC_ADDRESS,self.codes_PC.PC_REG_RESET,0,\
+        err = self.writePDI(self.codes_PC.PC_CARD,self.codes_PC.PC_REG_RESET,0,\
                             numberOfBytes=1,arrayData=False,noReadBack=True)
-        
+        if (err != ""):
+            return err
+
         err = self.sendCommand(self.codes_CC.OP_RESET,bytearray([0,0x07,0xd0]),sendImmediately=True)
         if (err != ""):
            return err
@@ -1483,7 +1489,7 @@ class APDCAM10G_regCom:
         err = self.sendCommand(self.codes_CC.OP_SETSATACONTROL,d,sendImmediately=True)
         if (err != ""):
            return err
-        return self.setADCDualSATA(self,dual_SATA_state=dual_SATA_state)      
+        return self.setADCDualSATA(dual_SATA_state=dual_SATA_state)      
         
     def setADCDualSATA(self,dual_SATA_state=True):
         """

@@ -28,6 +28,7 @@ from .APDCAM10G_control import *
 from .apdcam_plot import * 
 from .apdcam10g_channel_map import apdcam10g_channel_map
 from .apdcam_channel_list import apdcam_channel_list
+from .apdcam10g_settings import APDCAM_Settings_class
 
         
 class APDCAM_GUI_config_class:
@@ -91,7 +92,7 @@ class APDCAM_GUI_class(tk.Frame):
         
         self.state.GUI_top = self
         self.state.root_widg = master
-        
+        self.var_act_widget = tk.StringVar()
          
         # Instantiating the sub-GUIs 
         self.GUI_shotControl_widg = \
@@ -100,8 +101,9 @@ class APDCAM_GUI_class(tk.Frame):
 #        self.GUI_APDCAM_widg1 = APDCAM10G_GUI_class(GUI_status=self.state)
         self.APDCAM_plot_widg = APDCAM_Plot_class(root=root)
         self.state.config.APDCAM_Plot = self.APDCAM_plot_widg
-
-        # Creating a list of the sub-GUIs. The plot widget is separate not included in this list. 
+        self.APDCAM_settings_widg = APDCAM_Settings_class(root=root,state=self.state)
+        
+        # Creating a list of the sub-GUIs. The widgets on the right hand panel are separate, not included in this list. 
         self.widget_list = [self.GUI_shotControl_widg, \
                             self.GUI_APDCAM_widg
                             ]
@@ -139,17 +141,54 @@ class APDCAM_GUI_class(tk.Frame):
         shotControlFrame.grid(row=0,column=0)       
         self.GUI_shotControl_widg.create_widgets(shotControlFrame)
             
+        # Creating the right block
         APDCAMControlFrame = tk.Frame(col1)
         APDCAMControlFrame.grid(row=1,column=0)   
         self.GUI_APDCAM_widg.create_widgets(APDCAMControlFrame) 
-        APDCAMPlotFrame = tk.Frame(col1)
-        APDCAMPlotFrame.grid(row=0,column=1,rowspan=2,sticky='n')   
-        self.APDCAM_plot_widg.create_widgets(APDCAMPlotFrame,
-                                             camera_type=self.state.config.camera_type,
-                                             camera_version=self.state.config.camera_version
-                                             ) 
+        # right block is the frame into which different panels will go
+        right_block = tk.Frame(col1)
+#        right_block.pack(side="top", fill="both", expand=True)
+        right_block.grid_rowconfigure(0, weight=1)
+        right_block.grid_columnconfigure(0, weight=1)
+        right_block.grid(row=0,column=1,rowspan=2,sticky="nsew")
+        # Creating a list of widgets and their names
+        self.rightwidget_list = []
+        self.rightwidget_name_list = []
+        # The plot panel
+        self.APDCAMPlotFrame = tk.Frame(right_block)
+        self.APDCAMPlotFrame.grid(row=1,column=0,sticky="nsew")  
+        self.APDCAM_plot_widg.create_widgets(self.APDCAMPlotFrame,
+                                              camera_type=self.state.config.camera_type,
+                                              camera_version=self.state.config.camera_version
+                                              ) 
+        self.rightwidget_list.append(self.APDCAMPlotFrame)
+        self.rightwidget_name_list.append('Plot')
+        # The settings panel
+        self.APDCAMSettingsFrame = tk.Frame(right_block)
+        self.APDCAMSettingsFrame.grid(row=1,column=0,sticky="nsew")         
+        self.APDCAMSettingsFrame.grid(row=1,column=0,sticky="nsew")  
+        self.APDCAM_settings_widg.create_widgets(self.APDCAMSettingsFrame) 
+        self.rightwidget_list.append(self.APDCAMSettingsFrame)
+        self.rightwidget_name_list.append('APDCAM Settings')
 
-#        self.APDCAM_plot_widg.create_widgets(parent=col1)
+        
+        self.widget_select_widg = tk.OptionMenu(right_block,
+                                                self.var_act_widget,
+                                                *tuple(self.rightwidget_name_list),
+                                                command=self.switch_rightwidget
+                                                )
+        self.widget_select_widg.grid(column=0,row=0,sticky='w')
+        self.var_act_widget.set(self.rightwidget_name_list[0])
+        self.switch_rightwidget(None)
+        
+    def switch_rightwidget(self,event):
+        for name,widg in zip(self.rightwidget_name_list,self.rightwidget_list):
+            if (self.var_act_widget.get() == name):
+                widg.tkraise()
+            else:
+                widg.lower()
+
+        
             
     def config_get(self,file,section,key) :
         """ Reads an element from a configuration file
@@ -716,6 +755,7 @@ class APDCAM10G_GUI_class:
     def __init__(self,GUI_status=None):
         self.GUI_status = GUI_status
         self.GUI_status.APDCAM_reg = None
+        self.GUI_status.dualSATA = None
         self.updateThread = None
         self.stopThreadSignal = 0
         self.GUI_status.Update_APDCAM = False
@@ -875,10 +915,6 @@ class APDCAM10G_GUI_class:
         self.offset_widg.bind('<Return>',self.set_offset)
         self.offset_widg.grid(row=3,column=4,sticky='w')
         
-        self.APDCAM_reset_widg = tk.Button(self.frame_widg,text='FACTORY RESET',\
-                                           command=self.APDCAM_reset)
-        self.APDCAM_reset_widg.grid(row=1,column=2,sticky='s')            
-
         
     def set_defaults(self) :
         self.GUI_status.APDCAM_on = False
@@ -967,15 +1003,25 @@ class APDCAM10G_GUI_class:
             self.GUI_status.GUI.add_message("Error reading calibration light: {:s}".format(err))
         else:
             self.var_callight.set(d)
+        err,d = self.GUI_status.APDCAM_reg.getDualSATA()  
+        if (err != ""):
+            self.GUI_status.GUI.add_message("Error reading dual SATA state: {:s}".format(err))
+        else:
+            self.GUI_status.dualSATA = d
+        err,d = self.GUI_status.APDCAM_reg.getTestPattern()  
+        if (err != ""):
+            self.GUI_status.GUI.add_message("Error reading test pattern from APDCAM: {:s}".format(err))
+        else:
+            for i_adc in range(n):
+                for i in range(1,4):
+                    if (d[i_adc][i] != d[i_adc][0]):
+                        self.GUI_status.GUI.add_message("Warning: Different test pattern settings in ADC board #{:d}".format(i_adc + 1))
+            for i_adc in range(1,n):
+                if (d[i_adc][0] != d[0][0]):
+                    self.GUI_status.GUI.add_message("Warning: Different test pattern settings in ADC boards. Using board 1 value.")
+            self.GUI_status.testPattern = d[0][0]
+
     
-    def APDCAM_reset(self):
-        if (not self.GUI_status.APDCAM_connected):
-            return
-        v= tk.messagebox.askokcancel("Warning", "Do you really want to reset factory defaults?\n After reset camera will be at 10.123.13.102", default=tk.messagebox.OK)
-        if (v == False):
-            return
-        self.GUI_status.APDCAM_reg.FactoryReset(True)
-        
     def commErrorResponse(self,err):
         if (err != ""):
             self.GUI_status.GUI.add_message(err)

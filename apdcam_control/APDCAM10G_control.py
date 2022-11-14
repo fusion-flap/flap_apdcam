@@ -1587,6 +1587,69 @@ class APDCAM10G_regCom:
                 dac_addr = adcmap[i]-1
                 data.append(int.from_bytes(offsets[dac_addr * 2:dac_addr * 2 + 2], 'little'))
         return "",data
+
+    def getTestPattern(self):
+        """ 
+        Get all of the test pattern settings in the ADCs
+            
+        Parameters
+        ----------
+            None
+            
+        Return value
+        ------------
+        Returns
+        -------
+        string
+            "" or error text.
+        list
+            List of test pattern values. The list has as many elements as ADC boards
+            and each list element is a list of 4 values: the test pattern for the 4 blocks
+        """
+        n_adc = len(self.status.ADC_address)
+        data = []
+        for i_adc in range(n_adc):
+            err,d = self.readPDI(self.status.ADC_address[i_adc],self.codes_ADC.ADC_REG_AD1TESTMODE,numberOfBytes=4,arrayData=True)
+            if (err != ""):
+                return "Error in getTestPattern, ADC {:d}: {:s}".format(i_adc+1,err),None
+            data.append(d)
+        return "",data
+
+    def setTestPattern(self,value):
+        """ Set the test pattern of the ADCs.
+        
+        Parameters
+        ----------
+        value : list or int
+            If int all ADCs will be set to this test pattern
+            If list then each list element corresponds to one ADC block.
+            If a list element is a single number then each 8-block in the ADC is set to this value.
+            If a list element is a 4-element list the 8-channel blocks are set to these test patterns.
+        """   
+        n_adc = len(self.status.ADC_address)
+        if (type(value) is list):
+            if (len(value) != n_adc):
+                return "Bad input in setTestPattern. Should be scalar or list with number of elements equal to number of ADCs."
+            _value = value
+        else:
+            try:
+                _value = [int(value)] * n_adc
+            except ValueError:
+                return "Bad input in setTestPattern."
+        for i_adc in range(n_adc):  
+            d = bytearray(4)
+            if (type(_value[i_adc]) is list):
+                if (len(_value[i_adc]) != 4):
+                    return "Bad input in setTestPattern."
+                for i in range(4):
+                    d[i] = _value[i]
+            else:
+                for i in range(4):
+                    d[i] = _value                
+            err = self.writePDI(self.status.ADC_address[i_adc],self.codes_ADC.ADC_REG_AD1TESTMODE,d,numberOfBytes=4,arrayData=True)
+            if (err != ""):
+                break
+        return err  
     
     def setCallight(self,value):
         """ Set the calibration light.
@@ -1607,7 +1670,7 @@ class APDCAM10G_regCom:
         Returns
         -------
         err : string
-            "" o error text.
+            "" or error text.
         """
         
         err = self.writePDI(self.codes_PC.PC_CARD,self.codes_PC.PC_REG_SHSTATE,value,numberOfBytes=1,arrayData=False)

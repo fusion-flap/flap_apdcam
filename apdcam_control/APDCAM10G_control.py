@@ -374,7 +374,7 @@ class APDCAM_PCcodes_v1 :
     PC_REG_FACTORY_WRITE = 0x88
     PC_REG_ERRORCODE = 0x86
     PC_REG_CALLIGHT = 0x7A
-    PC_REG_POWER_ENABLE = 0x64
+    PC_IRQ_POWER_PID_ENABLE = 0x64
     PC_REG_PELT_MANUAL = 0x4e
 
 class APDCAM_onetimer:
@@ -1656,6 +1656,58 @@ class APDCAM10G_regCom:
         """    
         err = self.writePDI(self.codes_PC.PC_CARD,self.codes_PC.PC_REG_CALLIGHT,value,numberOfBytes=2,arrayData=False)
         return err  
+
+    def setAnalogPower(self,value):
+        """ 
+        Switch the analog power on/off.
+            
+        Parameters
+        ----------
+        value: int
+            0: power off
+            1: power on
+            
+        Return value
+        ------------
+        err : string
+            "" or error text.
+        
+        """    
+        err, d = self.readPDI(self.codes_PC.PC_CARD,self.codes_PC.PC_IRQ_POWER_PID_ENABLE,numberOfBytes=1,arrayData=False)
+        if (err != ""):
+            return err
+        if (value == 0):
+            d &= 0xfd
+        elif (value == 1):
+            d |= 0x02
+        else:
+            return "Invalid input value to setAnalogPower."
+        err = self.writePDI(self.codes_PC.PC_CARD,self.codes_PC.PC_IRQ_POWER_PID_ENABLE,d,numberOfBytes=1,arrayData=False)
+        return err  
+
+    def getAnalogPower(self):
+        """ 
+        Return the status of the analog power (on/off).
+            
+        Parameters
+        ----------
+        none            
+        
+        Return value
+        ------------
+        err : string
+            "" or error text.
+        value: int
+            0: power is off
+            1: power is on
+        """    
+        err, d = self.readPDI(self.codes_PC.PC_CARD,self.codes_PC.PC_IRQ_POWER_PID_ENABLE,numberOfBytes=1,arrayData=False)
+        if (err != ""):
+            return err
+        if (d & 0x02 == 0):
+            return "", 0
+        else:
+            return "", 1
 
     def setShutter(self,value):
         """

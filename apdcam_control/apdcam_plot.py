@@ -305,6 +305,9 @@ class APDCAM_Plot_class:
         self.spectrplot_widg.config(height=pheight)
         self.spectrplot_widg.grid_propagate(0)
 
+
+    def update(self):
+        pass
         
     def camera_type_select(self,event):
         """

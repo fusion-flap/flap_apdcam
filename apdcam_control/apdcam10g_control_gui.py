@@ -1003,23 +1003,7 @@ class APDCAM10G_GUI_class:
             self.GUI_status.GUI.add_message("Error reading calibration light: {:s}".format(err))
         else:
             self.var_callight.set(d)
-        err,d = self.GUI_status.APDCAM_reg.getDualSATA()  
-        if (err != ""):
-            self.GUI_status.GUI.add_message("Error reading dual SATA state: {:s}".format(err))
-        else:
-            self.GUI_status.dualSATA = d
-        err,d = self.GUI_status.APDCAM_reg.getTestPattern()  
-        if (err != ""):
-            self.GUI_status.GUI.add_message("Error reading test pattern from APDCAM: {:s}".format(err))
-        else:
-            for i_adc in range(n):
-                for i in range(1,4):
-                    if (d[i_adc][i] != d[i_adc][0]):
-                        self.GUI_status.GUI.add_message("Warning: Different test pattern settings in ADC board #{:d}".format(i_adc + 1))
-            for i_adc in range(1,n):
-                if (d[i_adc][0] != d[0][0]):
-                    self.GUI_status.GUI.add_message("Warning: Different test pattern settings in ADC boards. Using board 1 value.")
-            self.GUI_status.testPattern = d[0][0]
+        self.GUI_status.state.GUI_top.APDCAM_settings_widg.update()
 
     
     def commErrorResponse(self,err):

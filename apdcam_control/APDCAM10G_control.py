@@ -912,7 +912,7 @@ class APDCAM10G_regCom:
         err = self.sendCommand(self.codes_CC.OP_RESET,bytearray([0,0x07,0xd0]),sendImmediately=True)
         if (err != ""):
            return err
-        time.sleep(3)
+        time.sleep(5)
         err = self.setDualSATA(dual_SATA_state=dual_SATA_state)
         if (err != ""):
             err = "Could not set dual SATA setting to original state after reset. Camera was not on default address?"
@@ -1612,7 +1612,7 @@ class APDCAM10G_regCom:
             err,d = self.readPDI(self.status.ADC_address[i_adc],self.codes_ADC.ADC_REG_AD1TESTMODE,numberOfBytes=4,arrayData=True)
             if (err != ""):
                 return "Error in getTestPattern, ADC {:d}: {:s}".format(i_adc+1,err),None
-            data.append(d)
+            data.append(d[0])
         return "",data
 
     def setTestPattern(self,value):
@@ -1645,7 +1645,7 @@ class APDCAM10G_regCom:
                     d[i] = _value[i]
             else:
                 for i in range(4):
-                    d[i] = _value                
+                    d[i] = _value[i_adc]                
             err = self.writePDI(self.status.ADC_address[i_adc],self.codes_ADC.ADC_REG_AD1TESTMODE,d,numberOfBytes=4,arrayData=True)
             if (err != ""):
                 break
@@ -1676,6 +1676,7 @@ class APDCAM10G_regCom:
         err, d = self.readPDI(self.codes_PC.PC_CARD,self.codes_PC.PC_IRQ_POWER_PID_ENABLE,numberOfBytes=1,arrayData=False)
         if (err != ""):
             return err
+        d = d[0]
         if (value == 0):
             d &= 0xfd
         elif (value == 1):
@@ -1703,8 +1704,8 @@ class APDCAM10G_regCom:
         """    
         err, d = self.readPDI(self.codes_PC.PC_CARD,self.codes_PC.PC_IRQ_POWER_PID_ENABLE,numberOfBytes=1,arrayData=False)
         if (err != ""):
-            return err
-        if (d & 0x02 == 0):
+            return err, 0
+        if (d[0] & 0x02 == 0):
             return "", 0
         else:
             return "", 1

@@ -1003,7 +1003,8 @@ class APDCAM10G_GUI_class:
             self.GUI_status.GUI.add_message("Error reading calibration light: {:s}".format(err))
         else:
             self.var_callight.set(d)
-        self.GUI_status.state.GUI_top.APDCAM_settings_widg.update()
+
+        self.GUI_status.GUI_top.APDCAM_settings_widg.update()
 
     
     def commErrorResponse(self,err):

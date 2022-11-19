@@ -36,9 +36,17 @@ class APDCAM_Settings_class:
                                    '10000000000000',
                                    '11111111111111',
                                    '00000000000000',
-                                   'Pseudo random'
+                                   'Checkerboard',
+                                   'Pseudo random long',
+                                   'Pseudo random short',
+                                   '0-1 word toggle',
+                                   'User pattern',
+                                   '101010...',
+                                   '1x sync',
+                                   '1 bit high',
+                                   'Mixed frequency'
                                    ]
-        self.test_pattern_codes = [0,1,2,3,6]
+        self.test_pattern_codes = [0,1,2,3,4,5,6,7,8,9,10,11,12]
         self.var_test_pattern = tk.StringVar()
         self.var_test_pattern.set(self.test_pattern_names[0])
         self.act_test_pattern = 0
@@ -120,11 +128,17 @@ class APDCAM_Settings_class:
                 self.state.GUI.add_message(err)
                 return
             self.var_analog_power.set(d)
+            self.analog_power_state = d
             err,d = self.state.APDCAM_reg.getDualSATA()  
             if (err != ""):
                 self.state.GUI.add_message(err)
                 return
-            self.var_dual_sata = d
+            if (d):
+                self.var_dual_sata.set(1)
+                self.dual_sata_state = 1
+            else:
+                self.var_dual_sata.set(0)
+                self.dual_sata_state = 0              
             err,d = self.state.APDCAM_reg.getTestPattern()  
             if (err != ""):
                 self.state.GUI.add_message(err)
@@ -136,7 +150,8 @@ class APDCAM_Settings_class:
             for i_adc in range(1,n_adc):
                 if (d[i_adc][0] != d[0][0]):
                     self.state.GUI.add_message("Warning: Different test pattern settings in ADC boards. Using board 1 value.")
-            
+            self.var_test_pattern.set(self.test_pattern_names[d[0][0]])
+            self.act_test_pattern = d[0][0]
             
     
     def camera_type_select(self,event):
@@ -182,7 +197,7 @@ class APDCAM_Settings_class:
             self.var_analog_power.set(self.analog_power_state)
             return
 
-        if (self.var_analog_power.get() == 0):
+        if (self.analog_power_state == 0):
             err = self.state.APDCAM_reg.setAnalogPower(1)
             if (err != ""):
                 self.state.GUI.add_message(err)

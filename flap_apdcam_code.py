@@ -354,7 +354,7 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
             except OSError:
                 raise OSError("Error opening file: " + fn)
             try:
-                f.seek(int(read_samplerange[0]),os.SEEK_SET)
+                f.seek(int(read_samplerange[0]) * 2,os.SEEK_SET)
                 d = np.fromfile(f,dtype=np.int16,count=ndata)
             except IOError:
                 raise IOError("Error reading from file: " + fn)

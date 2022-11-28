@@ -1021,7 +1021,6 @@ class APDCAM10G_GUI_class:
     
     def callight_change(self,value):
         if (self.GUI_status.APDCAM_connected):
-            print(self.var_callight.get())
             self.GUI_status.APDCAM_reg.setCallight(self.var_callight.get())
         
     def clocksource_change(self,value):

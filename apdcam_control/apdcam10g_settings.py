@@ -98,7 +98,7 @@ class APDCAM_Settings_class:
         try:
             index = self.camera_type_list.index(self.camera_type)
             self.var_camera_type.set(self.camera_type_list[index])
-            self.camera_version_list = self.camera_version_list_list[index]
+            self.camera_version_list = self.camera_version_list_list[index - 1]
             menu = self.camera_version_select_widg['menu']
             menu.delete("0",tk.END)
             if (len(self.camera_version_list) != 0):
@@ -168,11 +168,29 @@ class APDCAM_Settings_class:
         None.
 
         """
+
         self.camera_type = self.var_camera_type.get()
         index = self.camera_type_list.index(self.camera_type)
         if (index == 0):
             self.camera_type = None
+            self.camera_version_List = []
+        else:
+            self.camera_version_list = self.camera_version_list_list[index - 1]
+#        menu = self.camera_version_select_widg['menu']
+#        menu.delete("0",tk.END)
+#        if (len(self.camera_version_list) != 0):
+#            for i,item in enumerate(self.camera_version_list):
+#                menu.add_command(label=str(item),command=tk._setit(self.var_camera_version,str(item),self.camera_version_select)) 
+#            self.var_camera_version.set(self.camera_version_list[0])
+#            self.camera_version = int(self.var_camera_version.get())
+#            self.state.config.camera_version = self.camera_version
+#        else:
+#            self.camera_version = None
+#            self.var_camera_version.set("n.a")
+#            self.state.config.camera_version = None
+        self.camera_version = self.camera_version_list[0]
         self.state.config.camera_type = self.camera_type
+        self.state.config.camera_version = self.camera_version 
         
         self.update()
         
@@ -186,7 +204,7 @@ class APDCAM_Settings_class:
     def APDCAM_reset(self):
         if (not self.state.APDCAM_connected):
             return
-        v= tk.messagebox.askokcancel("Warning", "Do you really want to reset factory defaults?\n After reset camera will be at 10.123.13.102", default=tk.messagebox.OK)
+        v= tk.messagebox.askokcancel("Warning", "Do you really want to reset factory defaults?\n After reset camera will be at 10.123.13.102\n Reset can take up to a minute\n", default=tk.messagebox.OK)
         if (v == False):
             return
         self.state.APDCAM_reg.FactoryReset(True)

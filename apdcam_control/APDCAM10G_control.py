@@ -879,24 +879,37 @@ class APDCAM10G_regCom:
             return "Not connected."
         if (not (reset_bool)):
             return
-        # Read the SATA state is it will be changed by the factory reset in V1
+
+        # Read the SATA state as it will be changed by the factory reset in V1
         err,dual_SATA_state = self.getDualSATA()
         if (err != ""):
             return err
         # Reset the ADCs
         n_adc = len(self.status.ADC_address)
-        reg = [self.codes_ADC.ADC_REG_RESET]*n_adc
-        data = [0xcd]*n_adc
-        err = self.writePDI(self.status.ADC_address,reg,data,\
-                            numberOfBytes=[1]*n_adc,arrayData=[False]*n_adc,noReadBack=True)
-        if (err != ""):
-            return err
-        time.sleep(2)
-        data = [0]*n_adc
-        err = self.writePDI(self.status.ADC_address,reg,data,\
-                            numberOfBytes=[1]*n_adc,arrayData=[False]*n_adc,noReadBack=True)
-        if (err != ""):
-            return err
+        for adc_addr in self.status.ADC_address:
+            reg = self.codes_ADC.ADC_REG_RESET
+            data = 0xcd
+            err = self.writePDI(adc_addr,
+                                reg,
+                                data,
+                                numberOfBytes=1,
+                                arrayData=False,
+                                noReadBack=True
+                                )
+            if (err != ""):
+                return err
+            time.sleep(2)
+            data = 0
+            err = self.writePDI(adc_addr,
+                                reg,
+                                data,
+                                numberOfBytes=1,
+                                arrayData=False,
+                                noReadBack=True
+                                )
+            if (err != ""):
+                return err
+            time.sleep(1)
         #Reset the control card
         err = self.writePDI(self.codes_PC.PC_CARD,self.codes_PC.PC_REG_RESET,0xcd,\
                             numberOfBytes=1,arrayData=False,noReadBack=True)
@@ -1506,28 +1519,22 @@ class APDCAM10G_regCom:
                 Returns an error text or "" of no error 
         """
         self.lock.acquire()
-        while (1):
-            n_adc = len(self.status.ADC_address)
-            reg = [self.codes_ADC.ADC_REG_CONTROL]*n_adc
-            l = [1]*n_adc
-            err,data = self.readPDI(self.status.ADC_address,reg,l,arrayData=[False]*n_adc)
-            if (err != ""):
-                break
-            for i in range(n_adc):
+        while (True):
+            for adc in self.status.ADC_address:
+                reg = self.codes_ADC.ADC_REG_CONTROL
+                err,data = self.readPDI(adc,reg,1,arrayData=False)
+                data = data[0]
+                if (err != ""):
+                    break
                 if (dual_SATA_state):
-                    data[i] |= 0x03
+                    data |= 0x03
                 else:
-                    data[i] &= 0xfd
-            err = self.writePDI(self.status.ADC_address,reg,data,\
-                                numberOfBytes=[1]*n_adc,arrayData=[False]*n_adc,noReadBack=False)
-            if (err != ""):
-                break
-            
-            # Don't need to read back, it is done in writePDI anyway
-            # err,data = self.readPDI(self.status.ADC_address,reg,l,arrayData=[False]*n_adc)
-            # if (err != ""):
-            #     break
-            #print("Control regs (setADCDualSATA): {:b},{:b}".format(data[0],data[1]))
+                    data &= 0xfd
+                err = self.writePDI(adc,reg,data,\
+                                    numberOfBytes=1,arrayData=False,noReadBack=False)
+                if (err != ""):
+                    break
+                time.sleep(1)
             break
         self.lock.release()
         return err
@@ -1569,6 +1576,7 @@ class APDCAM10G_regCom:
             err = self.writePDI(self.status.ADC_address[i_adc],self.codes_ADC.ADC_REG_DAC1,data,numberOfBytes=64,arrayData=True)
             if (err != ""):
                 return "Error in setOffsets, ADC {:d}: {:s}".format(i_adc+1,err)
+            time.sleep(0.1)
         return ""
     
     def getOffsets(self):
@@ -1586,6 +1594,7 @@ class APDCAM10G_regCom:
             for i in range(32):
                 dac_addr = adcmap[i]-1
                 data.append(int.from_bytes(offsets[dac_addr * 2:dac_addr * 2 + 2], 'little'))
+            time.sleep(0.1)
         return "",data
 
     def getTestPattern(self):
@@ -1612,6 +1621,7 @@ class APDCAM10G_regCom:
             err,d = self.readPDI(self.status.ADC_address[i_adc],self.codes_ADC.ADC_REG_AD1TESTMODE,numberOfBytes=4,arrayData=True)
             if (err != ""):
                 return "Error in getTestPattern, ADC {:d}: {:s}".format(i_adc+1,err),None
+            time.sleep(0.1)
             data.append(d[0])
         return "",data
 
@@ -1649,6 +1659,7 @@ class APDCAM10G_regCom:
             err = self.writePDI(self.status.ADC_address[i_adc],self.codes_ADC.ADC_REG_AD1TESTMODE,d,numberOfBytes=4,arrayData=True)
             if (err != ""):
                 break
+            time.sleep(0.1)
         return err  
     
     def setCallight(self,value):

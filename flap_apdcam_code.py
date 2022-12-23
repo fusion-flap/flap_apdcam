@@ -116,7 +116,8 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
                  Defines read ranges. The following coordinates are interpreted:
                      'Sample': The read samples
                      'Time': The read times
-                     Only a single equidistant range is interpreted.
+                     Only a single equidistant range is interpreted. Use option "Resample"
+                     to resample the signal to lower frequency than the original sampling frequency.
     options: dict
         'Scaling':  'Digit'
                     'Volt'
@@ -131,6 +132,7 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
                              APDCAM-10G_4x16
                              APDCAM-10G_8x16
                              APDCAM-10G_8x16A
+                             APDCAM-10G_FC
                          APDCAM-1G: 
                              APDCAM-1G : Standard APDCAM-1G (Horizontal array)
                              APDCAM-1G_90: APDCAM-1G with sensor rotated 90 degree CCW
@@ -138,6 +140,9 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
                              APDCAM-1G_270: APDCAM-1G with sensor rotated 270 degree CCW
         'Camera_version': int
             Only applicable to 10G cameras: 0,1,2
+        'Resample': Resample to this frequency [Hz]. Only frequencies below the sampling frequency can be used.
+                    The frequency will be rounded to the integer times the sampling frequency. 
+                    Data will be averaged in blocks and the variance in blocks will be added as error.
    
     Return value
     ------------
@@ -153,7 +158,8 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
     default_options = {'Datapath':'data',
                        'Scaling':'Digit',
                        'Camera type': None,
-                       'Camera version': None
+                       'Camera version': None,
+                       'Resample':None
                        }
     if (data_source is None):
         data_source = 'APDCAM'
@@ -174,6 +180,10 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
     except KeyError:
         raise TypeError("APDCAM family is not found in XML file head.")
     t = apdcam_get_config(xml)
+    if (_options['Resample'] is not None):
+        if (_options['Resample'] > 1 / t['sampletime']):
+            raise ValueError("Resampling frequency should be below the original sample frequency.")
+        resample_binsize = int(round((1 / _options['Resample']) / float(t['sampletime'])))
     fnames = os.listdir(datapath)
     if (camera_family == 'APDCAM-10G'):
         camera_type = _options['Camera type']
@@ -256,8 +266,7 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
     try:
         chname_proc, ch_index = flap.select_signals(ch_names,chspec)
     except ValueError as e:
-        raise e
-        
+        raise e     
     
     fnames_proc = [fnames[i] for i in ch_index]
     if (len(col_list) != 0):
@@ -329,7 +338,13 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
         read_samplerange[0] = 0
     if (read_samplerange[1] >= t['samplenumber']):
         read_samplerange[1] = t['samplenumber'] - 1
-    ndata = int(read_samplerange[1] - read_samplerange[0] + 1)
+
+    ndata_read = int(read_samplerange[1] - read_samplerange[0] + 1)
+    if (_options['Resample'] is not None):
+        ndata_out = int(ndata_read / resample_binsize) 
+        ndata_read = ndata_out * resample_binsize
+    else:
+        ndata_out = ndata_read
     if (_options['Scaling'] == 'Volt'):
         scale_to_volts = True
         dtype = float
@@ -340,11 +355,21 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
         data_unit = flap.Unit(name='Signal',unit='Digit')
     
     if (outdim == 1):
-        data_arr = np.empty(ndata,dtype=dtype) 
+        data_arr = np.empty(ndata_out,dtype=dtype) 
     elif (outdim == 2):
-        data_arr = np.empty((ndata,len(chname_proc)),dtype=dtype)
+        data_arr = np.empty((ndata_out,len(chname_proc)),dtype=dtype)
     else:
-        data_arr = np.empty((ndata,len(out_row_list),len(out_col_list)),dtype=dtype)
+        data_arr = np.empty((ndata_out,len(out_row_list),len(out_col_list)),dtype=dtype)
+    if (_options['Resample'] is not None):
+        if (outdim == 1):
+            error_arr = np.empty(ndata_out,dtype=dtype) 
+        elif (outdim == 2):
+            error_arr = np.empty((ndata_out,len(chname_proc)),dtype=dtype)
+        else:
+            error_arr = np.empty((ndata_out,len(out_row_list),len(out_col_list)),dtype=dtype)
+    else:
+        error_arr = None
+        
     
     if (no_data is False):
         for i in range(len(chname_proc)):
@@ -355,10 +380,30 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
                 raise OSError("Error opening file: " + fn)
             try:
                 f.seek(int(read_samplerange[0]) * 2,os.SEEK_SET)
-                d = np.fromfile(f,dtype=np.int16,count=ndata)
+                d = np.fromfile(f,dtype=np.int16,count=ndata_read)
             except IOError:
                 raise IOError("Error reading from file: " + fn)
             f.close()
+            if (_options['Resample'] is not None):
+                d = d.astype(float)
+                d_resample = np.zeros(ndata_out,dtype=float)
+                d_error = np.zeros(ndata_out,dtype=float)
+                if (ndata_out > resample_binsize):
+                    for i_slice in range(0,resample_binsize):
+                        d_resample += d[slice(i_slice,len(d),resample_binsize)]
+                        d_error += d[slice(i_slice,len(d),resample_binsize)] ** 2
+                else:
+                    for i_resamp in range(0,len(d_resample)):
+                        d_resample[i_resamp] = np.sum(d[i_resamp * resample_binsize : (i_resamp + 1) * resample_binsize])
+                        d_error[i_resamp] = np.sum(d[i_resamp * resample_binsize : (i_resamp + 1) * resample_binsize] ** 2)
+                d_error = np.sqrt(d_error / resample_binsize - (d_resample / resample_binsize) ** 2)
+                d = d_resample / resample_binsize
+                if (outdim == 1):
+                    error_arr = d_error
+                elif (outdim == 2):
+                    error_arr[:,i] = d_error
+                else:
+                    error_arr[:,out_row_index[i],out_col_index[i]] = d_error
             if (outdim == 1):
                 data_arr = d
             elif (outdim == 2):
@@ -371,6 +416,8 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
                 data_arr = ((2 ** t['bits'] - 1) - data_arr) / (2. ** t['bits'] - 1) * 2
             else:
                 data_arr = data_arr / (2.**t['bits'] - 1) * 2
+            if (_options['Resample'] is not None):
+                error_arr *= 2 / (2.**t['bits'] - 1) 
         else:
             if (camera_family == 'APDCAM-10G'):
                 data_arr = (2.**t['bits'] - 1) - data_arr
@@ -380,7 +427,7 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
     coord.append(flap.Coordinate(name='Sample',
                                  unit='n.a.',
                                  mode=c_mode,
-                                 shape=ndata,
+                                 shape=ndata_out,
                                  start=read_samplerange[0],
                                  step=1,
                                  dimension_list=[0]
@@ -391,7 +438,7 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
     coord.append(flap.Coordinate(name='Time',
                                  unit='Second',
                                  mode=c_mode,
-                                 shape=ndata,
+                                 shape=ndata_out,
                                  start=read_range[0],
                                  step=t['sampletime'],
                                  dimension_list=[0]
@@ -481,7 +528,7 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
     data_title = camera_family + " data"
     if (data_arr.ndim == 1):
         data_title += " " + chname_proc[0]
-    d = flap.DataObject(data_array=data_arr,data_unit=data_unit,
+    d = flap.DataObject(data_array=data_arr,error=error_arr,data_unit=data_unit,
                         coordinates=coord, exp_id=None,data_title=data_title)
     return d
 

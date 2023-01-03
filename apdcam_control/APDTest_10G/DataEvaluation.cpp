@@ -8,6 +8,17 @@
 
 #define GET_BYTE(p)  (*((uint8_t*)(p)))
 
+/*************** for time measurement **********************/
+#include <sys/time.h>
+TimeMeasurement:TimeMeasurement():
+   int counter = 0;
+   int len = 10000;
+   int struct times[len];
+
+void TimeMeasurement:add(times t):
+    times[counter++] = t;
+
+
 /* ********** Helpers for data evaluation  ********** */
 static UINT16 GetMask(int bitsPerSample)
 {

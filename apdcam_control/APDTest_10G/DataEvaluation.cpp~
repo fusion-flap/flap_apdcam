@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <unistd.h>
-#include <sys/time.h>
 
 #include "TypeDefs.h"
 #include "DataEvaluation.h"
@@ -29,11 +28,9 @@ TimeMeasurement::TimeMeasurement()
 
 void TimeMeasurement::add(struct timeval t)
 {	
-	if (counter < len)
-     		times[counter++] = t;   
+//    if (counter < len) 
+        times[counter++] = t;   
 }
-
-TimeMeasurement packet_times;
 
 /* ********** Helpers for data evaluation  ********** */
 static UINT16 GetMask(int bitsPerSample)
@@ -139,6 +136,7 @@ CDataEvaluation::CDataEvaluation() :
 	m_LastCallingTime.QuadPart = 0;
 	m_AvarageCallingTime.QuadPart = 0;
 	memset(m_ChannelOffsets, 0, sizeof(m_ChannelOffsets));
+	TimeMeasurement
 }
 
 
@@ -171,8 +169,6 @@ unsigned int CDataEvaluation::Handler()
 	m_SampleCount = 0;
 	m_SampleIndex = 0;
 	m_StreamNo = 0;
-	struct timeval tv;
-	struct timezone tz;
 
 	FillMap();
 	m_BlockSize = GetBlockSize(m_ActiveChannelNo, m_Bits);
@@ -226,8 +222,6 @@ unsigned int CDataEvaluation::Handler()
 					m_LastCallingTime.QuadPart = performanceCount1.QuadPart;
 
 					ProcessData();
-					gettimeofday(&tv,&tz);
-					packet_times.add(tv);
                  if (m_ContinuityError)  bQuit = true;
                  
 					QueryPerformanceCounter(&performanceCount2);

@@ -12,6 +12,12 @@
 #include "DataEvaluation.h"
 #include "helper.h"
 #include "CCRegs.h"
+#include "TimeMeasurement.h"
+
+extern struct timeval measure_start_tv;
+extern struct timezone measure_start_tz;
+extern TimeMeasurement packet_times;
+
 
 #define LIBVERSION_MAJOR 1
 #define LIBVERSION_MINOR 2
@@ -1111,6 +1117,7 @@ ADT_RESULT APDCAM_Start(ADT_HANDLE handle)
 
 	WorkingSet.state = AS_MEASURE;
 
+	gettimeofday(&measure_start_tv, &measure_start_tz);
 	unsigned char control = 0x0F; // Enables streams on all ADCs
 	if (!SetCCStreamControl(WorkingSet.client, control))
 	{

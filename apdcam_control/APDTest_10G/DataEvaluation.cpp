@@ -11,16 +11,7 @@
 
 /*************** for time measurement **********************/
 #include <sys/time.h>
-
-class TimeMeasurement 
-{
-public: 
-    TimeMeasurement();
-    void add(struct timeval t);
-    int counter;
-    int len;
-    struct timeval times[1000];
-};
+#include "TimeMeasurement.h"
 
 TimeMeasurement::TimeMeasurement()
 {
@@ -33,7 +24,9 @@ void TimeMeasurement::add(struct timeval t)
      		times[counter++] = t;   
 }
 
-TimeMeasurement packet_times;
+extern struct timeval measure_start_tv;
+extern struct timezone measure_start_tz;
+extern TimeMeasurement packet_times;
 
 /* ********** Helpers for data evaluation  ********** */
 static UINT16 GetMask(int bitsPerSample)

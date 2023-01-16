@@ -16,6 +16,10 @@ import xml.etree.ElementTree as ET
 import socket
 import os
 import numpy as np
+import struct
+import sys
+        
+
 
 def DAC_ADC_channel_mapping():
     """ returns the ADC channel numbers (1...32) for each of the 32 DAC channel numbers     
@@ -1322,9 +1326,16 @@ class APDCAM10G_regCom:
         return found
     
     def getInterface(self):
-        """ Determine network interface name
-            Works only on Linux
-            Return error text
+        """
+        Determine network interface name
+        Works only on Linux
+        Stores ther result in self.interface
+        
+        Returns
+        -------
+        str
+            "" or error txt
+
         """
         
         ip = self.getIP()
@@ -1332,13 +1343,30 @@ class APDCAM10G_regCom:
         net = net[0]+'.'+net[1]+'.'+net[2]+'.'
         cmd = "ip -f inet address show | grep "+net
         d=subprocess.run([cmd],check=False,shell=True,stdout=subprocess.PIPE)
-        if (len(d.stdout) == 0):
-            return "Cannot find interface for APDCAM. Is the camera on?"
-        txt = d.stdout
-        txt_lines = txt.split(b'\n')
-        txt = txt_lines[0].split()
-        self.interface = txt[-1]
+        if (len(d.stdout) > 1):
+            return "Multiple network intefaces found for the camera network."
+        if (len(d.stdout) != 0):    
+            txt = d.stdout
+            txt_lines = txt.split(b'\n')
+            txt = txt_lines[0].split()
+            self.interface = txt[-1]
+        else:
+            cmd = "ifconfig"
+            d=subprocess.run([cmd],check=False,shell=True,stdout=subprocess.PIPE)
+            if (len(d.stdout) == 0):    
+                return "Cannot find interface for APDCAM. Is the camera on?"
+            for i,l in enumerate(d.stdout):
+                if (l.find(net) > 0):
+                    if (i == 0):
+                        return "Cannot find interface for APDCAM. Bad answer from ifconfig."
+                    txt = l.split("")
+                    if (txt[-1] != ":"):
+                        return "Cannot find interface for APDCAM. Bad answer from ifconfig."
+                    self.interface = txt[:-1]
+            else:
+                return "Cannot find interface for APDCAM. Is the camera on?"
         return ""
+
         
     def setClock(self,source,adcdiv=33, adcmult=33, extdiv=20, extmult=20,autoExternal=False):
         """ Set external clock.
@@ -2039,31 +2067,58 @@ class APDCAM10G_regCom:
         return ""
            
     def measure(self,numberOfSamples=100000, channelMasks=[0xffffffff,0xffffffff, 0xffffffff, 0xffffffff], \
-                sampleDiv=None, datapath="data", bits=None, waitForResult=True, externalTriggerPolarity=None,\
+                sampleDiv=10, datapath="data", bits=14, waitForResult=0, externalTriggerPolarity=None,\
                 internalTrigger=False, internalTriggerADC=None,  triggerDelay=0, data_receiver='APDTest'):
-        """ This method measures by calling APDTest_10G. It will be replaced by another method in the
-        APDCAM_data class as soon as Python measures fast.
-        externalTriggerPolarity: None: no external trigger
-                                    0: Positive edge
-                                    1: Negative edge
-        internalTrigger: True enables internal trigger, False disables.
-                         If internalTriggerADC is None internal trigger enable in the ADCs
-                         follows this setting.
+        """
+        
+        Start measurement in APDCAM.
+        
+        Parameters
+        ----------
+        numberOfSamples : int, optional
+            The number of samples to measure in one ADC channel. The default is 100000.
+        channelMasks : list of four integers, optional
+            Channel masks to enable ASC channel. Each bit enables one channel. 
+            The default is [0xffffffff,0xffffffff, 0xffffffff, 0xffffffff].
+        sampleDiv : int, optional
+            The sample clock divider.
+            The default is 10. For the default ADC clock setting this means 2 MHz sampling.
+        datapath : string, optional
+            The path where data is stored. The default is "data".
+        bits : int, optional
+            The number of bits in sampling. The default is 14.
+        waitForResult : int, optional
+             <=0 : Do not wait for APDTest_10G to stop
+                   Measurement status can be checked with measurementStatus or 
+                   waited for with waiMeasurement.
+             > 0 : Wait this much seconds
+        externalTriggerPolarity: None or integer.
+            None: no external trigger
+            0: Positive edge
+            1: Negative edge
+        internalTrigger: boolean
+            True enables internal trigger, False disables.
+            If internalTriggerADC is None internal trigger enable in all ADCs
+            follows this setting.
         internalTriggerADC: None or boolean
-                            None: Internal trigger Enable/Disable follows internalTrigger
-                            True: Internal trigger in ADCs is enables
-                            False: Internal trigger in ADCs disables
-        triggerDelay:  Trigger with this delay [microsec]
-        waitForResult: <=0 : Do not wait for APDTest_10G to stop
-                        > 0 : Wait this much seconds
+            None: Internal trigger Enable/Disable follows internalTrigger
+            True: Internal trigger in all ADCs is enabled
+            False: Internal trigger in all ADCs is disabled
+        triggerDelay: int or float  
+            Trigger with this delay [microsec]
         data_receiver: str
             The data receiver method:
                 'APDTest': The scriptable APDTest_10G C++ program which is part of the module. This should be compiled
                            and will be called to collect data into files.
                 'Python': Python code inside this method. (Might still call some external C program.)
-                        
-        Returns, error, warning
-                        
+
+       Returns
+        -------
+        str
+            "" or error message
+        str
+            Warning. "" if no warning.
+
         """
         self.readStatus(dataOnly=True)
         
@@ -2130,87 +2185,95 @@ class APDCAM10G_regCom:
         if (err != ""):
             return err,""
         
-        cmdfile_name = "apd_python_meas.cmd"
-        cmdfile = datapath+'/'+cmdfile_name
-        try:
-            f = open(cmdfile,"wt")
-        except:
-            return "Error opening file "+cmdfile,""
+        if (data_receiver.lower() == 'apdest'):
         
-        ip = self.getIP()
-        interface = self.interface.decode('ascii')
-        chnum = 0
-        for i in range(n_adc):
-            chnum += bin(chmask[i]).count("1")
-            
-        numberOfSamples_plus = numberOfSamples + 10000    
-        buflen = numberOfSamples_plus * chnum * 2
-        min_buflen = 2e8
-        if (buflen > min_buflen):
-            buflen = round(min_buflen/float(buflen)*100)
-        else:
-            buflen = 100    
-        
-        
-        try:
-            f.write("Open "+ip+"\n")
-            f.write("Stop\n")
-            f.write("Stream-Interface "+interface+"\n")
-            s = "Allocate "+str(round(numberOfSamples_plus))+" "+str(bits)+" " 
-            for i in range(4):
-                s = s+"0x{:X} ".format(chmask[i])
-            s = s+"{:d}".format(buflen)
-            f.write(s+"\n")
-            f.write("Arm 0 "+str(round(numberOfSamples_plus))+" 0 1\n")
-            f.write("Start\n")
-            f.write("Wait 10000000\n")
-            f.write("Save\n")
-            # This clears the sample counter
-            f.write("CCCONTROL 276 6 0 0 0 0 0 0\n")
-            f.close()
-        except :
- #           print("Error: "+se.args[1])
-            return "Error writing command file " + cmdfile,""
-            f.close()
-    
-        self.measurePara.numberOfSamples = numberOfSamples
-        self.measurePara.channelMasks = copy.deepcopy(chmask)
-        self.measurePara.externalTriggerPolarity = externalTriggerPolarity
-        self.measurePara.internalTrigger = internalTrigger
-        self.measurePara.triggerDelay = triggerDelay
-        
-        time.sleep(1)
-        thisdir = os.path.dirname(os.path.realpath(__file__))
-        apdtest_prog = 'APDTest_10G'
-        apdtest = os.path.join(thisdir,'APDTest_10G','APDTest_10G')
-        cmd = "killall -KILL "+apdtest_prog+" 2> /dev/null ; cd "+datapath+" ; rm Channel*.dat 2> /dev/null ; "+apdtest+" "+cmdfile_name+" >APDTest_10G.out 2>&1 &"
-        d = subprocess.run([cmd],check=False,shell=True)
-        sleeptime = 0.1
-        maxcount = int(10/sleeptime)+1
-        err = ""
-        started = False
-        for i in range(maxcount):
+            cmdfile_name = "apd_python_meas.cmd"
+            cmdfile = datapath+'/'+cmdfile_name
             try:
-                f = open(datapath+"/"+"APDTest_10G.out","rt")
+                f = open(cmdfile,"wt")
             except:
-                time.sleep(sleeptime)
-                continue
-            all_txt = f.readlines()
-            f.close()
-            for il in range(len(all_txt)):
-               if (all_txt[il].lower().find("error") >= 0):
-                  err = "Error starting measurement: "+all_txt[il]
-                  return err,""
-               if (all_txt[il].lower().find("start succes") >= 0):
-                  started = True
-                  break
-            if (started):
-                break
-            time.sleep(sleeptime)
-
-        if (not started):
-            return "APDCAM did not start",""
+                return "Error opening file "+cmdfile,""
+            
+            ip = self.getIP()
+            interface = self.interface.decode('ascii')
+            chnum = 0
+            for i in range(n_adc):
+                chnum += bin(chmask[i]).count("1")
+                
+            numberOfSamples_plus = numberOfSamples + 10000    
+            buflen = numberOfSamples_plus * chnum * 2
+            min_buflen = 2e8
+            if (buflen > min_buflen):
+                buflen = round(min_buflen/float(buflen)*100)
+            else:
+                buflen = 100    
+            
+            
+            try:
+                f.write("Open "+ip+"\n")
+                f.write("Stop\n")
+                f.write("Stream-Interface "+interface+"\n")
+                s = "Allocate "+str(round(numberOfSamples_plus))+" "+str(bits)+" " 
+                for i in range(4):
+                    s = s+"0x{:X} ".format(chmask[i])
+                s = s+"{:d}".format(buflen)
+                f.write(s+"\n")
+                f.write("Arm 0 "+str(round(numberOfSamples_plus))+" 0 1\n")
+                f.write("Start\n")
+                f.write("Wait 10000000\n")
+                f.write("Save\n")
+                # This clears the sample counter
+                f.write("CCCONTROL 276 6 0 0 0 0 0 0\n")
+                f.close()
+            except :
+     #           print("Error: "+se.args[1])
+                return "Error writing command file " + cmdfile,""
+                f.close()
         
+            self.measurePara.numberOfSamples = numberOfSamples
+            self.measurePara.channelMasks = copy.deepcopy(chmask)
+            self.measurePara.externalTriggerPolarity = externalTriggerPolarity
+            self.measurePara.internalTrigger = internalTrigger
+            self.measurePara.triggerDelay = triggerDelay
+            
+            time.sleep(1)
+            thisdir = os.path.dirname(os.path.realpath(__file__))
+            apdtest_prog = 'APDTest_10G'
+            apdtest = os.path.join(thisdir,'APDTest_10G','APDTest_10G')
+            cmd = "killall -KILL "+apdtest_prog+" 2> /dev/null ; cd "+datapath+" ; rm Channel*.dat 2> /dev/null ; "+apdtest+" "+cmdfile_name+" >APDTest_10G.out 2>&1 &"
+            d = subprocess.run([cmd],check=False,shell=True)
+            sleeptime = 0.1
+            maxcount = int(10/sleeptime)+1
+            err = ""
+            started = False
+            for i in range(maxcount):
+                try:
+                    f = open(datapath+"/"+"APDTest_10G.out","rt")
+                except:
+                    time.sleep(sleeptime)
+                    continue
+                all_txt = f.readlines()
+                f.close()
+                for il in range(len(all_txt)):
+                   if (all_txt[il].lower().find("error") >= 0):
+                      err = "Error starting measurement: "+all_txt[il]
+                      return err,""
+                   if (all_txt[il].lower().find("start succes") >= 0):
+                      started = True
+                      break
+                if (started):
+                    break
+                time.sleep(sleeptime)
+    
+            if (not started):
+                return "APDCAM did not start",""
+        else:
+            # Native Python measurement
+            data_receiver = APDCAM10G_data(self)
+            
+            
+            
+            
         if (waitForResult <=0):
             return "",""
         
@@ -2415,32 +2478,56 @@ class APDCAM10G_data:
     CC_STREAMHEADER = 22
     MULTICAST = False
                 
-    def __init__(self):
-        """"
-            INPUT:
-                APDCAM: APDCAM10G_regCom classs for accessing camera registers
-        """        
-        self.APDCAM_IP = b"10.123.13.102"
+    def __init__(self,APDCAM):
+        """
+        Constructor for an APDCAM10G_data object.
+
+        Parameters
+        ----------
+        APDCAM : APDCAM10G_regCom
+            The communication class for the camera.
+
+        Returns
+        -------
+        None.
+
+        """
+        if (type(APDCAM) is not APDCAM10G_regCom):
+            raise TypeError("An APDCAM10G_regCom class is expected as input to APDCAM10G_data.")
+        self.APDCAM = APDCAM
         self.receiveSockets = [None, None, None, None]
         self.MTU = APDCAM10G_data.DEF_MTU
-        maxAdcDataLength = self.MTU-\
-                             (APDCAM10G_data.IPV4_HEADER+APDCAM10G_data.UDP_HEADER\
-                              +APDCAM10G_data.CC_STREAMHEADER)
-        self.octet = maxAdcDataLength//8
+        self.setOctet(self.MTU)
         self.streamTimeout = 10000 # ms
         
     def __del__(self):
+        """
+        Destructor for class. CLoses all receive sockets.
+
+        Returns
+        -------
+        None.
+
+        """
         for i in range(4) :
             if self.receiveSockets[i] != None :
                 self.receiveSockets[i].close()
             
-    def setIP(self,IP):
-        self.APDCAM_IP = IP
-        
-    def getIP(self):
-        return self.APDCAM_IP
-    
     def setOctet(self,MTU):
+        """
+        Calculates the octet setting for camera data communication and saves it in 
+        self.octet.
+
+        Parameters
+        ----------
+        MTU : int
+            The network interface MTU.
+
+        Returns
+        -------
+        None.
+
+        """
         self.MTU = MTU
         maxAdcDataLength = MTU-\
                             (APDCAM10G_data.IPV4_HEADER+APDCAM10G_data.UDP_HEADER\
@@ -2448,13 +2535,16 @@ class APDCAM10G_data:
         self.octet = maxAdcDataLength//8
         
 
-    def stopReceive(self,APDCAM):
-        """Stops streams and closes all the stream receive sockets
-            INPUT:
-                streamList: List 4 boolean values for enabling streams
-            Returns "" or error message
+    def stopReceive(self):
         """
+        Stops data receive on the sockets and closes the sockets.
 
+        Returns
+        -------
+        None.
+
+        """
+        
         # Delete sockets
         for i in range(4) :
             if (self.receiveSockets[i] != None):
@@ -2462,17 +2552,22 @@ class APDCAM10G_data:
                self.receiveSockets[i] = None
                
         
-    def startReceive(self,APDCAM,streamList):
-        """Starts the stream receive
-            INPUT:
-                streamList: List 4 boolean values for enabling streams
-            Returns "" or error message
+    def startReceive(self,streamList):
         """
-        import socket
-        import struct
-        import sys
-        
-        APDCAM10G_data.stopReceive(self,APDCAM)
+        Creates the data receive sockets and start to receive data on them. 
+        Does not start the data streams in the camera.
+
+        Parameters
+        ----------
+        streamList : 4 element list of boolean
+            True enables a receiving on a stream.
+
+        Returns
+        -------
+        str:
+            "" or error message.
+        """
+        APDCAM10G_data.stopReceive(self)
         
         for i in range(4) :
             if (streamList[i] == True) :
@@ -2483,24 +2578,39 @@ class APDCAM10G_data:
                 try:
                     self.receiveSockets[i].bind(('', APDCAM10G_data.RECEIVE_PORTS[i]))
                 except socket.error as se :
-                    return se.args[1]
+                    return str(se.args[1])
                 if APDCAM10G_data.MULTICAST :
                     d = socket.inet_aton(APDCAM10G_data.MULTICAST_ADDRESS)
                     mreq = struct.pack('4sL', d, socket.INADDR_ANY)
                     self.receiveSockets[i].setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
                 self.receiveSockets[i].setblocking(1)  # non blocking receive
                 self.receiveSockets[i].settimeout(self.streamTimeout/1000.)
+        return ""
      
-    def startStream(self,APDCAM,streamList) :
-        import socket
+    def startStream(self,streamList):
+        """
+        Starts the data streams in APDCAM.
+
+        Parameters
+        ----------
+        streamList : 4 element list of boolean
+            True enables a receiving on a stream.
+
+        Returns
+        -------
+        str:
+            "" or error message.
+
+        """
+
+        APDCAM10G_data.stopStream(self)
         
-        APDCAM10G_data.stopStream(self,APDCAM)
-        
-        strcontrol = bytearray([0])        
+        strcontrol = bytearray([0])       
+        err = ""
         for i in range(4) :
             if (streamList[i] == True) :
                 strcontrol[0] = strcontrol[0] | 2**i
-                print("Stream %d Octet: %d" % (i,self.octet))
+#                print("Stream %d Octet: %d" % (i,self.octet))
                 if (APDCAM10G_data.MULTICAST) :
                     UDP_data = bytearray(9)
                     UDP_data[0] = i+1
@@ -2513,7 +2623,7 @@ class APDCAM10G_data:
                     UDP_data[6] = d[3]
                     UDP_data[7] = APDCAM10G_data.RECEIVE_PORTS[i] // 256
                     UDP_data[8] = APDCAM10G_data.RECEIVE_PORTS[i] % 256
-                    err = APDCAM.sendCommand(APDCAM10G_codes_v1.OP_SETMULTICASTUDPSTREAM,UDP_data,sendImmediately=True)
+                    err = self.APDCAM.sendCommand(self.APDCAM.codes_CC.OP_SETMULTICASTUDPSTREAM,UDP_data,sendImmediately=True)
                 else :    
                     UDP_data = bytearray(15)
                     UDP_data[0] = i+1
@@ -2534,24 +2644,43 @@ class APDCAM10G_data:
                     UDP_data[12] = d[3]
                     UDP_data[13] = APDCAM10G_data.RECEIVE_PORTS[i] // 256
                     UDP_data[14] = APDCAM10G_data.RECEIVE_PORTS[i] % 256
-                    err = APDCAM.sendCommand(APDCAM10G_codes_v1.OP_SETUDPSTREAM,UDP_data,sendImmediately=True)
+                    err = self.APDCAM.sendCommand(self.APDCAM.codes_CC.OP_SETUDPSTREAM,UDP_data,sendImmediately=True)
                 
         # Start streams
         #print("TEST UDP!!!")
         #err = APDCAM.sendCommand(APDCAM10G_codes_v2.OP_SETUDPTESTCLOCKDIVIDER,bytes([1,0,0,0]),sendImmediately=True)
         #strcontrol[0] = strcontrol[0] | 0xF0
-        err = APDCAM.sendCommand(APDCAM10G_codes_v1.OP_SETSTREAMCONTROL,strcontrol,sendImmediately=True)
-        if (err != "") :
-            return err
-        return ""
+        err = self.APDCAM.sendCommand(self.APDCAM.codes_CC.OP_SETSTREAMCONTROL,strcontrol,sendImmediately=True)
+        return err
     
-    def stopStream(self,APDCAM):
-        # Stop streams
-        APDCAM.sendCommand(APDCAM10G_codes_v1.OP_SETSTREAMCONTROL,bytes([0]),sendImmediately=True)
+    def stopStream(self):
+        """
+        Stop streams
+    
+        Returns
+        -------
+        str:
+            "" or error message.
+
+        """
+        return self.APDCAM.sendCommand(self.APDCAM.codes_CC.OP_SETSTREAMCONTROL,bytes([0]),sendImmediately=True)
 
     def getData(self,streamNo):
         """
-        streamNo: 0...3
+        Get UDP data from a stream.
+
+        Parameters
+        ----------
+        streamNo : int
+            The stream number (0...3).
+
+        Returns
+        -------
+        str:
+            "" or error message.
+        bytearray:
+            The data.
+
         """
         import socket
         
@@ -2565,536 +2694,3 @@ class APDCAM10G_data:
             return se.argv[1], None
         return "", data        
         
-def testRcv():
-    c = APDCAM10G_regCom()
-    ret = c.startReceiveAnswer()
-    if ret != "" :
-        print("Could not start UDP read. (err:%s)" % ret)
-        return
-    err = c.sendCommand(APDCAM10G_codes_v1.OP_SETSAMPLECOUNT,bytes(10),sendImmediately=True)
-    err,d = c.getAnswer()
-    if (err != "") :
-        print("Error:%d" % err)
-        return
-    if d == None :
-        print("No answer received")
-    else :
-        print("Answer received (%d bytes)" % len(d))
-    c.close()    
-      
-def testPdiRead():
-    c = APDCAM10G_regCom()
-    ret = c.connect()
-    if ret != "" :
-        print("%s" % ret)
-        del c
-        return
-    card = [2,8]
-    add = [c.codes_PC.PC_REG_HVON,0]
-    l = [0,10]
-    ad = [False, True]
-    err, data = c.readPDI(card,add,l,arrayData=ad)   
-#    err, data = c.readPDI(c.codes_PC.PC_CARD,c.codes_PC.PC_REG_HVON,1,arrayData=False)
-    print("Operation result: %s" % err)
-    if data != None :
-        n_ans = len(data)
-        for i in range(n_ans) :
-            print("Data #%d" % i)
-            d = data[i]
-            if type(d) is bytes:
-                s = ""
-                for i in range(len(d)) :
-                    s = s+" "+str(d[i]) 
-                print(s)
-            else:
-                print(d)
-    c.close()         
-
-def testReadStatus():
-    c = APDCAM10G_regCom()
-    ret = c.connect()
-    if (ret != ""):
-        print(ret)
-        return
-    for count in range(100000):
-        err = c.readStatus()
-        if (err != ""):
-            print("Cycle {:d}, error: {:s}".format(count,err))
-            break
-        time.sleep(0.01)
-        if (count % 100 == 0):
-            print("Cycle {:d}".format(count))                    
-    c.close()     
-     
-def testPdiWrite():
-    c = APDCAM10G_regCom()
-    ret = c.connect()
-    if ret != "" :
-        print("%s" % ret)
-        del c
-        return
-    
-    err = c.writePDI([8,9],[0xAE,0xAE],[12345,bytes([0x01,0x03])],numberOfBytes=[2,2],arrayData=[False,True],waitTime=10,noReadBack=False)
-    #d = 3
-    #err = c.writePDI(c.codes_PC.PC_CARD,c.codes_PC.PC_REG_HVON,d,numberOfBytes=1,arrayData=False)
-
-    if (err == "") :
-        print("Write operation successful.")
-    else:
-        print("Write error: %s" % err)
-    del c         
-
-def test_socket():
-    import socket
-    recvSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    recvSocket.bind((b'127.0.0.0', 9999))
-    UDP_data = b"ABCD"
-    APDCAM_IP = b"10.123.13.102"
-    ret = recvSocket.sendto(UDP_data, (APDCAM_IP, APDCAM10G_regCom.APDCAM_PORT))
-    print(ret)
-
-def testSend():
-    c = APDCAM10G_regCom()    
-    ret = c.startReceiveAnswer()
-    if ret != "" :
-        print("Could not start UDP read. (err:%s)" % ret)
-        c.close()
-        return
-
-    cardAddress = 8
-    registerAddress = 0
-    numberOfBytes = 10
-    userData = bytes([cardAddress])\
-      +bytes([registerAddress//256*256*256])\
-      +bytes([registerAddress//256*256])+bytes([registerAddress//256])\
-      +bytes([registerAddress%256])\
-      +bytes([numberOfBytes//256])+bytes([numberOfBytes%256])           
-    err = c.sendCommand(APDCAM10G_regCom.OP_READPDI,userData,sendImmediately=True)
-    if (err != ""):
-        print(err)
-    else:
-        print("Successful readPDI send.")
-     
-    c.close()
-
-def testSendUDP():
-# Tests data UDP recever from camera
-    c = APDCAM10G_regCom()
-    ret = c.startReceiveAnswer()
-    if ret != "" :
-        print("Could not start UDP read. (err:%s)" % ret)
-        c.close()
-        return
-    # Stop streams
-    err = c.sendCommand(APDCAM10G_codes_v1.OP_SETSTREAMCONTROL,bytes([0]),sendImmediately=False)
-    # Samplediv=1024
-    err = c.sendCommand(APDCAM10G_codes_v1.OP_PROGRAMSAMPLEDIVIDER,bytes([4,0]),sendImmediately=False)
-    # 1024 samples
-    err = c.sendCommand(APDCAM10G_codes_v1.OP_SETSAMPLECOUNT,bytes([0,0,0,0,4,0]),sendImmediately=False)
-    # Start stream 1 
-    err = c.sendCommand(APDCAM10G_codes_v1.OP_SETSTREAMCONTROL,bytes([1]),sendImmediately=True)
-    if (err != "") :
-        print("Error starting streams: %s" % err)
-    c.close()
-    
-def testDataCollect():
-    c = APDCAM10G_regCom()
-    ret = c.connect()
-    if ret != "" :
-        print("%s" % ret)
-        del c
-        return
-    print("Firmware: "+c.status.firmware.decode('utf-8'))
-    apdcam_data = APDCAM10G_data()
-    apdcam_data.stopStream(c)
-    if (c.versionCode == 0) :
-        # Samplediv
-        print("Version code 0")
-        err = c.sendCommand(APDCAM10G_codes_v1.OP_PROGRAMSAMPLEDIVIDER,bytes([0,5]),sendImmediately=False)
-        # samples
-        err = c.sendCommand(APDCAM10G_codes_v1.OP_SETSAMPLECOUNT,bytes([0,0,0,1,0,0]),sendImmediately=True)
-        #apdcam_data.setOctet(1000)
-        apdcam_data.startReceive(c,[True, True, False, False])
-        apdcam_data.startStream(c,[True, True, False, False])
-    else:
-        #stop all data
-        print("Version code 1")
-        op = bytes([0xC0])
-        trigdelay = bytes([0,0,0,0])
-        samplecount = bytes([0,0,0,1,0,0])
-        err = c.sendCommand(APDCAM10G_codes_v2.OP_SETG1TRIGGERMODULE,op+trigdelay+samplecount,sendImmediately=True)
-        if (err != ""):
-            print(err)
-            return
-        err = c.sendCommand(APDCAM10G_codes_v2.OP_SETG2GATEMODULE,bytes([0]),sendImmediately=True)
-        if (err != ""):
-            print(err)
-            return
-        apdcam_data.startReceive(c,[False, True, False, False])
-        apdcam_data.startStream(c,[False, True, False, False])
-        # Start with SW trigger
-        trigdelay = bytes([0,0,0,0])
-        samplecount = bytes([0,0,0,1,0,0])
-        err = c.sendCommand(APDCAM10G_codes_v2.OP_SETG1TRIGGERMODULE,op+trigdelay+samplecount,sendImmediately=True)
-        if (err != ""):
-            print(err)
-            return
-         
-        
-    counter = 1
-    while 1 :
-        err,data = apdcam_data.getData(0)
-        if (err =="") :
-            if (counter == 1):
-                print("First packet")
-            packet_counter = int.from_bytes(data[8:14],'big') 
-            print(packet_counter)
-            if (packet_counter != counter) :
-                print("Error in packet counter: %d (exp: %d)" % (int.from_bytes(data[8:14],'big'), counter))
-            counter = counter+1    
-        else :
-            #print("Error: %s" % err)
-            break
-    print("Received {:d} packets".format(counter-1))    
-    del apdcam_data
-    c.close()
-    
-def testConnect():
-    c = APDCAM10G_regCom()
-    ret = c.connect()
-    if (ret != ""):
-        print(ret)
-        return
-    print("Firmware: "+c.status.firmware.decode('utf-8'))
-    print("No ADCs: %d" % len(c.status.ADC_address))
-    if (len(c.status.ADC_address) != 0):
-        print("Addresses:")
-        print(c.status.ADC_address)       
-    c.close()
-    
-def stopData():
-    c = APDCAM10G_regCom()
-    ret = c.connect()
-    if ret != "" :
-        print("%s" % ret)
-        c.close()
-        return
-    print("Firmware: "+c.status.firmware.decode('utf-8'))
-    apdcam_data = APDCAM10G_data()
-    apdcam_data.stopStream(c)
-    del apdcam_data
-    c.close()
-
-def testTimer():
-    c = APDCAM10G_regCom()
-    ret = c.connect()
-    if ret != "" :
-        print("%s" % ret)
-        c.close()
-        return
-    print("Firmware: "+c.status.firmware.decode('utf-8'))
-    c.clearAllTimers()
-    ts = APDCAM_onetimer()
-    c.CAMTIMER.clockDiv = 20000
-    c.CAMTIMER.outputEnable = 8
-    c.CAMTIMER.outputPolarity = 0
-    c.CAMTIMER.outputArmedState = 0
-    c.CAMTIMER.outputIdleState = 0
-    ts.delay = 0
-    ts.pulseOn = 3000
-    ts.pulseOff = 20
-    ts.numberOfPulses = 1
-    ts.channelEnable = 8
-    n = c.allocateTimer(ts)
-    if (n < 1):
-        print("Error allocating timer.")
-        return
-    print("Timer allocated to :%d" % n)
-    err = c.loadTimerSetup()
-    if (err != ""):
-        print(err)
-        return
-    err = c.timerIdle()
-    if (err != ""):
-        print(err)
-        return
-    time.sleep(0.01)
-    err = c.timerArm()
-    if (err != ""):
-        print(err)
-        return
-    time.sleep(0.01)
-    err = c.timerRun()
-    if (err != ""):
-        print(err)
-        return
-    print("Timer started")
-
-    
-    
-def testInterface():
-    c = APDCAM10G_regCom()
-    err = c.getInterface()
-    if (err == ""):
-        print(c.interface)
-    else:
-        print(err)
-def testMeasure():
-    c = APDCAM10G_regCom()
-    ret = c.connect()
-    if ret != "" :
-        print("%s" % ret)
-        c.close()
-        return
-    print("Connected. Firmware: "+c.status.firmware.decode('utf-8'))
-    err,warning = c.measure(numberOfSamples=100000,sampleDiv=10,bits=14,waitForResult=0,externalTriggerPolarity=0)
-    if (err != ""):
-        print("Error starting measurement:"+err)
-        c.close()
-        return
-    else:
-        print("Measurement started")
-    while (1):
-        err,stat,warning = c.measurementStatus()
-        if (err != ""):
-            print(err)
-        if (warning != ""):
-            print(warning)
-        if (stat == "Finished" ):
-            print("Measurement fininshed.")
-            break
-        
-    err = c.writeConfigFile()
-    if (err != ""):
-        print("Error in writeConfigFile:"+err)
-    else:
-        print("Config file written.")
-
-    del c
-        
-def testStream():
-    c = APDCAM10G_regCom()
-    ret = c.connect()
-    if ret != "" :
-        print("%s" % ret)
-        c.close()
-        return
-    print("Connected. Firmware: "+c.status.firmware.decode('utf-8'))
-    c.writeStreamData()
-    c = APDCAM10G_regCom()
-    ret = c.connect()
-    if ret != "" :
-        print("%s" % ret)
-        c.close()
-        return
-    print("Connected. Firmware: "+c.status.firmware.decode('utf-8'))
-   
-def testClock():
-    c = APDCAM10G_regCom()
-    ret = c.connect()
-    if ret != "" :
-        print("%s" % ret)
-        c.close()
-        return
-    print("Connected. Firmware: "+c.status.firmware.decode('utf-8'))
-    err = c.setClock(APDCAM10G_regCom.CLK_INTERNAL)
-    if (err == ""):
-        print("Internal clock set OK.")
-    else:
-        print("Error setting internal clock:"+err)
-        c.close
-        return
-    err,f,source = c.getAdcClock()
-    if (err == ""):
-        print("Clock frequency: {:f}[MHz]".format(f))
-        if (source == APDCAM10G_regCom.CLK_INTERNAL):
-            print("Clock source internal.")
-        else:
-            print("Clock source external.")     
-    else:
-        print("Error reading clock frequency:"+err)
-        c.close
-        return
-    err = c.setClock(APDCAM10G_regCom.CLK_EXTERNAL,extmult=4,extdiv=2)
-    if (err == ""):
-        print("EXTERNAL clock set OK.")
-    else:
-        print("Error setting external clock:"+err)
-        c.close
-        return
-    time.sleep(1)
-    err,f,source = c.getAdcClock()
-    if (err == ""):
-        print("Clock frequency: {:f}[MHz]".format(f))
-        if (source == APDCAM10G_regCom.CLK_INTERNAL):
-            print("Clock source internal.")
-        else:
-            print("Clock source external.")     
-
-    else:
-        print("Error reading clock frequency:"+err)
-        c.close
-        return
-def readStreamSetting():
-    c = APDCAM10G_regCom()
-    ret = c.connect()
-    if ret != "" :
-        print("%s" % ret)
-        c.close()
-        return
-    print("Connected. Firmware: "+c.status.firmware.decode('utf-8'))
-    err = c.readStatus()
-    if (err != ''):
-        print(err)
-        return
-    code = c.codes_CC
-    for i in range(4):
-        octet = int.from_bytes(c.status.CC_settings[code.CC_REGISTER_UDPOCTET1+16*i:code.CC_REGISTER_UDPOCTET1+2+16*i],'big',signed=False)
-        ip = c.status.CC_settings[code.CC_REGISTER_IP1+16*i:code.CC_REGISTER_IP1+4+16*i]
-        port = int.from_bytes(c.status.CC_settings[code.CC_REGISTER_UDPPORT1+16*i:code.CC_REGISTER_UDPPORT1+2+16*i],'big',signed=False)
-        print("{:d}...octet:{:d} IP:{:d}.{:d}.{:d}.{:d}  port:{:d}".format(i+1,octet,ip[0],ip[1],ip[2],ip[3],port))
-    c.close()
-    del c
-    
-def resetStream3():
-    c = APDCAM10G_regCom()
-    ret = c.connect()
-    if ret != "" :
-        print("%s" % ret)
-        c.close()
-        return
-    print("Connected. Firmware: "+c.status.firmware.decode('utf-8'))
-    c.resetStream3()
-    c.close()
-    del c    
-        
-def hardTestComm_core(apd,threadNo):
-    """ This is called by hardTestComm()
-    """
-    import random
-    random.seed()
-    
-    err_counter = 0
-    for i in range(100000):
-        v = random.randint(1,4)
-        if (v == 1):
-            card=8
-            reg = apd.codes_ADC.ADC_REG_MAXVAL11
-            numberOfBytes = 20
-            arrayData = True
-            err,data = apd.readPDI(card,reg,numberOfBytes=numberOfBytes,arrayData=arrayData)
-            print("Thread(err:{:d}) {:d}/{:d}...readPDI({:d},{:d},numberOfBytes={:d},arrayData{:d})"\
-                   .format(err_counter,threadNo,i,card,reg,numberOfBytes,arrayData))
-            if (err != ""):
-                print("   Thread {:d}/{:d}   error: ******>{:s}<******".format(threadNo,i,err))
-                err_counter += 1
-            if (err == ""):
-                print("   Thread {:d}/{:d}   data:".format(threadNo,i,)+str(data[0]))
-        elif (v == 2):
-            card=8
-            reg = apd.codes_ADC.ADC_REG_MAXVAL11
-            numberOfBytes = 20
-            arrayData = True
-            data = bytearray(range(20))
-            err = apd.writePDI(card,reg,data,numberOfBytes=numberOfBytes,arrayData=arrayData)
-            print("Thread(err:{:d}) {:d}/{:d}...writePDI({:d},{:d},data,numberOfBytes={:d},arrayData{:d})".format(err_counter,threadNo,i,card,reg,numberOfBytes,arrayData))
-            if (err != ""):
-                print("   Thread {:d}/{:d}   error: ******>{:s}<******".format(threadNo,i,err))
-        elif (v == 3):
-            err = apd.readStatus()
-            print("Thread(err:{:d} {:d}/{:d}...readStatus()".format(err_counter,threadNo,i))
-            if (err != ""):
-                print("   Thread {:d}/{:d}   error: ******>{:s}<******".format(threadNo,i,err))
-        elif (v == 4):
-            err = apd.syncADC()
-            print("Thread(err:{:d} {:d}/{:d}...syncADC()".format(err_counter,threadNo,i))
-            if (err != ""):
-                print("   Thread {:d}/{:d}   error: ******>{:s}<******".format(threadNo,i,err))
-            
-        w = random.random()
-        time.sleep(w/10)            
-    
-def hardTestComm():
-    """ This is to test a lot of communications from different streams
-    """    
-    apd = APDCAM10G_regCom()
-    ret = apd.connect()
-    if ret != "" :
-        print("%s" % ret)
-        apd.close()
-        return
-    print("Connected. Firmware: "+apd.status.firmware.decode('utf-8'))
-    
-    print("Starting thread 1")
-    thr1 = threading.Thread(target=hardTestComm_core,args=(apd,1))
-    thr1.start()
-    
-    print("Starting in main program (thread 2)")
-    hardTestComm_core(apd,2)
-    
-    apd.close()
-    del apd        
-
-def dumpStatus():
-    apd = APDCAM10G_regCom()
-    ret = apd.connect()
-    if ret != "" :
-        print("%s" % ret)
-        apd.close()
-        return
-    print("Connected. Firmware: "+apd.status.firmware.decode('utf-8'))
-#    err = apd.readStatus()
-#    if (err != ''):
-#        print(err)
-#        return
-    code = apd.codes_CC
-    print("Stream status:")
-    for i in range(4):
-        octet = int.from_bytes(apd.status.CC_settings[code.CC_REGISTER_UDPOCTET1+16*i:code.CC_REGISTER_UDPOCTET1+2+16*i],'big',signed=False)
-        ip = apd.status.CC_settings[code.CC_REGISTER_IP1+16*i:code.CC_REGISTER_IP1+4+16*i]
-        port = int.from_bytes(apd.status.CC_settings[code.CC_REGISTER_UDPPORT1+16*i:code.CC_REGISTER_UDPPORT1+2+16*i],'big',signed=False)
-        print("  {:d}...octet:{:d} IP:{:d}.{:d}.{:d}.{:d}  port:{:d}".format(i+1,octet,ip[0],ip[1],ip[2],ip[3],port))
-    clockstat = int(apd.status.CC_settings[code.CC_REGISTER_CLOCK_CONTROL])
-    cstat = "Clock source: "
-    if ((clockstat & 4) != 0):
-        cstat += "<External> "
-    else:
-        cstat += "<Internal> "
-    if ((clockstat & 8) != 0):
-        cstat += "<Auto External>"
-    print(cstat)
-    if ((clockstat & 16) != 0):
-        print("Sample clock: <External>")
-    else:
-        print("Sample clock: <Internal>")
-    trigstat = int(apd.status.CC_settings[code.CC_REGISTER_TRIGSTATE])  
-    tstat = "Trigger: "
-    if ((trigstat & 1) != 0):
-        tstat += "<External +> "
-    if ((trigstat & 2) != 0):
-        tstat += "<External -> "
-    if ((trigstat & 4) != 0):
-        tstat += "<Internal> "
-    if ((trigstat & 64) != 0):
-        tstat += "<DT> "
-    print(tstat)
-    
-    samplecount = int.from_bytes(apd.status.CC_settings[code.CC_REGISTER_SAMPLECOUNT:code.CC_REGISTER_SAMPLECOUNT+6],'big',signed=False)
-    print("Sample count:{:d}".format(samplecount))
-    txcount = int.from_bytes(apd.status.CC_variables[code.CC_REGISTER_STREAM_TX_FRAMES:code.CC_REGISTER_STREAM_TX_FRAMES+4],'little',signed=False)
-    print("Transmitted UDP frames:{:d}".format(txcount))
-#testReadStatus()   
-#testPdiRead()
-#testPdiWrite()
-#testSend()
-#testSendUDP()     
-#testDataCollect()
-#testConnect()
-#testTimer()
-#testInterface() 
-#testMeasure()
-#testStream()
-#testClock()
-#resetStreams()
-#readStreamSetting()
-#hardTestComm()

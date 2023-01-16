@@ -2040,7 +2040,7 @@ class APDCAM10G_regCom:
            
     def measure(self,numberOfSamples=100000, channelMasks=[0xffffffff,0xffffffff, 0xffffffff, 0xffffffff], \
                 sampleDiv=None, datapath="data", bits=None, waitForResult=True, externalTriggerPolarity=None,\
-                internalTrigger=False, internalTriggerADC=None,  triggerDelay=0):
+                internalTrigger=False, internalTriggerADC=None,  triggerDelay=0, data_receiver='APDTest'):
         """ This method measures by calling APDTest_10G. It will be replaced by another method in the
         APDCAM_data class as soon as Python measures fast.
         externalTriggerPolarity: None: no external trigger
@@ -2056,6 +2056,11 @@ class APDCAM10G_regCom:
         triggerDelay:  Trigger with this delay [microsec]
         waitForResult: <=0 : Do not wait for APDTest_10G to stop
                         > 0 : Wait this much seconds
+        data_receiver: str
+            The data receiver method:
+                'APDTest': The scriptable APDTest_10G C++ program which is part of the module. This should be compiled
+                           and will be called to collect data into files.
+                'Python': Python code inside this method. (Might still call some external C program.)
                         
         Returns, error, warning
                         

@@ -209,7 +209,7 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
             if (camera_type == 'APDCAM-1G'):
                 sensor_angle = 0
             else:
-                sensor_angle = int(camera_type[9:])
+                sensor_angle = int(camera_type[10:])
         else:
             try:
                 sensor_angle = t['Sensor angle']

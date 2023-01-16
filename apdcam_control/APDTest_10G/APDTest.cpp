@@ -980,9 +980,9 @@ int ProcessLine(char *buffer)
 			printf("Start time: %lu,%lu\n",(unsigned long)measure_start_tv.tv_sec,(unsigned long)measure_start_tv.tv_usec);
 			for (int i=0; i<packet_times.counter; i++)
 			{
-				printf("Packet %d time: %lu,%lu\n",i+1,(unsigned long)packet_times.times[i].tv_sec,(unsigned long)packet_times.times[i].tv_usec);
-			fflush(stdout);
+				printf("Packet %d time: %lu,%lu\n",i+1,(unsigned long)packet_times.times[i]->tv_sec,(unsigned long)packet_times.times[i]->tv_usec);
 			}
+			fflush(stdout);
 		}	
 		else
 		{

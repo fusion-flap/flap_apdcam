@@ -16,12 +16,14 @@
 TimeMeasurement::TimeMeasurement()
 {
    counter = 0;
+   len = 1000;
+   struct timeval times[1000];
 }
 
 void TimeMeasurement::add(struct timeval t)
 {	
 	if (counter < len)
-     		times[counter++] = t;   
+     		*(times[counter++]) = t;   
 }
 
 extern struct timeval measure_start_tv;
@@ -218,9 +220,11 @@ unsigned int CDataEvaluation::Handler()
 					}
 					m_LastCallingTime.QuadPart = performanceCount1.QuadPart;
 
-					ProcessData();
 					gettimeofday(&tv,&tz);
-					packet_times.add(tv);
+printf("Packet time %lu, %lu\n",(unsigned long)tv.tv_sec,(unsigned long)tv.tv_usec);
+		//			packet_times.add(tv);
+printf("Counter %d\n",packet_times.counter);
+					ProcessData();
                  if (m_ContinuityError)  bQuit = true;
                  
 					QueryPerformanceCounter(&performanceCount2);

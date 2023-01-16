@@ -1342,12 +1342,16 @@ class APDCAM10G_regCom:
         net = ip.split('.')
         net = net[0]+'.'+net[1]+'.'+net[2]+'.'
         cmd = "ip -f inet address show | grep "+net
-        d=subprocess.run([cmd],check=False,shell=True,stdout=subprocess.PIPE)
-        if (len(d.stdout) > 1):
-            return "Multiple network intefaces found for the camera network."
+        d=subprocess.run([cmd],check=False,shell=True,stdout=subprocess.PIPE)  
         if (len(d.stdout) != 0):    
             txt = d.stdout
-            txt_lines = txt.split(b'\n')
+            txt_lines_0 = txt.split(b'\n')
+            txt_lines = []
+            for l in txt_lines_0:
+                if (len(l) != 0):
+                    txt_lines.append(l)
+            if (len(txt_lines) > 1):
+                return("Multiple interfaces with {:s} netaddress?".format(net))
             txt = txt_lines[0].split()
             self.interface = txt[-1]
         else:
@@ -1355,14 +1359,17 @@ class APDCAM10G_regCom:
             d=subprocess.run([cmd],check=False,shell=True,stdout=subprocess.PIPE)
             if (len(d.stdout) == 0):    
                 return "Cannot find interface for APDCAM. Is the camera on?"
-            for i,l in enumerate(d.stdout):
+            txt_lines = d.stdout.split(b'\n')
+            for i,lb in enumerate(txt_lines):
+                l = str(lb,encoding='ascii')
                 if (l.find(net) > 0):
                     if (i == 0):
                         return "Cannot find interface for APDCAM. Bad answer from ifconfig."
-                    txt = l.split("")
-                    if (txt[-1] != ":"):
+                    txt = str(txt_lines[i-1],encoding='ascii').split()
+                    if (txt[0][-1] != ":"):
                         return "Cannot find interface for APDCAM. Bad answer from ifconfig."
-                    self.interface = txt[:-1]
+                    self.interface = bytes(txt[0][:-1],encoding='ascii')
+                    return("")
             else:
                 return "Cannot find interface for APDCAM. Is the camera on?"
         return ""

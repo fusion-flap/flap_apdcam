@@ -7,7 +7,7 @@ public:
 	void add(struct timeval t);
 	int counter;
 	int len;
-	struct timeval times[1000];
+	struct timeval * times[1000];
 };
 
 

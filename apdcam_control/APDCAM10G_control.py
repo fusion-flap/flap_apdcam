@@ -535,6 +535,7 @@ class APDCAM10G_regCom:
         self.lock = threading.RLock()
         self.repeatNumber=5 # Number of times a read/write operation is repeated before an error is indicated
         self.CAMTIMER = APDCAM_timer()
+        self.interface = None
         
     def connect(self,ip="10.123.13.102"):
         """ Connect to the camera and start the answrer reading socket
@@ -1324,7 +1325,7 @@ class APDCAM10G_regCom:
               found = i+1
               break
         return found
-    
+                    
     def getInterface(self):
         """
         Determine network interface name
@@ -2277,6 +2278,12 @@ class APDCAM10G_regCom:
         else:
             # Native Python measurement
             data_receiver = APDCAM10G_data(self)
+            ret = data_receiver.setOctet()
+            if (ret != ""):
+                return ret,""
+            self.start_receive([True,True,True,True])
+            self.startStream([0,1,2,3])
+            self.getData()
             
             
             
@@ -2503,8 +2510,7 @@ class APDCAM10G_data:
             raise TypeError("An APDCAM10G_regCom class is expected as input to APDCAM10G_data.")
         self.APDCAM = APDCAM
         self.receiveSockets = [None, None, None, None]
-        self.MTU = APDCAM10G_data.DEF_MTU
-        self.setOctet(self.MTU)
+        self.MTU = None
         self.streamTimeout = 10000 # ms
         
     def __del__(self):
@@ -2520,6 +2526,43 @@ class APDCAM10G_data:
             if self.receiveSockets[i] != None :
                 self.receiveSockets[i].close()
             
+    def getMTU(self):
+        
+        if (self.APDCAM.interface is None):
+            ret = self.APDCAM.getInterface()
+            if (ret != ""):
+                return ret
+        mtu = None
+        cmd = "ip link show " + self.APDCAM.interface
+        d=subprocess.run([cmd],check=False,shell=True,stdout=subprocess.PIPE) 
+        if (len(d.stdout) != 0):
+            txt = d.stdout
+            txt_lines_0 = txt.split(b'\n')
+            txt_lines = []
+            for l in txt_lines_0:
+                if (len(l) != 0):
+                    txt_lines.append(l)
+            for l in txt_lines:
+                ind = l.find("mtu")
+                if (ind >= 0):
+                    l_split = l.split()
+                    mtu_ind = -1
+                    for i,t in enumerate(l_split):
+                        if (t == 'mtu'):
+                            mtu_ind = i + 1
+                            break
+                    if ((mtu_ind <= len(l_split - 1)) and (mtu_ind > 0)):
+                        try:
+                            mtu = int(l_split[mtu_ind])
+                        except ValueError:
+                            pass
+                    break
+            if (mtu is not None):
+                self.MTU = mtu
+                return ""
+            return "Error determining MTU."
+    
+            
     def setOctet(self,MTU):
         """
         Calculates the octet setting for camera data communication and saves it in 
@@ -2532,14 +2575,21 @@ class APDCAM10G_data:
 
         Returns
         -------
-        None.
+        str:
+            "" or rrror code.
 
         """
-        self.MTU = MTU
+        if (self.MTU is None):
+            ret = self.getMTU()
+        if (ret != ""):
+            return ret
         maxAdcDataLength = MTU-\
                             (APDCAM10G_data.IPV4_HEADER+APDCAM10G_data.UDP_HEADER\
                               +APDCAM10G_data.CC_STREAMHEADER)
         self.octet = maxAdcDataLength//8
+        if (self.octet < 1):
+            return "too small MTU, cannot transfer data."
+        return ""
         
 
     def stopReceive(self):

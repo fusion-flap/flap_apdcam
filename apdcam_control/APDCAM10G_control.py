@@ -2193,7 +2193,7 @@ class APDCAM10G_regCom:
         if (err != ""):
             return err,""
         
-        if (data_receiver.lower() == 'apdest'):
+        if (data_receiver.lower() == 'apdtest'):
         
             cmdfile_name = "apd_python_meas.cmd"
             cmdfile = datapath+'/'+cmdfile_name
@@ -2244,6 +2244,7 @@ class APDCAM10G_regCom:
             self.measurePara.internalTrigger = internalTrigger
             self.measurePara.triggerDelay = triggerDelay
             
+            
             time.sleep(1)
             thisdir = os.path.dirname(os.path.realpath(__file__))
             apdtest_prog = 'APDTest_10G'
@@ -2281,11 +2282,15 @@ class APDCAM10G_regCom:
             ret = data_receiver.setOctet()
             if (ret != ""):
                 return ret,""
-            self.start_receive([True,True,True,True])
-            self.startStream([0,1,2,3])
-            self.getData()
-            self.stopStream()
-            self.stopReceive()
+            ret = data_receiver.startReceive([True,True,True,True])
+            if (ret != ""):
+                return ret,""
+            ret = data_receiver.startStream([True,True,True,True])
+            if (ret != ""):
+                return ret,""            
+            data_receiver.getData(0,npacket=10000)
+            data_receiver.stopStream()
+            data_receiver.stopReceive()
             
  
             
@@ -2534,7 +2539,7 @@ class APDCAM10G_data:
             if (ret != ""):
                 return ret
         mtu = None
-        cmd = "ip link show " + self.APDCAM.interface
+        cmd = "ip link show " + self.APDCAM.interface.decode('ascii')
         d=subprocess.run([cmd],check=False,shell=True,stdout=subprocess.PIPE) 
         if (len(d.stdout) != 0):
             txt = d.stdout
@@ -2542,7 +2547,7 @@ class APDCAM10G_data:
             txt_lines = []
             for l in txt_lines_0:
                 if (len(l) != 0):
-                    txt_lines.append(l)
+                    txt_lines.append(l.decode('ascii'))
             for l in txt_lines:
                 ind = l.find("mtu")
                 if (ind >= 0):
@@ -2552,7 +2557,7 @@ class APDCAM10G_data:
                         if (t == 'mtu'):
                             mtu_ind = i + 1
                             break
-                    if ((mtu_ind <= len(l_split - 1)) and (mtu_ind > 0)):
+                    if ((mtu_ind <= len(l_split) - 1) and (mtu_ind > 0)):
                         try:
                             mtu = int(l_split[mtu_ind])
                         except ValueError:
@@ -2564,7 +2569,7 @@ class APDCAM10G_data:
             return "Error determining MTU."
     
             
-    def setOctet(self,MTU):
+    def setOctet(self):
         """
         Calculates the octet setting for camera data communication and saves it in 
         self.octet.
@@ -2584,7 +2589,7 @@ class APDCAM10G_data:
             ret = self.getMTU()
         if (ret != ""):
             return ret
-        maxAdcDataLength = MTU-\
+        maxAdcDataLength = self.MTU-\
                             (APDCAM10G_data.IPV4_HEADER+APDCAM10G_data.UDP_HEADER\
                               +APDCAM10G_data.CC_STREAMHEADER)
         self.octet = maxAdcDataLength//8
@@ -2670,6 +2675,7 @@ class APDCAM10G_data:
                 strcontrol[0] = strcontrol[0] | 2**i
 #                print("Stream %d Octet: %d" % (i,self.octet))
                 if (APDCAM10G_data.MULTICAST) :
+                    raise NotImplementedError("Multicast send does not work.")
                     UDP_data = bytearray(9)
                     UDP_data[0] = i+1
                     UDP_data[1] = self.octet // 256
@@ -2687,15 +2693,15 @@ class APDCAM10G_data:
                     UDP_data[0] = i+1
                     UDP_data[1] = self.octet // 256
                     UDP_data[2] = self.octet % 256
-                    # mac = bytearray([0x90, 0xE2, 0xBA, 0xC3, 0x76, 0xA0]) # Helium
-                    mac = bytearray([0x90, 0xE2, 0xBA, 0xE3, 0xA4, 0x62])  # W7-X
+                    # The address where to send data
+                    mac = bytearray([0x00, 0x60, 0xdd, 0x47, 0x8b, 0xb3]) 
                     UDP_data[3] = mac[0]
                     UDP_data[4] = mac[1]
                     UDP_data[5] = mac[2]
                     UDP_data[6] = mac[3]
                     UDP_data[7] = mac[4]
                     UDP_data[8] = mac[5]
-                    d = socket.inet_aton("10.123.13.202")
+                    d = socket.inet_aton("10.123.13.200")
                     UDP_data[9] = d[0]
                     UDP_data[10] = d[1]
                     UDP_data[11] = d[2]
@@ -2703,7 +2709,8 @@ class APDCAM10G_data:
                     UDP_data[13] = APDCAM10G_data.RECEIVE_PORTS[i] // 256
                     UDP_data[14] = APDCAM10G_data.RECEIVE_PORTS[i] % 256
                     err = self.APDCAM.sendCommand(self.APDCAM.codes_CC.OP_SETUDPSTREAM,UDP_data,sendImmediately=True)
-                
+        if (err != ""):
+            return err
         # Start streams
         #print("TEST UDP!!!")
         #err = APDCAM.sendCommand(APDCAM10G_codes_v2.OP_SETUDPTESTCLOCKDIVIDER,bytes([1,0,0,0]),sendImmediately=True)
@@ -2743,22 +2750,26 @@ class APDCAM10G_data:
         import time
         
         t0 = time.time()
-        t = np.ndarray(npacket,dtype=float)
+        t = np.zeros(npacket,dtype=float)
         if (self.receiveSockets[streamNo] == None):
             return "Stream is not open.", None
         
+        received_packet = npacket
         for i in range(npacket):
             try:
                 data = self.receiveSockets[streamNo].recv(APDCAM10G_data.CC_STREAMHEADER + self.octet * 8)
                 t[i] = time.time()
             except socket.timeout as st:
+                received_packet = i
 #                return "Timeout receiving data", None
                 break
             except socket.error as se :
                 print(str(se))
+                received_packet = i
                 break
 #                return se.argv[1], None
-        for i in range(npacket):
-            print("{:d}...{:f}".format(i+1,t[i] - t0))
+        with open("UDPtimes.dat","wt") as f:
+            for i in range(received_packet):
+                f.writelines("{:d}...{:f}\n".format(i+1,t[i] - t0))
         return ""      
         

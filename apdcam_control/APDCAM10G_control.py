@@ -2284,9 +2284,10 @@ class APDCAM10G_regCom:
             self.start_receive([True,True,True,True])
             self.startStream([0,1,2,3])
             self.getData()
+            self.stopStream()
+            self.stopReceive()
             
-            
-            
+ 
             
         if (waitForResult <=0):
             return "",""
@@ -2722,7 +2723,7 @@ class APDCAM10G_data:
         """
         return self.APDCAM.sendCommand(self.APDCAM.codes_CC.OP_SETSTREAMCONTROL,bytes([0]),sendImmediately=True)
 
-    def getData(self,streamNo):
+    def getData(self,streamNo,npacket=100):
         """
         Get UDP data from a stream.
 
@@ -2739,15 +2740,25 @@ class APDCAM10G_data:
             The data.
 
         """
-        import socket
+        import time
         
+        t0 = time.time()
+        t = np.ndarray(npacket,dtype=float)
         if (self.receiveSockets[streamNo] == None):
             return "Stream is not open.", None
-        try:
-            data = self.receiveSockets[streamNo].recv(9000)
-        except socket.timeout as st:
-            return "Timeout receiving data", None
-        except socket.error as se :
-            return se.argv[1], None
-        return "", data        
+        
+        for i in range(npacket):
+            try:
+                data = self.receiveSockets[streamNo].recv(APDCAM10G_data.CC_STREAMHEADER + self.octet * 8)
+                t[i] = time.time()
+            except socket.timeout as st:
+#                return "Timeout receiving data", None
+                break
+            except socket.error as se :
+                print(str(se))
+                break
+#                return se.argv[1], None
+        for i in range(npacket):
+            print("{:d}...{:f}".format(i+1,t[i] - t0))
+        return ""      
         

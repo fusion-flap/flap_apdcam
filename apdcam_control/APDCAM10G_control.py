@@ -2571,7 +2571,7 @@ class APDCAM10G_data:
             """
             para_val = None
             line_lower = line.lower()
-            ind = line_lower.find(parameter.lower)
+            ind = line_lower.find(parameter.lower())
             if (ind >= 0):
                 l_split = line_lower.split()
                 para_ind = -1
@@ -2590,8 +2590,9 @@ class APDCAM10G_data:
         mtu = None
         mac = None
         IP = None
-        cmd = "ip -o link show " + self.APDCAM.interface.decode('ascii')
+        cmd = "ip link show " + self.APDCAM.interface.decode('ascii')
         d=subprocess.run([cmd],check=False,shell=True,stdout=subprocess.PIPE) 
+        d.stdout = ""
         if (len(d.stdout) != 0):
             txt = d.stdout
             txt_lines = txt.split(b'\n')
@@ -2604,12 +2605,13 @@ class APDCAM10G_data:
                 if (mac is not None):
                     break
             if (mtu is not None):
-                self.MTU = mtu
+                self.MTU = int(mtu)
             if (mac is not None):
                 mac_split = mac.split(':')
                 self.hostMac = [int(num,base=16) for num in mac_split]
         cmd = "ip -o address show " + self.APDCAM.interface.decode('ascii')
         d=subprocess.run([cmd],check=False,shell=True,stdout=subprocess.PIPE)
+        d.stdout = ""
         if (len(d.stdout) != 0):
             txt = d.stdout
             txt_lines = txt.split(b'\n')
@@ -2636,6 +2638,7 @@ class APDCAM10G_data:
                     if (mac is None):
                         mac = getParaFromLine(l.decode('ascii'),'ether')
                         if (mac is not None):
+                            mac_split = mac.split(':')
                             self.hostMac = [int(num,base=16) for num in mac_split]
                     if ((mac is not None) and (IP is not None) and (mtu is not None)):
                         break
@@ -2660,9 +2663,9 @@ class APDCAM10G_data:
 
         """
         if (self.MTU is None):
-            ret = self.getMTU()
-        if (ret != ""):
-            return ret
+            ret = self.getNetParameters()
+            if (ret != ""):
+                return ret
         maxAdcDataLength = self.MTU-\
                             (APDCAM10G_data.IPV4_HEADER+APDCAM10G_data.UDP_HEADER\
                               +APDCAM10G_data.CC_STREAMHEADER)
@@ -2716,10 +2719,6 @@ class APDCAM10G_data:
                     self.receiveSockets[i].bind(('', APDCAM10G_data.RECEIVE_PORTS[i]))
                 except socket.error as se :
                     return str(se.args[1])
-                if APDCAM10G_data.MULTICAST :
-                    d = socket.inet_aton(APDCAM10G_data.MULTICAST_ADDRESS)
-                    mreq = struct.pack('4sL', d, socket.INADDR_ANY)
-                    self.receiveSockets[i].setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
                 self.receiveSockets[i].setblocking(1)  # non blocking receive
                 self.receiveSockets[i].settimeout(self.streamTimeout/1000.)
         return ""
@@ -2747,42 +2746,25 @@ class APDCAM10G_data:
         for i in range(4) :
             if (streamList[i] == True) :
                 strcontrol[0] = strcontrol[0] | 2**i
-#                print("Stream %d Octet: %d" % (i,self.octet))
-                if (APDCAM10G_data.MULTICAST) :
-                    raise NotImplementedError("Multicast send does not work.")
-                    UDP_data = bytearray(9)
-                    UDP_data[0] = i+1
-                    UDP_data[1] = self.octet // 256
-                    UDP_data[2] = self.octet % 256
-                    d = socket.inet_aton(APDCAM10G_data.MULTICAST_ADDRESS)
-                    UDP_data[3] = d[0]
-                    UDP_data[4] = d[1]
-                    UDP_data[5] = d[2]
-                    UDP_data[6] = d[3]
-                    UDP_data[7] = APDCAM10G_data.RECEIVE_PORTS[i] // 256
-                    UDP_data[8] = APDCAM10G_data.RECEIVE_PORTS[i] % 256
-                    err = self.APDCAM.sendCommand(self.APDCAM.codes_CC.OP_SETMULTICASTUDPSTREAM,UDP_data,sendImmediately=True)
-                else :    
-                    UDP_data = bytearray(15)
-                    UDP_data[0] = i+1
-                    UDP_data[1] = self.octet // 256
-                    UDP_data[2] = self.octet % 256
-                    # The address where to send data
-                    mac = bytearray([0x00, 0x60, 0xdd, 0x47, 0x8b, 0xb3]) 
-                    UDP_data[3] = mac[0]
-                    UDP_data[4] = mac[1]
-                    UDP_data[5] = mac[2]
-                    UDP_data[6] = mac[3]
-                    UDP_data[7] = mac[4]
-                    UDP_data[8] = mac[5]
-                    d = socket.inet_aton("10.123.13.200")
-                    UDP_data[9] = d[0]
-                    UDP_data[10] = d[1]
-                    UDP_data[11] = d[2]
-                    UDP_data[12] = d[3]
-                    UDP_data[13] = APDCAM10G_data.RECEIVE_PORTS[i] // 256
-                    UDP_data[14] = APDCAM10G_data.RECEIVE_PORTS[i] % 256
-                    err = self.APDCAM.sendCommand(self.APDCAM.codes_CC.OP_SETUDPSTREAM,UDP_data,sendImmediately=True)
+                UDP_data = bytearray(15)
+                UDP_data[0] = i+1
+                UDP_data[1] = self.octet // 256
+                UDP_data[2] = self.octet % 256
+                # The address where to send data
+                UDP_data[3] = self.hostMac[0]
+                UDP_data[4] = self.hostMac[1]
+                UDP_data[5] = self.hostMac[2]
+                UDP_data[6] = self.hostMac[3]
+                UDP_data[7] = self.hostMac[4]
+                UDP_data[8] = self.hostMac[5]
+                d = socket.inet_aton(self.hostIP)
+                UDP_data[9] = d[0]
+                UDP_data[10] = d[1]
+                UDP_data[11] = d[2]
+                UDP_data[12] = d[3]
+                UDP_data[13] = APDCAM10G_data.RECEIVE_PORTS[i] // 256
+                UDP_data[14] = APDCAM10G_data.RECEIVE_PORTS[i] % 256
+                err = self.APDCAM.sendCommand(self.APDCAM.codes_CC.OP_SETUDPSTREAM,UDP_data,sendImmediately=True)
         if (err != ""):
             return err
         # Start streams
@@ -2825,6 +2807,7 @@ class APDCAM10G_data:
         
         t0 = time.time()
         t = np.zeros(npacket,dtype=float)
+        packet_counter = np.zeros(npacket,dtype=int)
         if (self.receiveSockets[streamNo] == None):
             return "Stream is not open.", None
         
@@ -2833,7 +2816,8 @@ class APDCAM10G_data:
             try:
                 data = self.receiveSockets[streamNo].recv(APDCAM10G_data.CC_STREAMHEADER + self.octet * 8)
                 t[i] = time.time()
-            except socket.timeout as st:
+                packet_counter[i] = int.from_bytes(data[8:14],'big')
+            except socket.timeout:
                 received_packet = i
 #                return "Timeout receiving data", None
                 break
@@ -2844,6 +2828,6 @@ class APDCAM10G_data:
 #                return se.argv[1], None
         with open("UDPtimes.dat","wt") as f:
             for i in range(received_packet):
-                f.writelines("{:d}...{:f}\n".format(i+1,t[i] - t0))
+                f.writelines("{:d}...{:f}...{:d}\n".format(i+1,t[i] - t0,packet_counter[i]))
         return ""      
         

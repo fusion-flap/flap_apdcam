@@ -2279,6 +2279,9 @@ class APDCAM10G_regCom:
         else:
             # Native Python measurement
             data_receiver = APDCAM10G_data(self)
+            ret = data_receiver.getNetParameters()
+            if (ret != ""):
+                return ret,""
             ret = data_receiver.setOctet()
             if (ret != ""):
                 return ret,""
@@ -2491,21 +2494,20 @@ class APDCAM10G_data:
         cannot be read/written any more.
     """ 
     RECEIVE_PORTS = [10000, 10001, 10002, 10003] # these are the receiving ports
-    MULTICAST_ADDRESS = "239.123.13.100"
-    DEF_MTU = 9000
     IPV4_HEADER = 20
     UDP_HEADER = 8
     CC_STREAMHEADER = 22
-    MULTICAST = False
                 
     def __init__(self,APDCAM):
         """
-        Constructor for an APDCAM10G_data object.
+        Constructor for an APDCAM10G_data object. 
 
         Parameters
         ----------
         APDCAM : APDCAM10G_regCom
-            The communication class for the camera.
+            The communication class for the camera. 
+            The need not be connected at the time of contruction of the
+            APDCAM10F_data class.
 
         Returns
         -------
@@ -2517,6 +2519,8 @@ class APDCAM10G_data:
         self.APDCAM = APDCAM
         self.receiveSockets = [None, None, None, None]
         self.MTU = None
+        self.hostMac = None
+        self.hostIP = None
         self.streamTimeout = 10000 # ms
         
     def __del__(self):
@@ -2532,43 +2536,113 @@ class APDCAM10G_data:
             if self.receiveSockets[i] != None :
                 self.receiveSockets[i].close()
             
-    def getMTU(self):
+    def getNetParameters(self):
+        """
+        Determine paraemters of the network and host. The network name is assumed to be
+        known in self.APDCAM.interface. See self.APDCAM.getInterface(). Puts the results into
+        self.MTU, self.hostMac, self.hostIP. 
+
+        Returns
+        -------
+        str:
+            "" or error code.
+
+        """
+     
         
+        def getParaFromLine(line,parameter):
+            """
+            Get the value of a parameter from the text line. It is
+            expected that the paramter value follows the parameter name sperated
+            by whitespace.
+
+            Parameters
+            ----------
+            line : str
+                The text line.
+            parameter : str
+                The parameter name.
+
+            Returns
+            -------
+            para_val : str
+                The parameter value.
+
+            """
+            para_val = None
+            line_lower = line.lower()
+            ind = line_lower.find(parameter.lower)
+            if (ind >= 0):
+                l_split = line_lower.split()
+                para_ind = -1
+                for i,t in enumerate(l_split):
+                    if (t == parameter):
+                        para_ind = i + 1
+                        break
+                if ((para_ind <= len(l_split) - 1) and (para_ind > 0)):
+                    para_val = l_split[para_ind]
+            return para_val
+   
         if (self.APDCAM.interface is None):
             ret = self.APDCAM.getInterface()
             if (ret != ""):
                 return ret
         mtu = None
-        cmd = "ip link show " + self.APDCAM.interface.decode('ascii')
+        mac = None
+        IP = None
+        cmd = "ip -o link show " + self.APDCAM.interface.decode('ascii')
         d=subprocess.run([cmd],check=False,shell=True,stdout=subprocess.PIPE) 
         if (len(d.stdout) != 0):
             txt = d.stdout
-            txt_lines_0 = txt.split(b'\n')
-            txt_lines = []
-            for l in txt_lines_0:
-                if (len(l) != 0):
-                    txt_lines.append(l.decode('ascii'))
+            txt_lines = txt.split(b'\n')
             for l in txt_lines:
-                ind = l.find("mtu")
-                if (ind >= 0):
-                    l_split = l.split()
-                    mtu_ind = -1
-                    for i,t in enumerate(l_split):
-                        if (t == 'mtu'):
-                            mtu_ind = i + 1
-                            break
-                    if ((mtu_ind <= len(l_split) - 1) and (mtu_ind > 0)):
-                        try:
-                            mtu = int(l_split[mtu_ind])
-                        except ValueError:
-                            pass
+                mtu = getParaFromLine(l.decode('ascii'),'mtu')
+                if (mtu is not None):
+                    break
+            for l in txt_lines:
+                mac = getParaFromLine(l.decode('ascii'),'link/ether')
+                if (mac is not None):
                     break
             if (mtu is not None):
                 self.MTU = mtu
-                return ""
-            return "Error determining MTU."
-    
-            
+            if (mac is not None):
+                mac_split = mac.split(':')
+                self.hostMac = [int(num,base=16) for num in mac_split]
+        cmd = "ip -o address show " + self.APDCAM.interface.decode('ascii')
+        d=subprocess.run([cmd],check=False,shell=True,stdout=subprocess.PIPE)
+        if (len(d.stdout) != 0):
+            txt = d.stdout
+            txt_lines = txt.split(b'\n')
+            for l in txt_lines:
+                IP = getParaFromLine(l.decode('ascii'),'inet')
+                if (IP is not None):
+                    self.hostIP = IP.split('/')[0]
+                    break
+        if ((mtu is None) or (mac is None) or (IP is None)):
+            cmd = "ifconfig " + self.APDCAM.interface.decode('ascii')
+            d=subprocess.run([cmd],check=False,shell=True,stdout=subprocess.PIPE)
+            if (len(d.stdout) != 0):
+                txt = d.stdout
+                txt_lines = txt.split(b'\n')
+                for l in txt_lines:
+                    if (mtu is None):
+                        mtu = getParaFromLine(l.decode('ascii'),'mtu')
+                        if (mtu is not None):
+                            self.MTU = int(mtu)
+                    if (IP is None):
+                        IP = getParaFromLine(l.decode('ascii'),'inet')
+                        if (IP is not None):
+                            self.hostIP = IP
+                    if (mac is None):
+                        mac = getParaFromLine(l.decode('ascii'),'ether')
+                        if (mac is not None):
+                            self.hostMac = [int(num,base=16) for num in mac_split]
+                    if ((mac is not None) and (IP is not None) and (mtu is not None)):
+                        break
+        if ((mac is None) or (IP is None) or (mtu is None)):
+            return "Cannot determine all host network parameters, neither with ip, nor with ifconfig."
+        return ""    
+       
     def setOctet(self):
         """
         Calculates the octet setting for camera data communication and saves it in 

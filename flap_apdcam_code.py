@@ -290,7 +290,9 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
         if (outdim == 3):
             out_row_list = sorted(set(row_proc))
             out_col_list = sorted(set(col_proc))
-            if (len(out_col_list) * len(out_row_list) != len(chname_proc)):
+            if ((len(out_col_list) * len(out_row_list) != len(chname_proc))
+                or (len(out_col_list) == 1) or  (len(out_row_list) == 1)  
+                ):
                 outdim = 2
             else:
                 out_col_index = []
@@ -424,23 +426,35 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
 
     coord = []
     c_mode = flap.CoordinateMode(equidistant=True)
+    if (_options['Resample'] is not None):
+        s_start = read_samplerange[0] + resample_binsize / 2
+        s_step = resample_binsize
+    else:
+        s_start = read_samplerange[0]
+        s_step = 1
     coord.append(flap.Coordinate(name='Sample',
                                  unit='n.a.',
                                  mode=c_mode,
                                  shape=ndata_out,
-                                 start=read_samplerange[0],
-                                 step=1,
+                                 start=s_start,
+                                 step=s_step,
                                  dimension_list=[0]
                                  )
                  )
     if (read_range is None):
         read_range = float(t['starttime']) + read_samplerange * float(t['sampletime'])
+    if (_options['Resample'] is not None):
+        tstart = read_range[0] + float(t['sampletime']) * resample_binsize / 2
+        tstep = float(t['sampletime']) * resample_binsize
+    else:
+        tstart = read_range[0]
+        tstep = float(t['sampletime'])
     coord.append(flap.Coordinate(name='Time',
                                  unit='Second',
                                  mode=c_mode,
                                  shape=ndata_out,
-                                 start=read_range[0],
-                                 step=t['sampletime'],
+                                 start=tstart,
+                                 step=tstep,
                                  dimension_list=[0]
                                  )
                  )
@@ -478,6 +492,30 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
                                      shape=[len(adc_proc)],
                                      values=np.array(chname_proc),
                                      dimension_list=[1]
+                                     )
+                     )
+        if (len(out_row_list) == 1):
+            dimlist = []
+        else:
+            dimlist = [1]
+        coord.append(flap.Coordinate(name='Row',
+                                     unit='n.a.',
+                                     mode=c_mode,
+                                     shape=[len(out_row_list)],
+                                     values=np.array(out_row_list),
+                                     dimension_list=dimlist
+                                     )
+                     )
+        if (len(out_col_list) == 1):
+            dimlist = []
+        else:
+            dimlist = [1]
+        coord.append(flap.Coordinate(name='Column',
+                                     unit='n.a.',
+                                     mode=c_mode,
+                                     shape=[len(out_col_list)],
+                                     values=np.array(out_col_list),
+                                     dimension_list=dimlist
                                      )
                      )
     else:

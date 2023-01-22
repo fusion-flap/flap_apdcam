@@ -620,9 +620,12 @@ class APDCAM10G_regCom:
             self.close()
             return err
         err = self.getInterface()
-#        if (err != ""):
-#            self.close()
-#            return err
+        if (err != ""):
+            return err
+        ret, ds = self.getDualSATA()
+        if (ret != ""):
+            return ret
+        self.dualSATA = ds
         return ""
         
     def close(self):
@@ -2282,20 +2285,19 @@ class APDCAM10G_regCom:
             ret = data_receiver.getNetParameters()
             if (ret != ""):
                 return ret,""
-            ret = data_receiver.setOctet()
+            ret = data_receiver.allocate(channel_masks=channelMasks,sample_number=numberOfSamples,bits=bits)
             if (ret != ""):
                 return ret,""
-            ret = data_receiver.startReceive([True,True,True,True])
+            ret = data_receiver.startReceive()
             if (ret != ""):
                 return ret,""
-            ret = data_receiver.startStream([True,True,True,True])
+            ret = data_receiver.startStream()
             if (ret != ""):
                 return ret,""            
-            data_receiver.getData(0,npacket=10000)
+            err, warn = data_receiver.getData()
             data_receiver.stopStream()
             data_receiver.stopReceive()
             
- 
             
         if (waitForResult <=0):
             return "",""
@@ -2506,8 +2508,8 @@ class APDCAM10G_data:
         ----------
         APDCAM : APDCAM10G_regCom
             The communication class for the camera. 
-            The need not be connected at the time of contruction of the
-            APDCAM10F_data class.
+            The need not be connected at the time of construction of the
+            APDCAM10G_data class.
 
         Returns
         -------
@@ -2536,6 +2538,34 @@ class APDCAM10G_data:
             if self.receiveSockets[i] != None :
                 self.receiveSockets[i].close()
             
+    def allocate(self,channel_masks=[0xffffffff,0xffffffff,0xffffffff,0xffffffff],sample_number=100000,bits=14):
+        
+        if (self.MTU is None):
+            raise ValueError("Network parameters should be determined before calling allocate.")
+        self.sample_number = sample_number
+        self.channel_masks = copy.deepcopy(channel_masks)
+        self.bits = bits
+        self.bytes_per_sample = [0] * len(self.APDCAM.status.ADC_address)
+        self.packets_per_stream = [0] * len(self.APDCAM.status.ADC_address)
+        self.packet_counter
+        for i in range(len(self.APDCAM.status.ADC_address)):
+            for ic in range(4):
+                chip_chmask = (channel_masks[i] >> ic * 8) % 256
+                chip_bits_per_sample = bits *  chip_chmask.bit_length()
+                if ((chip_bits_per_sample % 8) == 0):
+                    chip_bytes_per_sample = chip_bits_per_sample // 8
+                else:
+                    chip_bytes_per_sample = chip_bits_per_sample // 8 + 1        
+                self.bytes_per_sample[i] += chip_bytes_per_sample
+            if ((self.bytes_per_sample[i] * 8) % 32 != 0):
+               self.bytes_per_sample[i] = ((self.bytes_per_sample[i] * 8) // 32 + 1) * 32 / 8
+            if (self.bytes_per_sample[i] * self.sample_number % (self.octet * 8) == 0):
+                self.packets_per_stream[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8) 
+            else:
+                self.packets_per_stream[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8) + 1
+            self.packet_counter[i] = np.zeros(self.packets_per_stream,dtype=int)
+            
+        
     def getNetParameters(self):
         """
         Determine paraemters of the network and host. The network name is assumed to be
@@ -2644,6 +2674,7 @@ class APDCAM10G_data:
                         break
         if ((mac is None) or (IP is None) or (mtu is None)):
             return "Cannot determine all host network parameters, neither with ip, nor with ifconfig."
+        self.setOctet()
         return ""    
        
     def setOctet(self):
@@ -2692,25 +2723,32 @@ class APDCAM10G_data:
                self.receiveSockets[i] = None
                
         
-    def startReceive(self,streamList):
+    def startReceive(self):
         """
-        Creates the data receive sockets and start to receive data on them. 
+        Creates the data receive sockets and start to receive data on them.
+        Sets up addresses and other paramters in the camera.
         Does not start the data streams in the camera.
 
         Parameters
         ----------
-        streamList : 4 element list of boolean
-            True enables a receiving on a stream.
-
+        None
+        
         Returns
         -------
         str:
             "" or error message.
         """
-        APDCAM10G_data.stopReceive(self)
+        self.stopReceive(self)
         
+        self.stream_list = [False] * 4
+        if (self.dualSATA):
+            for i in range(len(self.APDCAM.status.ADC_address)):
+                self.stream_list[i*2] =  True
+        else:
+            for i in range(len(self.APDCAM.status.ADC_address)):
+                self.stream_list[i] =  True      
         for i in range(4) :
-            if (streamList[i] == True) :
+            if (self.streamList[i] == True) :
                 try:
                     self.receiveSockets[i] = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 except socket.error as se:
@@ -2719,33 +2757,8 @@ class APDCAM10G_data:
                     self.receiveSockets[i].bind(('', APDCAM10G_data.RECEIVE_PORTS[i]))
                 except socket.error as se :
                     return str(se.args[1])
-                self.receiveSockets[i].setblocking(1)  # non blocking receive
+                self.receiveSockets[i].setblocking(1)
                 self.receiveSockets[i].settimeout(self.streamTimeout/1000.)
-        return ""
-     
-    def startStream(self,streamList):
-        """
-        Starts the data streams in APDCAM.
-
-        Parameters
-        ----------
-        streamList : 4 element list of boolean
-            True enables a receiving on a stream.
-
-        Returns
-        -------
-        str:
-            "" or error message.
-
-        """
-
-        APDCAM10G_data.stopStream(self)
-        
-        strcontrol = bytearray([0])       
-        err = ""
-        for i in range(4) :
-            if (streamList[i] == True) :
-                strcontrol[0] = strcontrol[0] | 2**i
                 UDP_data = bytearray(15)
                 UDP_data[0] = i+1
                 UDP_data[1] = self.octet // 256
@@ -2765,12 +2778,31 @@ class APDCAM10G_data:
                 UDP_data[13] = APDCAM10G_data.RECEIVE_PORTS[i] // 256
                 UDP_data[14] = APDCAM10G_data.RECEIVE_PORTS[i] % 256
                 err = self.APDCAM.sendCommand(self.APDCAM.codes_CC.OP_SETUDPSTREAM,UDP_data,sendImmediately=True)
-        if (err != ""):
-            return err
-        # Start streams
-        #print("TEST UDP!!!")
-        #err = APDCAM.sendCommand(APDCAM10G_codes_v2.OP_SETUDPTESTCLOCKDIVIDER,bytes([1,0,0,0]),sendImmediately=True)
-        #strcontrol[0] = strcontrol[0] | 0xF0
+                if (err != ""):
+                    return err
+        return ""
+     
+    def startStream(self):
+        """
+        Starts the data streams in APDCAM.
+
+        Parameters
+        ----------
+        None
+        
+        Returns
+        -------
+        str:
+            "" or error message.
+
+        """
+
+        self.stopStream(self)
+        
+        strcontrol = bytearray([0])       
+        for i in range(4) :
+            if (self.streamList[i] == True) :
+                strcontrol[0] = strcontrol[0] | 2**i
         err = self.APDCAM.sendCommand(self.APDCAM.codes_CC.OP_SETSTREAMCONTROL,strcontrol,sendImmediately=True)
         return err
     
@@ -2782,11 +2814,13 @@ class APDCAM10G_data:
         -------
         str:
             "" or error message.
+        str:
+            "" or warning
 
         """
         return self.APDCAM.sendCommand(self.APDCAM.codes_CC.OP_SETSTREAMCONTROL,bytes([0]),sendImmediately=True)
 
-    def getData(self,streamNo,npacket=100):
+    def getData(self):
         """
         Get UDP data from a stream.
 

@@ -16,9 +16,8 @@ import xml.etree.ElementTree as ET
 import socket
 import os
 import numpy as np
-import struct
-import sys
-        
+#import struct
+#import sys
 
 
 def DAC_ADC_channel_mapping():
@@ -2455,37 +2454,7 @@ class APDCAM10G_regCom:
             port = int.from_bytes(d_port,'big',signed=False)
             print("Stream {:d}...octet:{:d}... IP:{:d}.{:d}.{:d}.{:d}...port:{:d}".format(i+1,octet,\
                   int(d_ip[0]),int(d_ip[1]),int(d_ip[2]),int(d_ip[3]),port))
-   
-    def resetStream3(self):
-        # This is a workaround for a problem of the APDTest program. For a 64 channel APDCAM10G
-        # APDTest sets up streams 1 and 2 for measurement. However, in a dual-SATA camera configuration
-        # streams 1 and 3 are used. During testing this worked accidentally as the factory setting of stream 3
-        # is identical to the setting of stream 2 by APDTest. If the setting of stream 3 is changed by whatever reason
-        # it has to be set back to the factory values either by resetting the camera (physically pressing the button) or 
-        # by running this function.
-        
-        # This contains the MAC address of a certain computer!!!!!!
-        code = self.codes_CC
-            
-        d = bytearray(9)
-        d[0] = 3
-        octet = 1118
-        port = 10003
-        d[1:3] = octet.to_bytes(2,'big',signed=False)
-        d[3:7] = bytearray([239,123,13,100])
-        d[7:9] = port.to_bytes(2,'big',signed=False)
-        err = self.sendCommand(code.OP_SETMULTICASTUDPSTREAM,d,sendImmediately=True)
-        
-        d = bytearray(15)
-        d[0] = 3
-        octet = 1118
-        port = 10003
-        d[1:3] = octet.to_bytes(2,'big',signed=False)
-        d[3:9] =[0x90, 0xe2, 0xba, 0xe3, 0xa4, 0x62]
-        d[9:13] = bytearray([239,123,13,100])
-        d[13:15] = port.to_bytes(2,'big',signed=False)
-        err = self.sendCommand(code.OP_SETUDPSTREAM,d,sendImmediately=True)
-        
+           
  # end of class APDCAM10G_regComm
 
 class APDCAM10G_data:
@@ -2546,8 +2515,7 @@ class APDCAM10G_data:
         self.channel_masks = copy.deepcopy(channel_masks)
         self.bits = bits
         self.bytes_per_sample = [0] * len(self.APDCAM.status.ADC_address)
-        self.packets_per_stream = [0] * len(self.APDCAM.status.ADC_address)
-        self.packet_counter
+        self.packets_per_adc = [0] * len(self.APDCAM.status.ADC_address)
         for i in range(len(self.APDCAM.status.ADC_address)):
             for ic in range(4):
                 chip_chmask = (channel_masks[i] >> ic * 8) % 256
@@ -2560,11 +2528,9 @@ class APDCAM10G_data:
             if ((self.bytes_per_sample[i] * 8) % 32 != 0):
                self.bytes_per_sample[i] = ((self.bytes_per_sample[i] * 8) // 32 + 1) * 32 / 8
             if (self.bytes_per_sample[i] * self.sample_number % (self.octet * 8) == 0):
-                self.packets_per_stream[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8) 
+                self.packets_per_adc[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8) 
             else:
-                self.packets_per_stream[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8) + 1
-            self.packet_counter[i] = np.zeros(self.packets_per_stream,dtype=int)
-            
+                self.packets_per_adc[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8) + 1            
         
     def getNetParameters(self):
         """
@@ -2740,13 +2706,25 @@ class APDCAM10G_data:
         """
         self.stopReceive(self)
         
+        # True means the stream will be active
         self.stream_list = [False] * 4
+        # The ADC number (0...) for each stream
+        self.stream_adc = [None] * 4 
+        self.packet_counter = [0] * 4
+        self.packet_numbers = [None] * 4
+        self.packet_times = [None] * 4
         if (self.dualSATA):
             for i in range(len(self.APDCAM.status.ADC_address)):
-                self.stream_list[i*2] =  True
+                self.stream_list[i * 2] =  True
+                self.stream_adc[i * 2] = i
+                self.packet_numbers[i * 2] = np.zeros(self.packets_per_adc[self.stream_adc[i*2]],dtype=np.uint32)
+                self.packet_times[i * 2] = np.zeros(self.packets_per_adc[self.stream_adc[i*2]],dtype=float)
         else:
             for i in range(len(self.APDCAM.status.ADC_address)):
-                self.stream_list[i] =  True      
+                self.stream_list[i] =  True  
+                self.stream_adc[i] = i
+                self.packet_numbers[i] = np.zeros(self.packets_per_adc[self.stream_adc[i*2]],dtype=np.uint32)
+                self.packet_times[i] = np.zeros(self.packets_per_adc[self.stream_adc[i*2]],dtype=float)
         for i in range(4) :
             if (self.streamList[i] == True) :
                 try:
@@ -2757,8 +2735,8 @@ class APDCAM10G_data:
                     self.receiveSockets[i].bind(('', APDCAM10G_data.RECEIVE_PORTS[i]))
                 except socket.error as se :
                     return str(se.args[1])
-                self.receiveSockets[i].setblocking(1)
-                self.receiveSockets[i].settimeout(self.streamTimeout/1000.)
+                self.receiveSockets[i].setblocking(False) # Non-blocking mode
+#                self.receiveSockets[i].settimeout(self.streamTimeout/1000.)
                 UDP_data = bytearray(15)
                 UDP_data[0] = i+1
                 UDP_data[1] = self.octet // 256
@@ -2803,7 +2781,9 @@ class APDCAM10G_data:
         for i in range(4) :
             if (self.streamList[i] == True) :
                 strcontrol[0] = strcontrol[0] | 2**i
+        self.stream_start_time_1 = time.time()
         err = self.APDCAM.sendCommand(self.APDCAM.codes_CC.OP_SETSTREAMCONTROL,strcontrol,sendImmediately=True)
+        self.stream_start_time_2 = time.time()
         return err
     
     def stopStream(self):
@@ -2837,31 +2817,28 @@ class APDCAM10G_data:
             The data.
 
         """
-        import time
-        
-        t0 = time.time()
-        t = np.zeros(npacket,dtype=float)
-        packet_counter = np.zeros(npacket,dtype=int)
-        if (self.receiveSockets[streamNo] == None):
-            return "Stream is not open.", None
-        
-        received_packet = npacket
-        for i in range(npacket):
-            try:
-                data = self.receiveSockets[streamNo].recv(APDCAM10G_data.CC_STREAMHEADER + self.octet * 8)
-                t[i] = time.time()
-                packet_counter[i] = int.from_bytes(data[8:14],'big')
-            except socket.timeout:
-                received_packet = i
-#                return "Timeout receiving data", None
-                break
-            except socket.error as se :
-                print(str(se))
-                received_packet = i
-                break
-#                return se.argv[1], None
-        with open("UDPtimes.dat","wt") as f:
-            for i in range(received_packet):
-                f.writelines("{:d}...{:f}...{:d}\n".format(i+1,t[i] - t0,packet_counter[i]))
+                
+        packet_size = APDCAM10G_data.CC_STREAMHEADER + self.octet * 8
+        for i_stream in range(4):
+            if (self.streamList[i_stream] \
+                   and (self.packet_counter[i_stream] < self.packets_per_adc[self.stream_adc[i_stream]]) \
+                ):
+                try:
+                    data = self.receiveSockets[i_stream].recv(packet_size)
+                    if (len(data) == 0):
+                        continue
+                    if (len(data) != packet_size):
+                        print("Data size is not equal to packet size.")
+                    self.packet_times[i_stream][self.packet_counter[i_stream]] = time.time()
+                    self.packet_numbers[i_stream][self.packet_counter[i_stream]] = int.from_bytes(data[8:14],'big')
+                    self.packet_counter[i_stream] += 1
+                except socket.error as se :
+                    print(str(se))
+        for i_stream in range(len(self.APDCAM.status.ADC_address)):
+            if (self.streamList[i_stream]):
+                with open("UDPtimes_ADC{:d}.dat".format(self.stream_adc[i_stream]),"wt") as f:
+                    f.writelines("{:f}-{:f}".format(self.stream_start_time_1,self.stream_start_time_2))
+                    for i in range(self.packet_counter[i_stream]):
+                        f.writelines("{:d}...{:f}...{:d}\n".format(i+1,self.packet_times[i_stream][i],self.packet_numbers[i_stream][i]))
         return ""      
         

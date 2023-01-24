@@ -1492,6 +1492,16 @@ class APDCAM10G_regCom:
         self.lock.release()
         return err
 
+    def setSampleNumber(self,sampleNumber=0):
+        if (self.commSocket is None):
+            return "Not connected.", None
+        d=bytearray(6)
+        for i in range(6):
+            d[5 - i] = (sampleNumber // 2 ** (i * 8)) % 256
+        err = self.sendCommand(self.codes_CC.OP_SETSAMPLECOUNT,d,sendImmediately=True)
+        return err
+        
+
     def getDualSATA(self):
         """
         Reads the dual SATA state from the communications card.
@@ -2530,7 +2540,8 @@ class APDCAM10G_data:
             if (self.bytes_per_sample[i] * self.sample_number % (self.octet * 8) == 0):
                 self.packets_per_adc[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8) 
             else:
-                self.packets_per_adc[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8) + 1     
+                self.packets_per_adc[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8) + 1  
+        self.APDCAM.setSampleNumber(sampleNumber=sample_number)
         return ""
         
     def getNetParameters(self):
@@ -2827,7 +2838,6 @@ class APDCAM10G_data:
                     ):
                     try:
                         data = self.receiveSockets[i_stream].recv(packet_size)
-                        print("{d}...{:d}".format(i_stream,self.packet_counter[i_stream]),flush=True)
                         if (len(data) == 0):
                             continue
                         if (len(data) != packet_size):

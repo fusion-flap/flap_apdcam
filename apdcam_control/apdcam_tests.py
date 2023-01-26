@@ -539,7 +539,8 @@ def testUDPMeasure():
         c.close()
         return
     print("Connected. Firmware: "+c.status.firmware.decode('utf-8'))
-    err,warning = c.measure(numberOfSamples=10000,data_receiver='Python')
+    err,warning = c.measure(numberOfSamples=100000,data_receiver='Python')
+#    err,warning = c.measure(numberOfSamples=10000)
     if (err != ""):
         print("Error starting measurement:"+err)
         c.close()

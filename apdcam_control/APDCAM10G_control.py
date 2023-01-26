@@ -679,7 +679,7 @@ class APDCAM10G_regCom:
         return "", data
     
     
-    def sendCommand(self,opCode,userData,sendImmediately=True):
+    def sendCommand(self,opCode,userData,sendImmediately=True,waitAfter=0.01):
         """
         Will create DDToIP command and add to existing UDP command package
         Will immadiately send UDP if SendImmadiately is not False
@@ -693,6 +693,8 @@ class APDCAM10G_regCom:
             The user data for the operation. Set None of no data.
         sendImmediately: bool
             If True send immediately
+        WaitAfter: float
+            Time to wait after sending the command [s]. The default is 0.01s.
         
         Return values
         -------------
@@ -732,7 +734,8 @@ class APDCAM10G_regCom:
             self.lock.release()
             return "Could not send all data."
         self.UDP_data = None
-        time.sleep(0.01)
+        if (waitAfter is not None):
+            time.sleep(waitAfter)
         self.lock.release()
         return ""
  
@@ -2795,7 +2798,7 @@ class APDCAM10G_data:
                 strcontrol[0] = strcontrol[0] | 2**i
         self.stream_start_time_1 = time.time()
         strcontrol[0] = 0x0f
-        err = self.APDCAM.sendCommand(self.APDCAM.codes_CC.OP_SETSTREAMCONTROL,strcontrol,sendImmediately=True)
+        err = self.APDCAM.sendCommand(self.APDCAM.codes_CC.OP_SETSTREAMCONTROL,strcontrol,sendImmediately=True,waitAfter=None)
         self.stream_start_time_2 = time.time()
         return err
     
@@ -2833,7 +2836,7 @@ class APDCAM10G_data:
         stream_running = [True] * 4
         while (stream_running[0] or stream_running[1] or stream_running[2] or stream_running[3]):
             for i_stream in range(4):
-                if (self.stream_list[i_stream] \
+                if (self.stream_list[i_stream] and stream_running[i_stream] \
                        and (self.packet_counter[i_stream] < self.packets_per_adc[self.stream_adc[i_stream]]) \
                     ):
                     try:
@@ -2846,7 +2849,7 @@ class APDCAM10G_data:
                         self.packet_numbers[i_stream][self.packet_counter[i_stream]] = int.from_bytes(data[8:14],'big')
                         self.packet_counter[i_stream] += 1
                     except socket.error as se :
-                        pass
+                        stream_running[i_stream] = False
                 else:
                     stream_running[i_stream] = False
         for i_stream in range(4):

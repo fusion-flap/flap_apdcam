@@ -531,7 +531,8 @@ def dumpStatus():
     txcount = int.from_bytes(apd.status.CC_variables[code.CC_REGISTER_STREAM_TX_FRAMES:code.CC_REGISTER_STREAM_TX_FRAMES+4],'little',signed=False)
     print("Transmitted UDP frames:{:d}".format(txcount))
 
-def testUDPMeasure():
+def testUDPMeasure(channelMasks=[0xffffffff,0xffffffff, 0xffffffff, 0xffffffff],
+                     sampleDiv=10, bits=14):
     c = APDCAM10G_regCom()
     ret = c.connect()
     if ret != "" :
@@ -539,7 +540,8 @@ def testUDPMeasure():
         c.close()
         return
     print("Connected. Firmware: "+c.status.firmware.decode('utf-8'))
-    err,warning = c.measure(numberOfSamples=100000,data_receiver='Python')
+    err,warning = c.measure(numberOfSamples=100000,data_receiver='Python',channelMasks=channelMasks, \
+                            sampleDiv=sampleDiv, bits=bits)
 #    err,warning = c.measure(numberOfSamples=10000)
     if (err != ""):
         print("Error starting measurement:"+err)

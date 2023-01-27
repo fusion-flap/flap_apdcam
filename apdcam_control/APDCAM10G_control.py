@@ -649,14 +649,14 @@ class APDCAM10G_regCom:
         try:
             self.commSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         except socket.error as se:
-            self.commSocket = Null
+            self.commSocket = None
             return se.args[1]
         try:
             self.commSocket.bind((b'0.0.0.0', self.commPort))
         except socket.error as se :
             self.commSocket = None
             return se.args[1]
-        self.commSocket.setblocking(1)  # non blocking receive
+        self.commSocket.setblocking(1) 
         self.commSocket.settimeout(self.answerTimeout/1000.)  
 
         return ""
@@ -2543,8 +2543,16 @@ class APDCAM10G_data:
             if (self.bytes_per_sample[i] * self.sample_number % (self.octet * 8) == 0):
                 self.packets_per_adc[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8) 
             else:
-                self.packets_per_adc[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8) + 1  
+                self.packets_per_adc[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8)
         self.APDCAM.setSampleNumber(sampleNumber=sample_number)
+        
+# 		map_locked = MAP_LOCKED;
+
+#             d *addr = mmap(NULL, m_BufferSize, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | map_locked /*| MAP_HUGETLB*/, -1, 0);
+
+#             (addr == MAP_FAILED)
+
+        
         return ""
         
     def getNetParameters(self):

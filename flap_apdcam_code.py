@@ -494,30 +494,32 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
                                      dimension_list=[1]
                                      )
                      )
-        if (len(out_row_list) == 1):
-            dimlist = []
-        else:
-            dimlist = [1]
-        coord.append(flap.Coordinate(name='Row',
-                                     unit='n.a.',
-                                     mode=c_mode,
-                                     shape=[len(out_row_list)],
-                                     values=np.array(out_row_list),
-                                     dimension_list=dimlist
-                                     )
-                     )
-        if (len(out_col_list) == 1):
-            dimlist = []
-        else:
-            dimlist = [1]
-        coord.append(flap.Coordinate(name='Column',
-                                     unit='n.a.',
-                                     mode=c_mode,
-                                     shape=[len(out_col_list)],
-                                     values=np.array(out_col_list),
-                                     dimension_list=dimlist
-                                     )
-                     )
+        if ('out_row_list' in locals()):
+            if (len(out_row_list) == 1):
+                dimlist = []
+            else:
+                dimlist = [1]
+            coord.append(flap.Coordinate(name='Row',
+                                         unit='n.a.',
+                                         mode=c_mode,
+                                         shape=[len(out_row_list)],
+                                         values=np.array(out_row_list),
+                                         dimension_list=dimlist
+                                         )
+                         )
+        if ('out_col_list' in locals()):
+            if (len(out_col_list) == 1):
+                dimlist = []
+            else:
+                dimlist = [1]
+            coord.append(flap.Coordinate(name='Column',
+                                         unit='n.a.',
+                                         mode=c_mode,
+                                         shape=[len(out_col_list)],
+                                         values=np.array(out_col_list),
+                                         dimension_list=dimlist
+                                         )
+                         )
     else:
         c_mode = flap.CoordinateMode(equidistant=False)
         c_array = np.ndarray((len(out_row_list),len(out_col_list)),dtype=int)

@@ -14,7 +14,6 @@
 #include "helper.h"
 #include "APDLib.h"
 
-
 #define MAX_RW_BYTES      1030  // Maximum number of bytes in register read/write
 #define MAX_LINE_LENGTH   (5 * 1030)
 
@@ -972,12 +971,13 @@ int ProcessLine(char *buffer)
 		if (res == 0)
 		{
 			printf("Wait success\n");
+			fflush(stdout);
 		}	
 		else
 		{
 			fprintf(stderr, "Error, wait time out\n");
 			fflush(stderr);
-       		}
+       }
 	}
 	else if (strcmp("STOP", token) == 0)
 	{

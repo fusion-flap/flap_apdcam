@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <unistd.h>
-#include <sys/time.h>
 
 #include "TypeDefs.h"
 #include "DataEvaluation.h"
@@ -8,9 +7,6 @@
 #include "Helpers.h"
 
 #define GET_BYTE(p)  (*((uint8_t*)(p)))
-
-/*************** for time measurement **********************/
-#include <sys/time.h>
 
 /* ********** Helpers for data evaluation  ********** */
 static UINT16 GetMask(int bitsPerSample)
@@ -148,8 +144,6 @@ unsigned int CDataEvaluation::Handler()
 	m_SampleCount = 0;
 	m_SampleIndex = 0;
 	m_StreamNo = 0;
-	struct timeval tv;
-	struct timezone tz;
 
 	FillMap();
 	m_BlockSize = GetBlockSize(m_ActiveChannelNo, m_Bits);

@@ -14,11 +14,6 @@
 #include "helper.h"
 #include "APDLib.h"
 
-#include "TimeMeasurement.h"
-
-struct timeval measure_start_tv;
-struct timezone measure_start_tz;
-TimeMeasurement packet_times;
 
 #define MAX_RW_BYTES      1030  // Maximum number of bytes in register read/write
 #define MAX_LINE_LENGTH   (5 * 1030)
@@ -977,12 +972,6 @@ int ProcessLine(char *buffer)
 		if (res == 0)
 		{
 			printf("Wait success\n");
-			printf("Start time: %lu,%lu\n",(unsigned long)measure_start_tv.tv_sec,(unsigned long)measure_start_tv.tv_usec);
-			for (int i=0; i<packet_times.counter; i++)
-			{
-				printf("Packet %d time: %lu,%lu\n",i+1,(unsigned long)packet_times.times[i]->tv_sec,(unsigned long)packet_times.times[i]->tv_usec);
-			}
-			fflush(stdout);
 		}	
 		else
 		{

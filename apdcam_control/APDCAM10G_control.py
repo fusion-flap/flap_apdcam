@@ -1082,7 +1082,7 @@ class APDCAM10G_regCom:
                                 integer or byte array. False: integer, True: byte array.
                                 Default is that all data are integer. If arrayData == False
                                 then the integer is converted to a byte array of numberOfBytes 
-                byteOrder: defines tyhe byte order for converting from integer to register data. 
+                byteOrder: defines the byte order for converting from integer to register data. 
                        List with 'MSB' or LSB' elements. LSB means LSB first.  Default is LSB.          
                 waitTime: Wait time between register write commands in ms. Will insert a wait command
                       between the read commands and also after the last one. If 0 no wait commands will be generated.

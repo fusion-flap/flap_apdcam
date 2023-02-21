@@ -11,24 +11,6 @@
 
 /*************** for time measurement **********************/
 #include <sys/time.h>
-#include "TimeMeasurement.h"
-
-TimeMeasurement::TimeMeasurement()
-{
-   counter = 0;
-   len = 1000;
-   struct timeval times[1000];
-}
-
-void TimeMeasurement::add(struct timeval t)
-{	
-	if (counter < len)
-     		*(times[counter++]) = t;   
-}
-
-extern struct timeval measure_start_tv;
-extern struct timezone measure_start_tz;
-extern TimeMeasurement packet_times;
 
 /* ********** Helpers for data evaluation  ********** */
 static UINT16 GetMask(int bitsPerSample)
@@ -220,10 +202,6 @@ unsigned int CDataEvaluation::Handler()
 					}
 					m_LastCallingTime.QuadPart = performanceCount1.QuadPart;
 
-					gettimeofday(&tv,&tz);
-printf("Packet time %lu, %lu\n",(unsigned long)tv.tv_sec,(unsigned long)tv.tv_usec);
-		//			packet_times.add(tv);
-printf("Counter %d\n",packet_times.counter);
 					ProcessData();
                  if (m_ContinuityError)  bQuit = true;
                  

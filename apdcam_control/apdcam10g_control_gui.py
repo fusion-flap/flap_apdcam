@@ -33,9 +33,10 @@ from .apdcam10g_settings import APDCAM_Settings_class
         
 class APDCAM_GUI_config_class:
     """
-    Configuration information for the specific camera in use. This will be set during startup
-    from the file APDCAM_GUI.cfg residing in the current working directory, and should
-    be edited by the user to contain the camera-specific information
+    Configuration information for the specific camera in use. This will be set 
+    during startup from the file APDCAM_GUI.cfg residing in the current working 
+    directory, and should be edited by the user to contain the camera-specific 
+    information
     """
     CLK_INTERNAL = 0
     CLK_EXTERNAL = 1
@@ -59,7 +60,7 @@ class APDCAM_GUI_status_class:
         self.APDCAM_reg = None
         self.APDCAM_data = None
 
-        # This is set ot True if stop measurement is requested
+        # This is set to True if stop measurement is requested
         self.stopMeasurement = False 
         # This indicates that measurement is running
         self.measurementRunning = False
@@ -80,12 +81,14 @@ class startup_message_class :
         self.messages.append(message)
                
 class APDCAM_GUI_class(tk.Frame):
+    """ The python class for the main GUI application window"""
+
     def __init__(self, master=None):
         """ Constructor for the GUI
             
             Parameters
             ----------
-            master: The instationation of the root Tk class above this
+            master: The instance of the root Tk class above this
         """
             
         super().__init__(master)
@@ -744,7 +747,7 @@ class APDCAM_settings:
         self.sampleDiv = 0 # Calculated from samplerate
     
 class APDCAM10G_GUI_class:
-    """ This implements APDCAM control
+    """ This implements APDCAM control for the 10G camera
     """
     OffColor = "#FCC"
     OnColor = "#CFC"
@@ -762,6 +765,8 @@ class APDCAM10G_GUI_class:
         self.stopThreadSignal = 0
         self.GUI_status.Update_APDCAM = False
         self.GUI_status.APDCAM_connected = False
+
+        # variables bound to the HV_set input, and HV_act (acquired) display fields
         self.var_HV1_set = tk.StringVar()
         self.var_HV2_set = tk.StringVar()
         self.var_HV3_set = tk.StringVar()
@@ -770,8 +775,11 @@ class APDCAM10G_GUI_class:
         self.var_HV2_act = tk.StringVar()
         self.var_HV3_act = tk.StringVar()
         self.var_HV4_act = tk.StringVar()
-        self.var_detTemp_act = tk.StringVar()
+
+        # variables bound to the detector temperature set/acquired input/output fields
         self.var_detTemp_set = tk.StringVar()
+        self.var_detTemp_act = tk.StringVar()
+
         self.var_baseTemp_act = tk.StringVar()
         self.var_ampTemp_act = tk.StringVar()
         self.var_powerTemp_act = tk.StringVar()
@@ -808,7 +816,7 @@ class APDCAM10G_GUI_class:
         self.HV1_set_widg.bind('<Return>',self.hv1_set)
         self.HV1_set_widg.grid(row=1,column=2)
         w = tk.Label(hvblock,text='actual:').grid(row=1,column=3)
-        self.HV1_stat_widg = tk.Entry(hvblock,width=6,textvariable=self.var_HV1_act)
+        self.HV1_stat_widg = tk.Entry(hvblock,width=6,textvariable=self.var_HV1_act,state=tk.DISABLED)
         self.HV1_stat_widg.grid(row=1,column=4)
         self.HV1_on_widg = tk.Button(hvblock,text="HV1 on",command=self.hv1_on)
         self.HV1_on_widg.grid(row=1,column=5)
@@ -822,7 +830,7 @@ class APDCAM10G_GUI_class:
         self.HV2_set_widg.bind('<Return>',self.hv2_set)
         self.HV2_set_widg.grid(row=2,column=2)
         w = tk.Label(hvblock,text='actual:').grid(row=2,column=3)
-        self.HV2_stat_widg = tk.Entry(hvblock,width=6,textvariable=self.var_HV2_act)
+        self.HV2_stat_widg = tk.Entry(hvblock,width=6,textvariable=self.var_HV2_act,state=tk.DISABLED)
         self.HV2_stat_widg.grid(row=2,column=4)
         self.HV2_on_widg = tk.Button(hvblock,text="HV2 on",command=self.hv2_on)
         self.HV2_on_widg.grid(row=2,column=5)
@@ -836,7 +844,7 @@ class APDCAM10G_GUI_class:
         self.HV3_set_widg.bind('<Return>',self.hv3_set)
         self.HV3_set_widg.grid(row=3,column=2)
         w = tk.Label(hvblock,text='actual:').grid(row=3,column=3)
-        self.HV3_stat_widg = tk.Entry(hvblock,width=6,textvariable=self.var_HV3_act)
+        self.HV3_stat_widg = tk.Entry(hvblock,width=6,textvariable=self.var_HV3_act,state=tk.DISABLED)
         self.HV3_stat_widg.grid(row=3,column=4)
         self.HV3_on_widg = tk.Button(hvblock,text="HV3 on",command=self.hv3_on)
         self.HV3_on_widg.grid(row=3,column=5)
@@ -848,7 +856,7 @@ class APDCAM10G_GUI_class:
         self.HV4_set_widg.bind('<Return>',self.hv4_set)
         self.HV4_set_widg.grid(row=4,column=2)
         w = tk.Label(hvblock,text='actual:').grid(row=4,column=3)
-        self.HV4_stat_widg = tk.Entry(hvblock,width=6,textvariable=self.var_HV4_act)
+        self.HV4_stat_widg = tk.Entry(hvblock,width=6,textvariable=self.var_HV4_act,state=tk.DISABLED)
         self.HV4_stat_widg.grid(row=4,column=4)
         self.HV4_on_widg = tk.Button(hvblock,text="HV4 on",command=self.hv4_on)
         self.HV4_on_widg.grid(row=4,column=5)
@@ -865,7 +873,7 @@ class APDCAM10G_GUI_class:
         self.detTemp_set_widg.bind('<Return>',self.detTemp_set)
         self.detTemp_set_widg.grid(row=1,column=2)
         w = tk.Label(detblock,text='Actual:').grid(row=1,column=3)
-        self.detTemp_stat_widg = tk.Entry(detblock,width=5,textvariable=self.var_detTemp_act)
+        self.detTemp_stat_widg = tk.Entry(detblock,width=5,textvariable=self.var_detTemp_act,state=tk.DISABLED)
         self.detTemp_stat_widg.grid(row=1,column=4)
         
         # Temperature block
@@ -1035,6 +1043,7 @@ class APDCAM10G_GUI_class:
             
     def HV_onOff(self,n,on):
         if (self.GUI_status.APDCAM_connected):
+            # acquire the HV on status in the variable 'd'
             err, d = self.GUI_status.APDCAM_reg.readPDI(self.GUI_status.APDCAM_reg.codes_PC.PC_CARD,\
                                                        self.GUI_status.APDCAM_reg.codes_PC.PC_REG_HVON,\
                                                        1,arrayData=False)
@@ -1042,9 +1051,11 @@ class APDCAM10G_GUI_class:
                 return  
             d = d[0]
             if (on != 0):
-               d = d | 2**(n-1)
+               d = d | 2**(n-1)  # set bit #(n-1) to 1 in the HV status byte
             else:
-               d = d & (2**(n-1) ^ 0xff)
+               d = d & (2**(n-1) ^ 0xff) # set bit #(n-1) to 0 in the HV status byte
+               
+            # write the HV status to the camera
             err = self.GUI_status.APDCAM_reg.writePDI(self.GUI_status.APDCAM_reg.codes_PC.PC_CARD,\
                                                      self.GUI_status.APDCAM_reg.codes_PC.PC_REG_HVON,\
                                                      d,numberOfBytes=1,arrayData=False)

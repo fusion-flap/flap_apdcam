@@ -944,22 +944,26 @@ class APDCAM10G_regCom:
 
     def readPDI(self,cardAddress=None,registerAddress=None,numberOfBytes=None,arrayData=None,byteOrder=None,waitTime=None):       
         """Reads data through the Parallel Data Interface (PDI). Can do multiple reads in succession.
-            Waits a given time after each read. Returns data in a list, each element is the result 
-            of one read operation. Returns data either as array of bytes or integer, as defined by the
-            arrayData and byteOrder input.
+           Waits a given time after each read. Returns data in a list, each element is the result 
+           of one read operation. Returns data either as array of bytes or integer, as defined by the
+           arrayData and byteOrder input.
 
-            INPUT:
-                cardAddress: Card addresses (one or more)
-                registerAddress: Register start address (list length should be equal to cardAddress length)
-                numberOfBytes: Read length (list length should be equal to cardAddress length)
-                arrayData : For each read operation sets whether the data should be returned as one 
-                            integer or byte array. False: return integer, True: return byte array.
-                            Default is that all reads are integer.
-                byteOrder: defines the byte order for converting to integer. 
-                            List with 'MSB' or LSB' elements. LSB means LSB first.  Default is LSB.         
-                waitTime: Wait time between register read commands in ms. Will insert a wait command
-                          between the read commands and also after the last one. If 0 no wait commands will be generated.
-          Returns error text and data in list of bytarrays       
+           Parameters
+           ----------
+           cardAddress: Card addresses (one or more)
+           registerAddress: Register start address (list length should be equal to cardAddress length)
+           numberOfBytes:   Read length (list length should be equal to cardAddress length)
+           arrayData : For each read operation sets whether the data should be returned as one 
+                       integer or byte array. False: return integer, True: return byte array.
+                       Default is that all reads are integer.
+           byteOrder:  defines the byte order for converting to integer. 
+                       List with 'MSB' or LSB' elements. LSB means LSB first.  Default is LSB.         
+           waitTime:   Wait time between register read commands in ms. Will insert a wait command
+                       between the read commands and also after the last one. If 0 no wait commands will be generated.
+
+           Returns
+           -------
+           Error text and data in list of bytarrays       
         """ 
         
         #Ensuring that input values are not modified
@@ -968,7 +972,6 @@ class APDCAM10G_regCom:
         numberOfBytes = copy.deepcopy(numberOfBytes)
         arrayData =  copy.deepcopy(arrayData)
         byteOrder = copy.deepcopy(byteOrder)
-
 
         if type(cardAddress) is not list:
             cardAddress = [cardAddress]

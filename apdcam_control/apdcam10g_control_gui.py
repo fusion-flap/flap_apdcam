@@ -33,7 +33,9 @@ from .apdcam10g_settings import APDCAM_Settings_class
         
 class APDCAM_GUI_config_class:
     """
-    Configuration information. This will be set during startup
+    Configuration information for the specific camera in use. This will be set during startup
+    from the file APDCAM_GUI.cfg residing in the current working directory, and should
+    be edited by the user to contain the camera-specific information
     """
     CLK_INTERNAL = 0
     CLK_EXTERNAL = 1

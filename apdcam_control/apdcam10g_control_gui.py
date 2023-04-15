@@ -10,6 +10,7 @@ and plotting data using the flap environment
  
 import tkinter as tk
 from tkinter import messagebox
+from tkinter import ttk
 import threading
 import datetime
 import time
@@ -120,12 +121,10 @@ class APDCAM_GUI_class(tk.Frame):
         self.state.GUI.add_message = sm.collect_startup_messages
         self.read_config()
         
-        
         # Showing the top-level widget
         self.grid()
         
         self.create_widgets()
-        
         
         for i in range(len(sm.messages)):
             self.state.GUI.add_message(sm.messages[i])
@@ -140,61 +139,71 @@ class APDCAM_GUI_class(tk.Frame):
         GUI_frame_widg = tk.Frame(self,bd=4,padx=4,pady=4)
         GUI_frame_widg.grid()
 
-        col1 = tk.Frame(GUI_frame_widg)
-        col1.grid(row=0,column=0)
-        shotControlFrame = tk.Frame(col1)
-        shotControlFrame.grid(row=0,column=0)       
+        factoryPasswordFrame = tk.Frame(GUI_frame_widg)
+        factoryPasswordFrame.grid(row=0,column=0)
+
+        self.factoryPasswordValue=tk.StringVar()
+        factoryPasswordLabel = tk.Label(factoryPasswordFrame,text='Password to access factory settings: ')
+        factoryPasswordLabel.pack(side=tk.LEFT)
+        self.factoryPasswordEntry = tk.Entry(factoryPasswordFrame,width=20,textvariable=self.factoryPasswordValue,show='*')
+        self.factoryPasswordEntry.pack(side=tk.LEFT)
+        self.factoryPasswordEntry.bind('<Return>',self.enable_factory_settings)
+
+        self.tabs = tk.ttk.Notebook(GUI_frame_widg);
+        self.tabs.bind("<<NotebookTabChanged>>",self.tab_changed)
+        self.measurementControlTab = tk.ttk.Frame(self.tabs);
+        self.tabs.add(self.measurementControlTab,text='Measurement control')
+        self.cameraControlTab = tk.ttk.Frame(self.tabs);
+        self.tabs.add(self.cameraControlTab,text='Camera control')
+        self.cameraSettingsTab = tk.ttk.Frame(self.tabs);
+        self.tabs.add(self.cameraSettingsTab,text='Camera settings')
+        self.plotControlTab = tk.ttk.Frame(self.tabs);
+        self.tabs.add(self.plotControlTab,text='Plot control')
+        self.factorySettingsTab = tk.ttk.Frame(self.tabs);
+        self.tabs.add(self.factorySettingsTab,text='Factory settings') #,state='disabled')
+        self.tabs.grid(row=1,column=0)
+
+        # shot control tab
+        shotControlFrame = tk.Frame(self.measurementControlTab)
+        shotControlFrame.pack(expand=1,fill='both')
         self.GUI_shotControl_widg.create_widgets(shotControlFrame)
             
-        # Creating the right block
-        APDCAMControlFrame = tk.Frame(col1)
-        APDCAMControlFrame.grid(row=1,column=0)   
+        # apdcam control tab
+        APDCAMControlFrame = tk.Frame(self.cameraControlTab)
+        APDCAMControlFrame.pack(expand=1,fill='both')
         self.GUI_APDCAM_widg.create_widgets(APDCAMControlFrame) 
-        # right block is the frame into which different panels will go
-        right_block = tk.Frame(col1)
-#        right_block.pack(side="top", fill="both", expand=True)
-        right_block.grid_rowconfigure(0, weight=1)
-        right_block.grid_columnconfigure(0, weight=1)
-        right_block.grid(row=0,column=1,rowspan=2,sticky="nsew")
-        # Creating a list of widgets and their names
-        self.rightwidget_list = []
-        self.rightwidget_name_list = []
+
         # The plot panel
-        self.APDCAMPlotFrame = tk.Frame(right_block)
-        self.APDCAMPlotFrame.grid(row=1,column=0,sticky="nsew")  
+        self.APDCAMPlotFrame = tk.Frame(self.plotControlTab)
+        self.APDCAMPlotFrame.pack(expand=1,fill='both')
         self.APDCAM_plot_widg.create_widgets(self.APDCAMPlotFrame,
                                               camera_type=self.state.config.camera_type,
                                               camera_version=self.state.config.camera_version
                                               ) 
-        self.rightwidget_list.append(self.APDCAMPlotFrame)
-        self.rightwidget_name_list.append('Plot')
+
         # The settings panel
-        self.APDCAMSettingsFrame = tk.Frame(right_block)
-        self.APDCAMSettingsFrame.grid(row=1,column=0,sticky="nsew")         
-        self.APDCAMSettingsFrame.grid(row=1,column=0,sticky="nsew")  
+        self.APDCAMSettingsFrame = tk.Frame(self.cameraSettingsTab)
+        self.APDCAMSettingsFrame.pack(expand=1,fill='both')
         self.APDCAM_settings_widg.create_widgets(self.APDCAMSettingsFrame) 
-        self.rightwidget_list.append(self.APDCAMSettingsFrame)
-        self.rightwidget_name_list.append('APDCAM Settings')
 
-        
-        self.widget_select_widg = tk.OptionMenu(right_block,
-                                                self.var_act_widget,
-                                                *tuple(self.rightwidget_name_list),
-                                                command=self.switch_rightwidget
-                                                )
-        self.widget_select_widg.grid(column=0,row=0,sticky='w')
-        self.var_act_widget.set(self.rightwidget_name_list[0])
-        self.switch_rightwidget(None)
-        
-    def switch_rightwidget(self,event):
-        for name,widg in zip(self.rightwidget_name_list,self.rightwidget_list):
-            if (self.var_act_widget.get() == name):
-                widg.tkraise()
-            else:
-                widg.lower()
+        self.message_widg = tk.Text(GUI_frame_widg, font=('Times','10'), height=10, width=110)
+        self.message_widg.grid(row=2,column=0)
 
-        
-            
+    def enable_factory_settings(self,event):
+        if self.factoryPasswordValue.get()=="hello":
+            self.tabs.tab(4,state='normal')
+            self.tabs.select(4)
+            self.factoryPasswordValue.set('')
+        else:
+            print("Wrong password!")
+
+    def tab_changed(self,event):
+        selected_tab = event.widget.select()
+        print(selected_tab)
+        tab_text = event.widget.tab(selected_tab, "text")
+        if tab_text != 'Factory settings':
+            self.tabs.tab(4,state='disabled')
+
     def config_get(self,file,section,key) :
         """ Reads an element from a configuration file
             The file format is 

@@ -36,7 +36,7 @@ class MainPage(QWidget):
         layout.addLayout(l)
         l.addWidget(QLabel("PC Error:"))
         self.pcError = QLineEdit()
-        self.pcError.setEnabled(False)
+        self.pcError.setReadOnly(True)
         l.addWidget(self.pcError)
         
         

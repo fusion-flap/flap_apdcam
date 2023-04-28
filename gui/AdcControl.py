@@ -174,7 +174,7 @@ class Adc(QWidget):
         v = QVBoxLayout()
         layout.addLayout(v)
 
-        g = QGridGroupBox()
+        g = QGridGroupBox("Overload")
         v.addWidget(g)
         g.addWidget(QLabel("Overl. level:"),0,0)
         self.overloadLevel = QDoubleEdit()
@@ -190,7 +190,7 @@ class Adc(QWidget):
         self.overload = QCheckBox("OVERLOAD")
         g.addWidget(self.overload,4,0,1,2)
 
-        g = QGridGroupBox()
+        g = QGridGroupBox("Trigger")
         v.addWidget(g)
         g.addWidget(QLabel("Trig. level (all)"),0,0)
         self.triggerLevelAll = QDoubleEdit()

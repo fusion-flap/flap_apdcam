@@ -71,8 +71,8 @@ class Adc(QWidget):
         l.addLayout(h)
         h.addWidget(QLabel("Error:"))
         self.error = QLineEdit()
+        self.error.setReadOnly(True)
         h.addWidget(self.error)
-        h.addStretch(1)
         l.addStretch(1)
 
         self.whatIsThis = [None]*32

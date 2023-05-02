@@ -1,11 +1,16 @@
-from PyQt6.QtWidgets import QApplication, QWidget,  QFormLayout, QVBoxLayout, QHBoxLayout, QGridLayout, QTabWidget, QLineEdit, QDateEdit, QPushButton, QTextEdit, QGroupBox, QLabel
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QDoubleValidator
+import importlib
+from QtVersion import QtVersion
+QtWidgets = importlib.import_module(QtVersion+".QtWidgets")
+QtGui     = importlib.import_module(QtVersion+".QtGui")
 
-class QHGroupBox(QGroupBox):
+#from PyQt6.QtWidgets import QApplication, QWidget,  QFormLayout, QVBoxLayout, QHBoxLayout, QGridLayout, QTabWidget, QLineEdit, QDateEdit, QPushButton, QTextEdit, QGroupBox, QLabel
+#from PyQt6.QtCore import Qt
+#from PyQt6.QtGui import QDoubleValidator
+
+class QHGroupBox(QtWidgets.QGroupBox):
     def __init__(self,title=""):
         super(QHGroupBox,self).__init__(title)
-        self.layout = QHBoxLayout()
+        self.layout = QtWidgets.QHBoxLayout()
         self.setLayout(self.layout)
 
     def addWidget(self,w):
@@ -21,10 +26,10 @@ class QHGroupBox(QGroupBox):
         self.layout.addStretch(s)
 
 
-class QVGroupBox(QGroupBox):
+class QVGroupBox(QtWidgets.QGroupBox):
     def __init__(self,title=""):
         super(QVGroupBox,self).__init__(title)
-        self.layout = QVBoxLayout()
+        self.layout = QtWidgets.QVBoxLayout()
         self.setLayout(self.layout)
 
 #    def addWidget(self,w):
@@ -42,10 +47,10 @@ class QVGroupBox(QGroupBox):
     def addStretch(self,s):
         self.layout.addStretch(s)
 
-class QGridGroupBox(QGroupBox):
+class QGridGroupBox(QtWidgets.QGroupBox):
     def __init__(self,title=""):
         super(QGridGroupBox,self).__init__(title)
-        self.layout = QGridLayout()
+        self.layout = QtWidgets.QGridLayout()
         self.setLayout(self.layout)
 
 #    def addWidget(self,w,row,col):
@@ -66,11 +71,11 @@ class QGridGroupBox(QGroupBox):
     def rowCount(self):
         return self.layout.rowCount()
 
-class QDoubleEdit(QLineEdit):
+class QDoubleEdit(QtWidgets.QLineEdit):
     def __init__(self,min=None,max=None):
         super(QDoubleEdit,self).__init__()
         #self.setMaximumWidth(60)
-        validator = QDoubleValidator()
+        validator = QtGui.QDoubleValidator()
         if not min is None:
             validator.setBottom(min)
         if not max is None:

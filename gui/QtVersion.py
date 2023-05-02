@@ -1,0 +1,1 @@
+QtVersion = "PyQt5"

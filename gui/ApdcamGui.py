@@ -1,8 +1,12 @@
 import sys
 import datetime
 import inspect
-from PyQt6.QtWidgets import QApplication, QWidget,  QFormLayout, QGridLayout, QHBoxLayout, QVBoxLayout, QTabWidget, QLineEdit, QDateEdit, QPushButton, QTextEdit, QGroupBox, QCheckBox
-from PyQt6.QtCore import Qt
+
+import importlib
+from QtVersion import QtVersion
+QtWidgets = importlib.import_module(QtVersion+".QtWidgets")
+QtGui = importlib.import_module(QtVersion+".QtGui")
+Qt = importlib.import_module(QtVersion+".QtCore")
 
 from ApdcamUtils import *
 
@@ -14,27 +18,27 @@ from AdcControl import AdcControl
 from ControlTiming import ControlTiming
 from CameraTimer import CameraTimer
 
-class ApdcamGui(QWidget):
+class ApdcamGui(QtWidgets.QWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.setWindowTitle('APDCAM Control')
 
-        layout = QGridLayout(self)
+        layout = QtWidgets.QGridLayout(self)
         self.setLayout(layout)
 
         self.factorySettingsGroupBox = QHGroupBox("Factory settings")
         layout.addWidget(self.factorySettingsGroupBox,0,0)
         self.factorySettingsMode = False
-        self.factorySettingsPassword = QLineEdit(self)
-        self.factorySettingsPassword.setEchoMode(QLineEdit.EchoMode.Password)
+        self.factorySettingsPassword = QtWidgets.QLineEdit(self)
+        self.factorySettingsPassword.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.factorySettingsPassword.returnPressed.connect(self.toggleFactorySettingsMode)
         self.factorySettingsGroupBox.addWidget(self.factorySettingsPassword)
-        self.factorySettingsModeButton = QPushButton("Enter factory settings mode")
+        self.factorySettingsModeButton = QtWidgets.QPushButton("Enter factory settings mode")
         self.factorySettingsGroupBox.addWidget(self.factorySettingsModeButton)
         self.factorySettingsModeButton.clicked.connect(self.toggleFactorySettingsMode)
         
-        self.tabs = QTabWidget(self)
+        self.tabs = QtWidgets.QTabWidget(self)
         layout.addWidget(self.tabs, 1, 0)
 
         self.tabs.addTab(MainPage(self),"Main")
@@ -46,13 +50,13 @@ class ApdcamGui(QWidget):
         self.tabs.addTab(CameraTimer(self),"Camera timer")
         
 
-        layout.addWidget(QLabel("Messages/<font color='orange'>Warnings</font>/<font color='red'>Errors</font>:"))
-        self.messages = QTextEdit(self)
+        layout.addWidget(QtWidgets.QLabel("Messages/<font color='orange'>Warnings</font>/<font color='red'>Errors</font>:"))
+        self.messages = QtWidgets.QTextEdit(self)
         self.messages.setReadOnly(True)
         layout.addWidget(self.messages,3,0)
 
         self.show()
-        children = self.findChildren(QWidget)
+        children = self.findChildren(QtWidgets.QWidget)
         for child in children:
             if hasattr(child,"factorySetting") and child.factorySetting:
                 self.setControlEnabled(child,False)
@@ -75,9 +79,9 @@ class ApdcamGui(QWidget):
             control.setEnabled(status)
         else:
             self.showError("A factory-setting control can not be be toggled between enabled/disabled (alert the developer!)")
-        if isinstance(control,QPushButton):
+        if isinstance(control,QtWidgets.QPushButton):
             control.setStyleSheet("color: " + ("rgba(255,0,0,1)" if status else "rgba(255,0,0,0.25)"))
-        if isinstance(control,QCheckBox):
+        if isinstance(control,QtWidgets.QCheckBox):
             control.setStyleSheet("color: " + ("rgba(255,0,0,1)" if status else "rgba(255,0,0,0.25)"))
         
 
@@ -96,7 +100,7 @@ class ApdcamGui(QWidget):
             self.factorySettingsModeButton.setText("Quit factory settings mode")
         else:
             self.factorySettingsModeButton.setText("Enter factory settings mode")
-        children = self.findChildren(QWidget)
+        children = self.findChildren(QtWidgets.QWidget)
         for child in children:
             if hasattr(child,"factorySetting") and child.factorySetting:
                 self.setControlEnabled(child,self.factorySettingsMode)
@@ -104,6 +108,6 @@ class ApdcamGui(QWidget):
 
                     
 if __name__ == '__main__':
-    app = QApplication(sys.argv)
+    app = QtWidgets.QApplication(sys.argv)
     window = ApdcamGui()
     sys.exit(app.exec())

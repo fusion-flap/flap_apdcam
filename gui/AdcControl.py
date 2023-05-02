@@ -142,7 +142,9 @@ class Adc(QWidget):
         self.firCoeff = [0,0,0,0,0]
         for i in range(5):
             g.addWidget(QLabel("Coeff" + str(i+1)),i,0)
-            self.firCoeff[i] = QDoubleEdit()
+            self.firCoeff[i] = QSpinBox()
+            self.firCoeff[i].setMinimum(0)
+            self.firCoeff[i].setMaximum(65535)
             g.addWidget(self.firCoeff[i],i,1)
         g.setRowStretch(g.rowCount(),1)
 
@@ -151,9 +153,13 @@ class Adc(QWidget):
         g = QGridGroupBox("Int. Filter")
         b.addWidget(g)
         g.addWidget(QLabel("Coeff:"),0,0)
-        self.internalFilterCoeff = QDoubleEdit()
+        self.internalFilterCoeff = QSpinBox()
+        self.internalFilterCoeff.setMinimum(0)
+        self.internalFilterCoeff.setMaximum(4095)
         g.addWidget(self.internalFilterCoeff,0,1)
         self.internalFilterDiv = QSpinBox()
+        self.internalFilterDiv.setMinimum(0)
+        self.internalFilterDiv.setMaximum(14)
         g.addWidget(QLabel("Filter div.:"),1,0)
         g.addWidget(self.internalFilterDiv,1,1)
         b.addStretch(1)

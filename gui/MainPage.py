@@ -26,23 +26,23 @@ class MainPage(QtWidgets.QWidget):
         self.interface = QtWidgets.QLineEdit()
         addressGroupBox.addWidget(self.interface,1,1)
 
-        self.cameraConnectedStatus = QtWidgets.QLabel("Camera connected locally");
-        layout.addWidget(self.cameraConnectedStatus)
+        l = QtWidgets.QHBoxLayout()
+        layout.addLayout(l)
+        l.addWidget(QtWidgets.QLabel("Camera type:"))
+        self.cameraType = QtWidgets.QLineEdit()
+        l.addWidget(self.cameraType)
 
-        self.findCameraButton = QtWidgets.QPushButton("Find camera")
-        layout.addWidget(self.findCameraButton)
+        l = QtWidgets.QHBoxLayout()
+        layout.addLayout(l)
+        self.cameraConnectedStatus = QtWidgets.QLabel("Camera connected locally");
+        l.addWidget(self.cameraConnectedStatus)
+        self.connectCameraButton = QtWidgets.QPushButton("Connect camera")
+        l.addWidget(self.connectCameraButton)
+        self.disconnectCameraButton = QtWidgets.QPushButton("Disconnect camera")
+        l.addWidget(self.disconnectCameraButton)
 
         self.messages = QtWidgets.QTextEdit(self)
         layout.addWidget(self.messages)
 
-        self.controlFactoryResetButton = QtWidgets.QPushButton("Control factory reset")
-        self.controlFactoryResetButton.factorySetting = True
-        layout.addWidget(self.controlFactoryResetButton)
 
-        l = QtWidgets.QHBoxLayout()
-        layout.addLayout(l)
-        l.addWidget(QtWidgets.QLabel("PC Error:"))
-        self.pcError = QtWidgets.QLineEdit()
-        self.pcError.setReadOnly(True)
-        l.addWidget(self.pcError)
         

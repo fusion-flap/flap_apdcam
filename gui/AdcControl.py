@@ -10,6 +10,7 @@ Qt = importlib.import_module(QtVersion+".QtCore")
 # from PyQt6.QtCore import Qt,QLocale
 # from PyQt6.QtGui import QDoubleValidator
 from ApdcamUtils import *
+from GuiMode import *
 
 class Adc(QtWidgets.QWidget):
     def name(self):
@@ -102,11 +103,11 @@ class Adc(QtWidgets.QWidget):
         layout.addWidget(g)
         self.sataOn = QtWidgets.QCheckBox()
         self.sataOn.setText("SATA On")
-        self.sataOn.factorySetting = True
+        self.sataOn.guiMode = GuiMode.factory
         g.addWidget(self.sataOn)
         self.dualSata = QtWidgets.QCheckBox()
         self.dualSata.setText("Dual SATA")
-        self.dualSata.factorySetting = True
+        self.dualSata.guiMode = GuiMode.factory
         g.addWidget(self.dualSata)
         self.sataSync = QtWidgets.QCheckBox()
         self.sataSync.setText("SATA Sync")
@@ -120,7 +121,7 @@ class Adc(QtWidgets.QWidget):
         self.internalTrigger = QtWidgets.QCheckBox("Internal trigger")
         g.addWidget(self.internalTrigger)
         self.reverseBitOrder = QtWidgets.QCheckBox("Rev. bitord.")
-        self.reverseBitOrder.factorySetting = True
+        self.reverseBitOrder.guiMode = GuiMode.factory
         g.addWidget(self.reverseBitOrder)
         g.addStretch(1)
 
@@ -229,7 +230,7 @@ class AdcControl(QtWidgets.QWidget):
         self.setAdcs(4)
 
         self.factoryResetButton = QtWidgets.QPushButton("Factory reset")
-        self.factoryResetButton.factorySetting = True
+        self.factoryResetButton.guiMode = GuiMode.factory
         self.layout.addWidget(self.factoryResetButton)
 
         self.readFromHwButton = QtWidgets.QPushButton("Read from HW")

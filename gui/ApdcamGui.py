@@ -12,24 +12,56 @@ from ApdcamUtils import *
 
 from MainPage import MainPage
 from CameraControl import CameraControl
-from HvShutterLight import HvShutterLight
+from Infrastructure import Infrastructure
 from OffsetNoise import OffsetNoise
 from AdcControl import AdcControl
 from ControlTiming import ControlTiming
 from CameraTimer import CameraTimer
+from CameraConfig import CameraConfig
+from GuiMode import *
 
-class ApdcamGui(QtWidgets.QWidget):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
 
+class ApdcamGui(QtWidgets.QMainWindow):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        # set this property to make it defined. However, this has no effect here
+        self.guiMode = GuiMode.simple
+        
         self.setWindowTitle('APDCAM Control')
 
-        layout = QtWidgets.QGridLayout(self)
-        self.setLayout(layout)
+        self.centralWidget = QtWidgets.QWidget()
+        self.setCentralWidget(self.centralWidget)
+        layout = QtWidgets.QGridLayout(self.centralWidget)
+        self.centralWidget.setLayout(layout)
 
+        QAction = None
+        if QtVersion == "PyQt6":
+            QAction = QtGui.QAction
+        else:
+            QAction = QtWidgets.QAction
+
+        menuBar = self.menuBar()
+
+        # File menu --------------------
+        fileMenu = menuBar.addMenu("&File")
+        exitAction = QAction("&Exit",self)
+        exitAction.triggered.connect(self.close)
+        fileMenu.addAction(exitAction)
+
+        # Run mode menu ------------------
+        modeMenu = menuBar.addMenu("&GUI Mode")
+        self.simpleModeAction = QAction("&Simple",self)
+        self.simpleModeAction.triggered.connect(lambda: self.setGuiMode(GuiMode.simple))
+        self.simpleModeAction.setIcon(QtGui.QIcon("./checkmark.png"))
+        modeMenu.addAction(self.simpleModeAction)
+        self.expertModeAction = QAction("&Expert",self)
+        self.expertModeAction.triggered.connect(lambda: self.setGuiMode(GuiMode.expert))
+        modeMenu.addAction(self.expertModeAction)
+        
         self.factorySettingsGroupBox = QHGroupBox("Factory settings")
+        self.factorySettingsGroupBox.guiMode = GuiMode.expert
         layout.addWidget(self.factorySettingsGroupBox,0,0)
-        self.factorySettingsMode = False
         self.factorySettingsPassword = QtWidgets.QLineEdit(self)
         self.factorySettingsPassword.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.factorySettingsPassword.returnPressed.connect(self.toggleFactorySettingsMode)
@@ -37,18 +69,22 @@ class ApdcamGui(QtWidgets.QWidget):
         self.factorySettingsModeButton = QtWidgets.QPushButton("Enter factory settings mode")
         self.factorySettingsGroupBox.addWidget(self.factorySettingsModeButton)
         self.factorySettingsModeButton.clicked.connect(self.toggleFactorySettingsMode)
-        
-        self.tabs = QtWidgets.QTabWidget(self)
-        layout.addWidget(self.tabs, 1, 0)
 
+        self.tabs = QtWidgets.QTabWidget(self)
+        self.tabs.guiMode = GuiMode.expert
+        layout.addWidget(self.tabs, 1, 0)
         self.tabs.addTab(MainPage(self),"Main")
-        self.tabs.addTab(HvShutterLight(self),"HV/Shutter/Light")
+        self.tabs.addTab(Infrastructure(self),"Infrastructure")
         self.tabs.addTab(OffsetNoise(self),"Offset/Noise")
         self.tabs.addTab(CameraControl(self),"Camera control")
         self.tabs.addTab(AdcControl(self),"ADC control")
         self.tabs.addTab(ControlTiming(self),"Control timing")
         self.tabs.addTab(CameraTimer(self),"Camera timer")
+        self.tabs.addTab(CameraConfig(self),"Camera configuration")
         
+        self.simpleModeLabel = QtWidgets.QLabel("<font size='30'>This is now simple mode. To be filled from the Tkinter version</font>")
+        self.simpleModeLabel.guiMode = GuiMode.simple
+        layout.addWidget(self.simpleModeLabel)
 
         layout.addWidget(QtWidgets.QLabel("Messages/<font color='orange'>Warnings</font>/<font color='red'>Errors</font>:"))
         self.messages = QtWidgets.QTextEdit(self)
@@ -56,10 +92,7 @@ class ApdcamGui(QtWidgets.QWidget):
         layout.addWidget(self.messages,3,0)
 
         self.show()
-        children = self.findChildren(QtWidgets.QWidget)
-        for child in children:
-            if hasattr(child,"factorySetting") and child.factorySetting:
-                self.setControlEnabled(child,False)
+        self.setGuiMode(GuiMode.simple)
 
     def showMessageWithTime(self,msg):
         time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -83,28 +116,59 @@ class ApdcamGui(QtWidgets.QWidget):
             control.setStyleSheet("color: " + ("rgba(255,0,0,1)" if status else "rgba(255,0,0,0.25)"))
         if isinstance(control,QtWidgets.QCheckBox):
             control.setStyleSheet("color: " + ("rgba(255,0,0,1)" if status else "rgba(255,0,0,0.25)"))
-        
 
-    def toggleFactorySettingsMode(self):
-        if not self.factorySettingsMode and self.factorySettingsPassword.text() != "hello":
-            self.showError("Incorrect password")
-            self.factorySettingsPassword.setText("")
-            return
+    def setGuiMode(self,mode):
+        oldMode = self.guiMode
+        self.guiMode = mode
         self.factorySettingsPassword.setText("")
-        self.factorySettingsMode = not self.factorySettingsMode
-        if self.factorySettingsMode:
-            self.showWarning("Enter factory settings mode")
-        else:
-            self.showMessage("Quit factory settings mode")
-        if self.factorySettingsMode:
+        if mode == GuiMode.simple:
+            self.simpleModeAction.setIcon(QtGui.QIcon("checkmark.png"))
+            self.expertModeAction.setIcon(QtGui.QIcon())
+        if mode == GuiMode.factory:
             self.factorySettingsModeButton.setText("Quit factory settings mode")
-        else:
+            self.showWarning("Enter factory settings mode")
+            self.expertModeAction.setIcon(QtGui.QIcon("checkmark.png"))
+            self.simpleModeAction.setIcon(QtGui.QIcon())
+        if mode == GuiMode.expert:
             self.factorySettingsModeButton.setText("Enter factory settings mode")
+            if oldMode == GuiMode.factory:
+                self.showMessage("Quit factory settings mode")
+            self.expertModeAction.setIcon(QtGui.QIcon("checkmark.png"))
+            self.simpleModeAction.setIcon(QtGui.QIcon())
         children = self.findChildren(QtWidgets.QWidget)
         for child in children:
-            if hasattr(child,"factorySetting") and child.factorySetting:
-                self.setControlEnabled(child,self.factorySettingsMode)
+            if hasattr(child,"guiMode") and child.guiMode == GuiMode.simple:
+                if self.guiMode == GuiMode.simple:
+                    child.setHidden(False)
+                else:
+                    child.setHidden(True)
+            if hasattr(child,"guiMode") and child.guiMode == GuiMode.expert:
+                if self.guiMode == GuiMode.simple:
+                    child.setHidden(True)
+                else:
+                    child.setHidden(False)
+            if hasattr(child,"guiMode") and child.guiMode == GuiMode.factory:
+                if self.guiMode == GuiMode.simple or self.guiMode == GuiMode.expert:
+                    self.setControlEnabled(child,False)
+                else:
+                    self.setControlEnabled(child,True)
+                    
+    def toggleFactorySettingsMode(self):
+        if self.guiMode == GuiMode.simple:
+            self.showError("This should never happen")
+            return
 
+        if self.guiMode == GuiMode.expert:
+            if self.factorySettingsPassword.text() != "hello":
+                self.showError("Incorrect password")
+                self.factorySettingsPassword.setText("")
+                return
+            self.factorySettingsPassword.setText("")
+            self.setGuiMode(GuiMode.factory)
+            return
+
+        if self.guiMode == GuiMode.factory:
+            self.setGuiMode(GuiMode.expert)
 
                     
 if __name__ == '__main__':

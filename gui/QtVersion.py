@@ -1,3 +1,3 @@
-QtVersion = "PyQt6"
+QtVersion = "PyQt5"
 
 

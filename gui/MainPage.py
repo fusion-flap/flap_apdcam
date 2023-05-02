@@ -1,8 +1,9 @@
 import sys
-import importlib
 
+import importlib
 from QtVersion import QtVersion
 QtWidgets = importlib.import_module(QtVersion+".QtWidgets")
+QtGui     = importlib.import_module(QtVersion+".QtGui")
 Qt = importlib.import_module(QtVersion+".QtCore")
 
 #from PyQt6.QtWidgets import QApplication, QWidget, QFormLayout, QVBoxLayout, QHBoxLayout, QGridLayout, QTabWidget, QLineEdit, QDateEdit, QPushButton, QTextEdit, QGroupBox, QLabel

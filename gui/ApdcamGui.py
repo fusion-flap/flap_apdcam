@@ -1,6 +1,7 @@
 import sys
 import datetime
 import inspect
+import types
 
 import importlib
 from QtVersion import QtVersion
@@ -18,8 +19,33 @@ from AdcControl import AdcControl
 from ControlTiming import ControlTiming
 from CameraTimer import CameraTimer
 from CameraConfig import CameraConfig
+from FactoryTest import FactoryTest
 from GuiMode import *
 
+
+"""
+The setEnabled method of a QWidget, when it is a tab of a QTabWidget, makes apparantly nothing.
+The correct way to disable a tab within a QTabWidget is QTabWidget.setTabEnabled(index,status)
+This function therefore implements this functionality, and this method will be assigned (overwrite)
+the default setEnabled member function of the given widget used as a tab.
+It is the responsibility of the programmer to set this function for the given tab, as follows
+t = SomeClassUsedAsTab()
+t.guiMode = GuiMode.factory
+t.setEnabled = types.MethodType(setTabEnabled,t)
+self.tabs.addTab(t,"Tab title")  # must record the index!
+"""
+def setTabEnabled(self,enabled):
+    o = self.parent()
+    while o is not None and not isinstance(o,QtWidgets.QTabWidget):
+        o = o.parent()
+    if o is not None:
+        i = o.indexOf(self)
+        if i >= 0:
+            o.setTabEnabled(i,enabled)
+        else:
+            print("This widget doesn't seem to be the child of this QTabWidget")
+    else:
+        print("This widget is not within a QTabWidget")
 
 class ApdcamGui(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
@@ -81,7 +107,12 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.tabs.addTab(ControlTiming(self),"Control timing")
         self.tabs.addTab(CameraTimer(self),"Camera timer")
         self.tabs.addTab(CameraConfig(self),"Camera configuration")
-        
+
+        fs = FactoryTest(self)
+        fs.guiMode = GuiMode.factory
+        fs.setEnabled = types.MethodType(setTabEnabled,fs)
+        self.tabs.addTab(fs,"Factory test")
+
         self.simpleModeLabel = QtWidgets.QLabel("<font size='30'>This is now simple mode. To be filled from the Tkinter version</font>")
         self.simpleModeLabel.guiMode = GuiMode.simple
         layout.addWidget(self.simpleModeLabel)
@@ -92,7 +123,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
         layout.addWidget(self.messages,3,0)
 
         self.show()
-        self.setGuiMode(GuiMode.simple)
+        self.setGuiMode(GuiMode.expert)
 
     def showMessageWithTime(self,msg):
         time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")

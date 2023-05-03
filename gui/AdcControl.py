@@ -50,6 +50,10 @@ class Adc(QtWidgets.QWidget):
         for i in range(32):
             self.setInternalTriggerPositive(i,False)
 
+    def allTriggerLevels(self,value):
+        for i in range(32):
+            self.internalTriggerLevel[i].setValue(value)
+
     def __init__(self,parent,number):
         super(Adc,self).__init__(parent)
         self.number = number
@@ -60,34 +64,34 @@ class Adc(QtWidgets.QWidget):
         topRow = QtWidgets.QHBoxLayout()
         layout.addLayout(topRow)
 
-        l = QtWidgets.QGridLayout()
-        topRow.addLayout(l)
-        l.addWidget(QtWidgets.QLabel("DVDD:"),1,0)
+        g = QGridGroupBox()
+        topRow.addWidget(g)
+        g.addWidget(QtWidgets.QLabel("DVDD:"),1,0)
         self.dvdd = QtWidgets.QLineEdit()
         self.dvdd.setEnabled(False)
-        l.addWidget(self.dvdd,1,1)
+        g.addWidget(self.dvdd,1,1)
         
-        l.addWidget(QtWidgets.QLabel("AVDD:"),2,0)
+        g.addWidget(QtWidgets.QLabel("AVDD:"),2,0)
         self.avdd = QtWidgets.QLineEdit()
         self.avdd.setEnabled(False)
-        l.addWidget(self.avdd,2,1)
+        g.addWidget(self.avdd,2,1)
 
-        l.addWidget(QtWidgets.QLabel("1.8 V:"),3,0)
+        g.addWidget(QtWidgets.QLabel("1.8 V:"),3,0)
         self.v18 = QtWidgets.QLineEdit()
         self.v18.setEnabled(False)
-        l.addWidget(self.v18,3,1)
+        g.addWidget(self.v18,3,1)
 
-        l.addWidget(QtWidgets.QLabel("2.5 V:"),4,0)
+        g.addWidget(QtWidgets.QLabel("2.5 V:"),4,0)
         self.v25 = QtWidgets.QLineEdit()
         self.v25.setEnabled(False)
-        l.addWidget(self.v25,4,1)
+        g.addWidget(self.v25,4,1)
 
-        l.addWidget(QtWidgets.QLabel("Temp:"),5,0)
+        g.addWidget(QtWidgets.QLabel("Temp:"),5,0)
         self.temperature = QtWidgets.QLineEdit()
         self.temperature.setEnabled(False)
-        l.addWidget(self.temperature,5,1)
+        g.addWidget(self.temperature,5,1)
 
-        l.setRowStretch(l.rowCount(),1)
+        g.setRowStretch(g.rowCount(),1)
 
         l = QtWidgets.QVBoxLayout()
         topRow.addLayout(l)
@@ -147,31 +151,31 @@ class Adc(QtWidgets.QWidget):
         h.addWidget(self.allChannelsOffButton)
         
 
-        g = QVGroupBox(self)
+        g = QGridGroupBox(self)
         topRow.addWidget(g)
         self.sataOn = QtWidgets.QCheckBox()
         self.sataOn.setText("SATA On")
         self.sataOn.guiMode = GuiMode.factory
-        g.addWidget(self.sataOn)
+        g.addWidget(self.sataOn,0,0)
         self.dualSata = QtWidgets.QCheckBox()
         self.dualSata.setText("Dual SATA")
         self.dualSata.guiMode = GuiMode.factory
-        g.addWidget(self.dualSata)
+        g.addWidget(self.dualSata,1,0)
         self.sataSync = QtWidgets.QCheckBox()
         self.sataSync.setText("SATA Sync")
-        g.addWidget(self.sataSync)
+        g.addWidget(self.sataSync,2,0)
         self.test = QtWidgets.QCheckBox()
         self.test.setText("Test")
-        g.addWidget(self.test)
+        g.addWidget(self.test,3,0)
         self.filter = QtWidgets.QCheckBox()
         self.filter.setText("Filter")
-        g.addWidget(self.filter)
+        g.addWidget(self.filter,0,1)
         self.internalTrigger = QtWidgets.QCheckBox("Internal trigger")
-        g.addWidget(self.internalTrigger)
+        g.addWidget(self.internalTrigger,1,1)
         self.reverseBitOrder = QtWidgets.QCheckBox("Rev. bitord.")
         self.reverseBitOrder.guiMode = GuiMode.factory
-        g.addWidget(self.reverseBitOrder)
-        g.addStretch(1)
+        g.addWidget(self.reverseBitOrder,2,1)
+        g.setRowStretch(g.rowCount(),10)
 
         g = QGridGroupBox(self)
         topRow.addWidget(g)
@@ -237,12 +241,17 @@ class Adc(QtWidgets.QWidget):
         layout.addWidget(g)
         h = QtWidgets.QHBoxLayout()
         g.addLayout(h)
-        h.addWidget(QtWidgets.QLabel("Trig. level (all)"))
-        self.triggerLevelAll = QDoubleEdit()
+        triggerLevelAllButton = QtWidgets.QPushButton("Set all trigger levels")
+        triggerLevelAllButton.clicked.connect(lambda: self.allTriggerLevels(self.triggerLevelAll.value()))
+        h.addWidget(triggerLevelAllButton)
+        self.triggerLevelAll = QtWidgets.QSpinBox()
+        self.triggerLevelAll.setMinimum(0)
+        self.triggerLevelAll.setMaximum(65535)
         h.addWidget(self.triggerLevelAll)
+        h.addStretch(1)
 
-        h = QtWidgets.QHBoxLayout()
-        g.addLayout(h)
+#        h = QtWidgets.QHBoxLayout()
+#        g.addLayout(h)
         b = QtWidgets.QPushButton("All triggers enabled")
         b.clicked.connect(self.allInternalTriggersEnabled)
         h.addWidget(b)
@@ -255,6 +264,7 @@ class Adc(QtWidgets.QWidget):
         b = QtWidgets.QPushButton("All triggers negative.")
         b.clicked.connect(self.allInternalTriggersNegative)
         h.addWidget(b)
+        h.addStretch(10)
 
         grid = QtWidgets.QGridLayout()
         g.addLayout(grid)

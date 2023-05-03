@@ -81,6 +81,16 @@ class QDoubleEdit(QtWidgets.QLineEdit):
         if not max is None:
             validator.setTop(max)
         self.setValidator(validator)
+class QIntEdit(QtWidgets.QLineEdit):
+    def __init__(self,min=None,max=None):
+        super(QIntEdit,self).__init__()
+        #self.setMaximumWidth(60)
+        validator = QtGui.QIntValidator()
+        if not min is None:
+            validator.setBottom(min)
+        if not max is None:
+            validator.setTop(max)
+        self.setValidator(validator)
 
 class Empty:
     pass

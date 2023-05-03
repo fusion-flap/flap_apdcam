@@ -1,7 +1,7 @@
 import sys
 
 import importlib
-from QtVersion import QtVersion
+from QtVersion import *
 QtWidgets = importlib.import_module(QtVersion+".QtWidgets")
 QtGui = importlib.import_module(QtVersion+".QtGui")
 Qt = importlib.import_module(QtVersion+".QtCore")
@@ -29,22 +29,25 @@ class Adc(QVGroupBox):
         l.addWidget(QtWidgets.QLabel("DAC"),4,0)
         
         for i in range(32):
-            l.addWidget(QtWidgets.QLabel(str(i+1)),0,i+1)
+            l.addWidget(QtWidgets.QLabel(str(i+1)),0,i+1,AlignCenter)
             self.mean[i] = QtWidgets.QLineEdit()
             self.mean[i].setEnabled(False)
             self.mean[i].setMaximumWidth(30)
-            l.addWidget(self.mean[i],1,i+1)
+            l.addWidget(self.mean[i],1,i+1,AlignCenter)
             self.hf[i] = QtWidgets.QLineEdit()
             self.hf[i].setEnabled(False)
             self.hf[i].setMaximumWidth(30)
-            l.addWidget(self.hf[i],2,i+1)
+            l.addWidget(self.hf[i],2,i+1,AlignCenter)
             self.lf[i] = QtWidgets.QLineEdit()
             self.lf[i].setEnabled(False)
             self.lf[i].setMaximumWidth(30)
-            l.addWidget(self.lf[i],3,i+1)
-            self.dac[i] = QtWidgets.QLineEdit()
-            self.dac[i].setMaximumWidth(30)
-            l.addWidget(self.dac[i],4,i+1)
+            l.addWidget(self.lf[i],3,i+1,AlignCenter)
+            self.dac[i] = QIntEdit(0,65535)
+#            self.dac[i].setMinimum(0)
+#            self.dac[i].setMaximum(65535)
+            self.dac[i].setMaximumWidth(54)
+            l.addWidget(self.dac[i],4,i+1,AlignCenter)
+        l.setSpacing(0)
         l.setColumnStretch(l.columnCount(),1)
 
         l = QtWidgets.QHBoxLayout()
@@ -58,7 +61,7 @@ class Adc(QVGroupBox):
         l.addWidget(QtWidgets.QLabel("Set all 32 DAC values to:"))
         self.allDacValuesEntry = QtWidgets.QSpinBox()
         self.allDacValuesEntry.setMinimum(0)
-        self.allDacValuesEntry.setMaximum(10)
+        self.allDacValuesEntry.setMaximum(65535)
         l.addWidget(self.allDacValuesEntry)
         l.addStretch(1)
 
@@ -86,7 +89,7 @@ class OffsetNoise(QtWidgets.QWidget):
         l.addWidget(QtWidgets.QLabel("Set all DAC values to:"))
         self.allDacValuesEntry = QtWidgets.QSpinBox()
         self.allDacValuesEntry.setMinimum(0)
-        self.allDacValuesEntry.setMaximum(10)
+        self.allDacValuesEntry.setMaximum(65535)
         l.addWidget(self.allDacValuesEntry)
         l.addStretch(1)
 

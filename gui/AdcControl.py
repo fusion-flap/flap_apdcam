@@ -1,7 +1,7 @@
 import sys
 
 import importlib
-from QtVersion import QtVersion
+from QtVersion import *
 QtWidgets = importlib.import_module(QtVersion+".QtWidgets")
 QtGui = importlib.import_module(QtVersion+".QtGui")
 Qt = importlib.import_module(QtVersion+".QtCore")
@@ -16,15 +16,52 @@ class Adc(QtWidgets.QWidget):
     def name(self):
         return "ADC " + str(self.number)
 
+    def channelOnOff(self,i,state):
+        if i >= 32 or i < 0:
+            return
+        self.channelOn[i].setChecked(state)
+
+    def allChannelsOn(self):
+        for i in range(32):
+            self.channelOnOff(i,True)
+    def allChannelsOff(self):
+        for i in range(32):
+            self.channelOnOff(i,False)
+
+    def internalTriggerEnable(self,i,state):
+        if i >= 32 or i < 0:
+            return
+        self.internalTriggerEnabled[i].setChecked(state)
+    def allInternalTriggersEnabled(self):
+        for i in range(32):
+            self.internalTriggerEnable(i,True)
+    def allInternalTriggersDisabled(self):
+        for i in range(32):
+            self.internalTriggerEnable(i,False)
+
+    def setInternalTriggerPositive(self,i,state):
+        if i >= 32 or i < 0:
+            return
+        self.internalTriggerPositive[i].setChecked(state)
+    def allInternalTriggersPositive(self):
+        for i in range(32):
+            self.setInternalTriggerPositive(i,True)
+    def allInternalTriggersNegative(self):
+        for i in range(32):
+            self.setInternalTriggerPositive(i,False)
+
     def __init__(self,parent,number):
         super(Adc,self).__init__(parent)
         self.number = number
 
-        layout = QtWidgets.QHBoxLayout()
+        layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
 
+        topRow = QtWidgets.QHBoxLayout()
+        layout.addLayout(topRow)
+
         l = QtWidgets.QGridLayout()
-        layout.addLayout(l)
+        topRow.addLayout(l)
         l.addWidget(QtWidgets.QLabel("DVDD:"),1,0)
         self.dvdd = QtWidgets.QLineEdit()
         self.dvdd.setEnabled(False)
@@ -53,7 +90,7 @@ class Adc(QtWidgets.QWidget):
         l.setRowStretch(l.rowCount(),1)
 
         l = QtWidgets.QVBoxLayout()
-        layout.addLayout(l)
+        topRow.addLayout(l)
         g = QVGroupBox(self)
         l.addWidget(g)
         self.pllLocked = QtWidgets.QCheckBox("PLL Locked")
@@ -71,10 +108,8 @@ class Adc(QtWidgets.QWidget):
         self.led2 = QtWidgets.QCheckBox("LED 2")
         self.led2.setEnabled(False)
         g.addWidget(self.led2)
-        self.allChannelsOnButton = QtWidgets.QPushButton("All channels on")
-        l.addWidget(self.allChannelsOnButton)
-        self.allChannelsOffButton = QtWidgets.QPushButton("All channels off")
-        l.addWidget(self.allChannelsOffButton)
+
+
         h = QtWidgets.QHBoxLayout()
         l.addLayout(h)
         h.addWidget(QtWidgets.QLabel("Error:"))
@@ -83,24 +118,37 @@ class Adc(QtWidgets.QWidget):
         h.addWidget(self.error)
         l.addStretch(1)
 
-        self.whatIsThis = [None]*32
+        channelStatusGroup = QVGroupBox("Channels on/off")
+        topRow.addWidget(channelStatusGroup)
+        self.channelOn = [None]*32
         l = QtWidgets.QGridLayout()
         l.setContentsMargins(10,0,0,0)
         l.setSpacing(15)
-        layout.addLayout(l)
+        channelStatusGroup.addLayout(l)
         l.setVerticalSpacing(10)
-        for col in range(4):
+        cols = 8
+        rows = 4
+        for col in range(cols):
             l.setColumnMinimumWidth(col,1)
-            for row in range(8):
+            for row in range(rows):
                 l.setRowMinimumHeight(row,1)
-                self.whatIsThis[col*row] = QtWidgets.QCheckBox(str(col*8+row+1))
-                self.whatIsThis[col*row].setStyleSheet("padding: 0px; margin: 0px; margin-top:0px; margin-bottom:0px;")
-                self.whatIsThis[col*row].setContentsMargins(0,0,0,0)
-                l.addWidget(self.whatIsThis[col*row],row,col)
+                self.channelOn[row*cols+col] = QtWidgets.QCheckBox(str(row*cols+col+1))
+                self.channelOn[row*cols+col].setStyleSheet("padding: 0px; margin: 0px; margin-top:0px; margin-bottom:0px;")
+                self.channelOn[row*cols+col].setContentsMargins(0,0,0,0)
+                l.addWidget(self.channelOn[row*cols+col],row,col)
         l.setRowStretch(l.rowCount(),1)
+        h = QtWidgets.QHBoxLayout()
+        channelStatusGroup.addLayout(h)
+        self.allChannelsOnButton = QtWidgets.QPushButton("All channels on")
+        self.allChannelsOnButton.clicked.connect(self.allChannelsOn)
+        h.addWidget(self.allChannelsOnButton)
+        self.allChannelsOffButton = QtWidgets.QPushButton("All channels off")
+        self.allChannelsOffButton.clicked.connect(self.allChannelsOff)
+        h.addWidget(self.allChannelsOffButton)
+        
 
         g = QVGroupBox(self)
-        layout.addWidget(g)
+        topRow.addWidget(g)
         self.sataOn = QtWidgets.QCheckBox()
         self.sataOn.setText("SATA On")
         self.sataOn.guiMode = GuiMode.factory
@@ -126,7 +174,7 @@ class Adc(QtWidgets.QWidget):
         g.addStretch(1)
 
         g = QGridGroupBox(self)
-        layout.addWidget(g)
+        topRow.addWidget(g)
         g.addWidget(QtWidgets.QLabel("Bits:"),0,0)
         self.bits = QtWidgets.QLineEdit()
         g.addWidget(self.bits,0,1)
@@ -146,7 +194,7 @@ class Adc(QtWidgets.QWidget):
 
         g = QGridGroupBox(self)
         g.setTitle("FIR filter")
-        layout.addWidget(g)
+        topRow.addWidget(g)
         self.firCoeff = [0,0,0,0,0]
         for i in range(5):
             g.addWidget(QtWidgets.QLabel("Coeff" + str(i+1)),i,0)
@@ -157,7 +205,7 @@ class Adc(QtWidgets.QWidget):
         g.setRowStretch(g.rowCount(),1)
 
         b = QtWidgets.QVBoxLayout()
-        layout.addLayout(b)
+        topRow.addLayout(b)
         g = QGridGroupBox("Int. Filter")
         b.addWidget(g)
         g.addWidget(QtWidgets.QLabel("Coeff:"),0,0)
@@ -185,34 +233,70 @@ class Adc(QtWidgets.QWidget):
         l.addWidget(self.filterGain,2,1)
         b.addStretch(1)
 
-        v = QtWidgets.QVBoxLayout()
-        layout.addLayout(v)
-
-        g = QGridGroupBox("Overload")
-        v.addWidget(g)
-        g.addWidget(QtWidgets.QLabel("Overl. level:"),0,0)
-        self.overloadLevel = QDoubleEdit()
-        g.addWidget(self.overloadLevel,0,1)
-        g.addWidget(QtWidgets.QLabel("Overl. time [\u03bcs]:"),1,0)
-        self.overloadTime = QDoubleEdit()
-        g.addWidget(self.overloadTime,1,1)
-        self.overloadEnabled = QtWidgets.QCheckBox()
-        self.overloadEnabled.setText("Overload en.")
-        g.addWidget(self.overloadEnabled,2,0,1,2)
-        self.ovrPlus = QtWidgets.QCheckBox("Ovr +")
-        g.addWidget(self.ovrPlus,3,0,1,2)
-        self.overload = QtWidgets.QCheckBox("OVERLOAD")
-        g.addWidget(self.overload,4,0,1,2)
-
-        g = QGridGroupBox("Trigger")
-        v.addWidget(g)
-        g.addWidget(QtWidgets.QLabel("Trig. level (all)"),0,0)
+        g = QVGroupBox("Internal trigger")
+        layout.addWidget(g)
+        h = QtWidgets.QHBoxLayout()
+        g.addLayout(h)
+        h.addWidget(QtWidgets.QLabel("Trig. level (all)"))
         self.triggerLevelAll = QDoubleEdit()
-        g.addWidget(self.triggerLevelAll,0,1)
-        self.triggerEnabled = QtWidgets.QCheckBox("Trigger enabled")
-        g.addWidget(self.triggerEnabled,1,0,1,2)
-        self.plusTrigger = QtWidgets.QCheckBox("+ trig")
-        g.addWidget(self.plusTrigger,2,0,1,2)
+        h.addWidget(self.triggerLevelAll)
+
+        h = QtWidgets.QHBoxLayout()
+        g.addLayout(h)
+        b = QtWidgets.QPushButton("All triggers enabled")
+        b.clicked.connect(self.allInternalTriggersEnabled)
+        h.addWidget(b)
+        b = QtWidgets.QPushButton("All triggers disabled")
+        b.clicked.connect(self.allInternalTriggersDisabled)
+        h.addWidget(b)
+        b = QtWidgets.QPushButton("All triggers positive")
+        b.clicked.connect(self.allInternalTriggersPositive)
+        h.addWidget(b)
+        b = QtWidgets.QPushButton("All triggers negative.")
+        b.clicked.connect(self.allInternalTriggersNegative)
+        h.addWidget(b)
+
+        grid = QtWidgets.QGridLayout()
+        g.addLayout(grid)
+        self.internalTriggerEnabled = [None]*32
+        self.internalTriggerLevel = [None]*32
+        self.internalTriggerPositive = [None]*32
+        cols = 8
+        rows = 4
+        for col in range(cols):
+            grid.setColumnMinimumWidth(col,1)
+            for row in range(rows):
+                grid.setRowMinimumHeight(row,1)
+                c = QVGroupBox()
+                c.setStyleSheet("padding-top:-1px; padding-bottom:-1px;")
+                grid.addWidget(c,row,col)
+                h1 = QtWidgets.QHBoxLayout()
+                label = QtWidgets.QLabel("<b>" + str(row*cols+col+1) + "</b>")
+                label.setStyleSheet("background-color: rgba(0,0,0,0.2); padding-left:5px; padding-right:5px;")
+                label.setAlignment(AlignCenter)
+                h1.addWidget(label)
+                c.addLayout(h1)
+                self.internalTriggerEnabled[row*cols+col] = QtWidgets.QCheckBox("En.")
+                self.internalTriggerEnabled[row*cols+col].setStyleSheet("padding: 0px; margin: 0px; margin-top:0px; margin-bottom:0px;")
+                self.internalTriggerEnabled[row*cols+col].setContentsMargins(0,0,0,0)
+                h1.addWidget(self.internalTriggerEnabled[row*cols+col])
+                self.internalTriggerPositive[row*cols+col] = QtWidgets.QCheckBox("+")
+                self.internalTriggerPositive[row*cols+col].setStyleSheet("padding: 0px; margin: 0px; margin-top:0px; margin-bottom:0px;")
+                self.internalTriggerPositive[row*cols+col].setContentsMargins(0,0,0,0)
+                h1.addWidget(self.internalTriggerPositive[row*cols+col])
+
+#                h2 = QtWidgets.QHBoxLayout()
+#                c.addLayout(h2)
+#                h1.addWidget(QtWidgets.QLabel("Lev:"))
+                self.internalTriggerLevel[row*cols+col] = QtWidgets.QSpinBox()
+                self.internalTriggerLevel[row*cols+col].setMinimum(0)
+                self.internalTriggerLevel[row*cols+col].setMaximum(65535)
+                self.internalTriggerLevel[row*cols+col].setStyleSheet("padding: 0px; margin: 0px; margin-top:0px; margin-bottom:0px;")
+                self.internalTriggerLevel[row*cols+col].setContentsMargins(0,0,0,0)
+                h1.addWidget(self.internalTriggerLevel[row*cols+col])
+                
+                #grid.addWidget(self.internalTriggerEnabled[row*8+col],row,col)
+        
 
 class AdcControl(QtWidgets.QWidget):
     def __init__(self,parent):

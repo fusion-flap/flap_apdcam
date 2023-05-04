@@ -20,6 +20,8 @@ from ControlTiming import ControlTiming
 from CameraTimer import CameraTimer
 from CameraConfig import CameraConfig
 from FactoryTest import FactoryTest
+from Plot import Plot
+from SimpleMeasurementControl import SimpleMeasurementControl
 from GuiMode import *
 
 
@@ -96,26 +98,33 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.factorySettingsGroupBox.addWidget(self.factorySettingsModeButton)
         self.factorySettingsModeButton.clicked.connect(self.toggleFactorySettingsMode)
 
-        self.tabs = QtWidgets.QTabWidget(self)
-        self.tabs.guiMode = GuiMode.expert
-        layout.addWidget(self.tabs, 1, 0)
-        self.tabs.addTab(MainPage(self),"Main")
-        self.tabs.addTab(Infrastructure(self),"Infrastructure")
-        self.tabs.addTab(OffsetNoise(self),"Offset/Noise")
-        self.tabs.addTab(CameraControl(self),"Camera control")
-        self.tabs.addTab(AdcControl(self),"ADC control")
-        self.tabs.addTab(ControlTiming(self),"Control timing")
-        self.tabs.addTab(CameraTimer(self),"Camera timer")
-        self.tabs.addTab(CameraConfig(self),"Camera configuration")
+        # ------------------ Expert tabs ----------------------------------
+        self.expertTabs = QtWidgets.QTabWidget(self)
+        self.expertTabs.guiMode = GuiMode.expert
+        layout.addWidget(self.expertTabs, 1, 0)
+        self.expertTabs.addTab(MainPage(self),"Main")
+        self.expertTabs.addTab(Infrastructure(self),"Infrastructure")
+        self.expertTabs.addTab(OffsetNoise(self),"Offset/Noise")
+        self.expertTabs.addTab(CameraControl(self),"Camera control")
+        self.expertTabs.addTab(AdcControl(self),"ADC control")
+        self.expertTabs.addTab(ControlTiming(self),"Control timing")
+        self.expertTabs.addTab(CameraTimer(self),"Camera timer")
+        self.expertTabs.addTab(CameraConfig(self),"Camera configuration")
 
         fs = FactoryTest(self)
         fs.guiMode = GuiMode.factory
         fs.setEnabled = types.MethodType(setTabEnabled,fs)
-        self.tabs.addTab(fs,"Factory test")
+        self.expertTabs.addTab(fs,"Factory test")
 
-        self.simpleModeLabel = QtWidgets.QLabel("<font size='30'>This is now simple mode. To be filled from the Tkinter version</font>")
-        self.simpleModeLabel.guiMode = GuiMode.simple
-        layout.addWidget(self.simpleModeLabel)
+        self.expertTabs.addTab(Plot(self),"Plot")
+
+        # ------------------ Simple tabs ----------------------------------
+        self.simpleTabs = QtWidgets.QTabWidget(self)
+        self.simpleTabs.guiMode = GuiMode.simple
+        layout.addWidget(self.simpleTabs)
+
+        self.simpleTabs.addTab(SimpleMeasurementControl(self),"Measurement control")
+
 
         layout.addWidget(QtWidgets.QLabel("Messages/<font color='orange'>Warnings</font>/<font color='red'>Errors</font>:"))
         self.messages = QtWidgets.QTextEdit(self)

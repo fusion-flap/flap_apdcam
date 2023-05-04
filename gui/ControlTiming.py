@@ -125,7 +125,7 @@ class ControlTiming(QtWidgets.QWidget):
         g.addWidget(self.trigPlus)
         self.trigMinus = QtWidgets.QCheckBox("Trig -")
         g.addWidget(self.trigMinus)
-        self.internalTrig = QtWidgets.QCheckBox("Int. trig.")
+        self.internalTrig = QtWidgets.QCheckBox("Internal trigger")
         g.addWidget(self.internalTrig)
         self.disableWhenStreamOff = QtWidgets.QCheckBox("Disable when stream off")
         g.addWidget(self.disableWhenStreamOff)

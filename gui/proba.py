@@ -1,12 +1,6 @@
-from enum import Enum
+#import logging
+#logging.basicConfig(level=logging.DEBUG)
 
+#from pylab import rcParams
+import matplotlib.pyplot as plt
 
-class GuiMode(Enum):
-    simple = 1
-    expert = 2
-    factory = 3
-
-a = {GuiMode.simple: 1, GuiMode.expert: 10}
-
-if GuiMode.expert in a:
-    print(a[GuiMode.expert])

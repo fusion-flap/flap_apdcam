@@ -25,6 +25,9 @@ from SimpleMeasurementControl import SimpleMeasurementControl
 from GuiMode import *
 
 
+sys.path.append('/home/barna/fusion-instruments/sw/flap_apdcam/apdcam_control')
+from APDCAM10G_control import *
+
 """
 The setEnabled method of a QWidget, when it is a tab of a QTabWidget, makes apparantly nothing.
 The correct way to disable a tab within a QTabWidget is QTabWidget.setTabEnabled(index,status)
@@ -52,6 +55,8 @@ def setTabEnabled(self,enabled):
 class ApdcamGui(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
+
+        self.camera = APDCAM10G_regCom()
 
         time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.logfile = open("apdcam-gui-log_" + time,"w")
@@ -115,7 +120,10 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.expertTabs.guiMode = GuiMode.expert
         layout.addWidget(self.expertTabs, 1, 0)
         self.expertTabs.addTab(MainPage(self),"Main")
-        self.expertTabs.addTab(Infrastructure(self),"Infrastructure")
+
+        self.infrastructure = Infrastructure(self)
+        self.expertTabs.addTab(self.infrastructure,"Infrastructure")
+
         self.expertTabs.addTab(OffsetNoise(self),"Offset/Noise")
         self.expertTabs.addTab(CameraControl(self),"Camera control")
         self.expertTabs.addTab(AdcControl(self),"ADC control")
@@ -136,7 +144,6 @@ class ApdcamGui(QtWidgets.QMainWindow):
         layout.addWidget(self.simpleTabs)
 
         self.simpleTabs.addTab(SimpleMeasurementControl(self),"Measurement control")
-
 
         layout.addWidget(QtWidgets.QLabel("Messages/<font color='orange'>Warnings</font>/<font color='red'>Errors</font>:"))
         self.messages = QtWidgets.QTextEdit(self)
@@ -231,8 +238,13 @@ class ApdcamGui(QtWidgets.QMainWindow):
         if self.guiMode == GuiMode.factory:
             self.setGuiMode(GuiMode.expert)
 
-                    
+class ApdcamGuiApp(QtWidgets.QApplication):
+    def __init__(self):
+        super(ApdcamGuiApp,self).__init__(sys.argv)
+        self.window = ApdcamGui()
+        self.exec()
+
 if __name__ == '__main__':
-    app = QtWidgets.QApplication(sys.argv)
-    window = ApdcamGui()
-    sys.exit(app.exec())
+    app = ApdcamGuiApp()
+
+        

@@ -53,6 +53,10 @@ class ApdcamGui(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
 
+        time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.logfile = open("apdcam-gui-log_" + time,"w")
+        
+
         # set this property to make it defined. However, this has no effect here
         self.guiMode = GuiMode.simple
         
@@ -86,17 +90,25 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.expertModeAction = QAction("&Expert",self)
         self.expertModeAction.triggered.connect(lambda: self.setGuiMode(GuiMode.expert))
         modeMenu.addAction(self.expertModeAction)
-        
+
+        # Developer menu ------------------
+        developerMenu = menuBar.addMenu("&Developer")
+        self.markFunctionlessAction = QAction("&Mark functionless (=no tooltip...) controls",self)
+        self.markFunctionlessAction.triggered.connect(self.markFunctionlessControls)
+        developerMenu.addAction(self.markFunctionlessAction)
+
         self.factorySettingsGroupBox = QHGroupBox("Factory settings")
         self.factorySettingsGroupBox.guiMode = GuiMode.expert
         layout.addWidget(self.factorySettingsGroupBox,0,0)
         self.factorySettingsPassword = QtWidgets.QLineEdit(self)
         self.factorySettingsPassword.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.factorySettingsPassword.returnPressed.connect(self.toggleFactorySettingsMode)
+        self.factorySettingsPassword.setToolTip("Specify the password here and hit Enter (or click the button) to have access to factory factory settings")
         self.factorySettingsGroupBox.addWidget(self.factorySettingsPassword)
         self.factorySettingsModeButton = QtWidgets.QPushButton("Enter factory settings mode")
         self.factorySettingsGroupBox.addWidget(self.factorySettingsModeButton)
         self.factorySettingsModeButton.clicked.connect(self.toggleFactorySettingsMode)
+        self.factorySettingsModeButton.setToolTip("Enter or quit factory settings mode with elevated control rights")
 
         # ------------------ Expert tabs ----------------------------------
         self.expertTabs = QtWidgets.QTabWidget(self)
@@ -134,9 +146,18 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.show()
         self.setGuiMode(GuiMode.expert)
 
+    def markFunctionlessControls(self):
+        children = self.findChildren(QtWidgets.QWidget)
+        for child in children:
+            if isinstance(child,QtWidgets.QPushButton) or isinstance(child,QtWidgets.QLineEdit) or isinstance(child,QtWidgets.QSpinBox) or isinstance(child,QDoubleEdit) or isinstance(child,QIntEdit) or isinstance(child,QtWidgets.QCheckBox) or isinstance(child,QtWidgets.QComboBox):
+                if child.toolTip() == "":
+                    child.setStyleSheet("background-color: red")
+
     def showMessageWithTime(self,msg):
         time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.messages.append(time + " - " + msg)
+        self.logfile.write(msg + "\n")
+        self.logfile.flush()
 
     def showMessage(self,msg):
         self.showMessageWithTime(msg)

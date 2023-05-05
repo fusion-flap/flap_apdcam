@@ -31,9 +31,11 @@ class Plot(QtWidgets.QWidget):
             self.popOutWindow.close()
             self.popOutWindow = None
             self.popOutButton.setToolTip("Move the plot to a new window")
+            self.popOutButton.setIcon(QtGui.QIcon("popout.png"))
         else:
             self.popOutWindow = DetachedWindow(self.plotWidget,self.restorePlot)
             self.popOutButton.setToolTip("Move the plot back here")
+            self.popOutButton.setIcon(QtGui.QIcon("popin.png"))
 
     def __init__(self,parent):
         super(Plot,self).__init__(parent)

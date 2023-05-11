@@ -15,6 +15,7 @@ import subprocess
 import xml.etree.ElementTree as ET
 import socket
 import os
+import platform
 import numpy as np
 #import struct
 #import sys
@@ -1334,7 +1335,7 @@ class APDCAM10G_regCom:
     def getInterface(self):
         """
         Determine network interface name
-        Works only on Linux
+        Works only on Linux, on Windows sets interface to ' '
         Stores ther result in self.interface
         
         Returns
@@ -1344,6 +1345,10 @@ class APDCAM10G_regCom:
 
         """
         
+        if (platform.platform().lower()[:len('windows')] == 'windows'):
+            print("Windows system detercted. Cannot determine interface. Measuement does not work with APDTest.")
+            self.interface =  " "
+            return ""
         ip = self.getIP()
         net = ip.split('.')
         net = net[0]+'.'+net[1]+'.'+net[2]+'.'

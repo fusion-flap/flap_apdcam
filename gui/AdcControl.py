@@ -278,11 +278,11 @@ class Adc(QtWidgets.QWidget):
             for row in range(rows):
                 grid.setRowMinimumHeight(row,1)
                 c = QVGroupBox()
-                c.setStyleSheet("padding-top:-1px; padding-bottom:-1px;")
+                c.setStyleSheet("padding-top:-5px; padding-bottom:-5px;")
                 grid.addWidget(c,row,col)
                 h1 = QtWidgets.QHBoxLayout()
                 label = QtWidgets.QLabel("<b>" + str(row*cols+col+1) + "</b>")
-                label.setStyleSheet("background-color: rgba(0,0,0,0.2); padding-left:5px; padding-right:5px;")
+                label.setStyleSheet("background-color: rgba(0,0,0,0.2); padding-left:5px; padding-right:5px; padding-top:-1px; padding-bottom:-1px; margin:0px;")
                 label.setAlignment(AlignCenter)
                 h1.addWidget(label)
                 c.addLayout(h1)
@@ -304,9 +304,28 @@ class Adc(QtWidgets.QWidget):
                 self.internalTriggerLevel[row*cols+col].setStyleSheet("padding: 0px; margin: 0px; margin-top:0px; margin-bottom:0px;")
                 self.internalTriggerLevel[row*cols+col].setContentsMargins(0,0,0,0)
                 h1.addWidget(self.internalTriggerLevel[row*cols+col])
-                
-                #grid.addWidget(self.internalTriggerEnabled[row*8+col],row,col)
-        
+
+        g = QVGroupBox("DAC")
+        layout.addWidget(g)
+        h = QtWidgets.QHBoxLayout()
+        g.addLayout(h)
+        h.setSpacing(0)
+        self.dac = [None]*32
+        for i in range(32):
+            self.dac[i] = QIntEdit(0,65535)
+            self.dac[i].setMaximumWidth(54)
+            h.addWidget(self.dac[i])
+        h.addStretch(1)
+
+        h = QtWidgets.QHBoxLayout()
+        g.addLayout(h)
+        self.setAllDacButton = QtWidgets.QPushButton("Set all values")
+        h.addWidget(self.setAllDacButton)
+        self.allDacValues = QtWidgets.QSpinBox()
+        self.allDacValues.setMinimum(0)
+        self.allDacValues.setMaximum(65535)
+        h.addWidget(self.allDacValues)
+        h.addStretch(1)
 
 class AdcControl(QtWidgets.QWidget):
     def __init__(self,parent):

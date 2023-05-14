@@ -10,9 +10,11 @@ Qt = importlib.import_module(QtVersion+".QtCore")
 #from PyQt6.QtCore import Qt
 from ApdcamUtils import *
 
-class Adc(QVGroupBox):
+# Egesz offset/noise ful eltunhet, menjen aDC.be
+
+class AdcBoard(QVGroupBox):
     def __init__(self,parent,number):
-        super(Adc,self).__init__(parent)
+        super(AdcBoard,self).__init__(parent)
         self.number = number
         self.mean = [None]*32
         self.hf = [None]*32
@@ -23,13 +25,14 @@ class Adc(QVGroupBox):
         label = QtWidgets.QLabel("<b>ADC"+str(number)+"</b>")
         label.setStyleSheet("background-color: rgba(0,0,0,0.1); padding:4px;")
         l.addWidget(label,0,0)
-        l.addWidget(QtWidgets.QLabel("Mean"),1,0)
-        l.addWidget(QtWidgets.QLabel("HF"),2,0)
-        l.addWidget(QtWidgets.QLabel("LF"),3,0)
+#        l.addWidget(QtWidgets.QLabel("Mean"),1,0)
+#        l.addWidget(QtWidgets.QLabel("HF"),2,0)
+#        l.addWidget(QtWidgets.QLabel("LF"),3,0)
         l.addWidget(QtWidgets.QLabel("DAC"),4,0)
         
         for i in range(32):
             l.addWidget(QtWidgets.QLabel(str(i+1)),0,i+1,AlignCenter)
+            # csak DAC kell
             self.mean[i] = QtWidgets.QLineEdit()
             self.mean[i].setEnabled(False)
             self.mean[i].setMaximumWidth(30)
@@ -52,8 +55,8 @@ class Adc(QVGroupBox):
 
         l = QtWidgets.QHBoxLayout()
         self.addLayout(l)
-        self.measureDataButton = QtWidgets.QPushButton("Measure data")
-        l.addWidget(self.measureDataButton)
+#        self.measureDataButton = QtWidgets.QPushButton("Measure data")
+#        l.addWidget(self.measureDataButton)
         self.getDacValuesButton = QtWidgets.QPushButton("Get DAC values")
         l.addWidget(self.getDacValuesButton)
         self.setDacOutputButton = QtWidgets.QPushButton("Set DAC output")
@@ -71,12 +74,8 @@ class OffsetNoise(QtWidgets.QWidget):
         self.layout = QtWidgets.QVBoxLayout()
         self.setLayout(self.layout)
 
-        self.adc = []
-        self.addAdc()
-
-        b = QtWidgets.QPushButton("Add ADC (Debugging...)")
-        b.clicked.connect(self.addAdc)
-        self.layout.addWidget(b)
+        self.adcBoards = []
+        self.setAdcBoards(3)
 
         l = QtWidgets.QHBoxLayout()
         self.layout.addLayout(l)
@@ -95,7 +94,20 @@ class OffsetNoise(QtWidgets.QWidget):
 
         self.layout.addStretch(1)
 
-    def addAdc(self):
-        adc = Adc(self,len(self.adc)+1)
-        self.adc.append(adc)
-        self.layout.insertWidget(len(self.adc)-1,adc)
+    def addAdcBoard(self):
+        adc = AdcBoard(self,len(self.adcBoards)+1)
+        self.adcBoards.append(adc)
+        self.layout.insertWidget(len(self.adcBoards)-1,adc)
+
+    def setAdcBoards(self,n):
+        """
+        Set the specified number of ADC boards
+        """
+        
+        for i in range(len(self.adcBoards)):
+            self.adcBoards[i].setParent(None)
+
+        self.adcBoards = [None]*n
+        for i in range(n):
+            self.adcBoards[i] = AdcBoard(self,i+1)
+            self.layout.insertWidget(i,self.adcBoards[i])

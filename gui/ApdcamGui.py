@@ -1,5 +1,6 @@
 import sys
 import datetime
+import time
 import inspect
 import types
 
@@ -12,9 +13,9 @@ Qt = importlib.import_module(QtVersion+".QtCore")
 from ApdcamUtils import *
 
 from MainPage import MainPage
-from CameraControl import CameraControl
+# from CameraControl import CameraControl
 from Infrastructure import Infrastructure
-from OffsetNoise import OffsetNoise
+#from OffsetNoise import OffsetNoise
 from AdcControl import AdcControl
 from ControlTiming import ControlTiming
 from CameraTimer import CameraTimer
@@ -23,7 +24,6 @@ from FactoryTest import FactoryTest
 from Plot import Plot
 from SimpleMeasurementControl import SimpleMeasurementControl
 from GuiMode import *
-
 
 sys.path.append('/home/barna/fusion-instruments/sw/flap_apdcam/apdcam_control')
 from APDCAM10G_control import *
@@ -58,10 +58,16 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
         self.camera = APDCAM10G_regCom()
 
+        # Status info is collected into a sub-class 'status'
+        class Status:
+            pass
+        self.status = Status()
+        self.status.connected = False
+        
+
         time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.logfile = open("apdcam-gui-log_" + time,"w")
         
-
         # set this property to make it defined. However, this has no effect here
         self.guiMode = GuiMode.simple
         
@@ -83,7 +89,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
         # File menu --------------------
         fileMenu = menuBar.addMenu("&File")
         exitAction = QAction("&Exit",self)
-        exitAction.triggered.connect(self.close)
+        exitAction.triggered.connect(sys.exit)
         fileMenu.addAction(exitAction)
 
         # Run mode menu ------------------
@@ -124,8 +130,6 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.infrastructure = Infrastructure(self)
         self.expertTabs.addTab(self.infrastructure,"Infrastructure")
 
-        self.expertTabs.addTab(OffsetNoise(self),"Offset/Noise")
-        self.expertTabs.addTab(CameraControl(self),"Camera control")
         self.expertTabs.addTab(AdcControl(self),"ADC control")
         self.expertTabs.addTab(ControlTiming(self),"Control timing")
         self.expertTabs.addTab(CameraTimer(self),"Camera timer")
@@ -136,7 +140,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
         fs.setEnabled = types.MethodType(setTabEnabled,fs)
         self.expertTabs.addTab(fs,"Factory test")
 
-        self.expertTabs.addTab(Plot(self),"Plot")
+#        self.expertTabs.addTab(Plot(self),"Plot")
 
         # ------------------ Simple tabs ----------------------------------
         self.simpleTabs = QtWidgets.QTabWidget(self)
@@ -153,6 +157,75 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.show()
         self.setGuiMode(GuiMode.expert)
 
+    def call(self,function,*,n=1,wait=1,critial=False,showall=False,name='',where=''):
+        """
+        Creates a callable proxy object running the given function, to be used as push-button or other widget actions.
+        The function is assumed to return an error message in case of a fault, or an empty string in the case of success.
+        The proxy will report eventual error messages.
+
+        Parameters
+        ^^^^^^^^^^
+        function
+            a callable object, which will be called with no arguments (if you want to run
+            a function with given arguments, make the binding using a lambda)
+        n=1
+            Number of times the function should be called
+        wait=1
+            Number of seconds the routine should wait before subsequent calls of the function
+        critical=False
+            If True, the GUI will shut down the connection to the camera, and report a critical error
+        showall=False
+            If True, all function calls and error messages will be reported individually. If
+            only the last error message is shown, and individual calls are not reported
+        name=''
+            Give a descriptive name to your function, to be displayed along with error messages, if any
+        where=''
+            Give a source file/location info for debugging (should be done more automatically using
+            python's built-in functionality)
+
+        Returns
+        ^^^^^^^
+        A python function is returned, which can be connected to a Qt signal
+        """
+
+        def wrapper():
+            if not self.status.connected:
+                msg = "Camera is not connected. Failed to call '"
+                if name != "":
+                    msg += name
+                else:
+                    msg += '(no name provided)'
+                msg += "'"
+                if where != "":
+                    msg += " [" + where + "]"
+                self.showError(msg)
+                return
+
+            errors = []
+            success = False
+            ncalls = 0
+            for i in range(n):
+                if all:
+                    self.showMessage("Calling " + function.__qualname__)
+                e = function()
+                ncalls += 1
+                if e == "":
+                    success = True
+                    break
+                else:
+                    if all:
+                        self.showError(e)
+                        errors.append(e)
+                if n > 1:
+                    time.sleep(wait)
+            if not success:
+                msg = "Function " + function.__qualname__ + " failed " + str(n) + " times. ";
+                if not all:
+                    msg += "Last error: " + errors[len(errors)-1]
+                self.showError(msg)
+
+        return wrapper
+    
     def markFunctionlessControls(self):
         children = self.findChildren(QtWidgets.QWidget)
         for child in children:
@@ -244,7 +317,25 @@ class ApdcamGuiApp(QtWidgets.QApplication):
         self.window = ApdcamGui()
         self.exec()
 
+    def run(self):
+        self.exec()
+
+    
+
+        
 if __name__ == '__main__':
     app = ApdcamGuiApp()
 
+    def criticalDoBefore(func):
+        app.showMessage("Calling " + func.__qualname__)
         
+    def criticalDoAfter(func,err):
+        if type(err) is tuple:
+            err = err[0]
+        if err != "":
+            app.showError(err)
+
+    critical.doBefore = criticalDoBefore
+    critical.doAfter  = criticalDoAfter
+
+    app.run()

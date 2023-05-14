@@ -1,0 +1,1 @@
+APDCAM10G_control class has HV_conversion_in and HV_conversion_out, used at one place. In setHV method, however, HV_conversion is used, which is only set from the GUI.

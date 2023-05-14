@@ -535,48 +535,60 @@ class APDCAM10G_regCom:
         self.repeatNumber=5 # Number of times a read/write operation is repeated before an error is indicated
         self.CAMTIMER = APDCAM_timer()
         self.interface = None
+        self.log = lambda msg: print(msg)
         
     def connect(self,ip="10.123.13.102"):
-        """ Connect to the camera and start the answrer reading socket
-        Returns and error message or ""
+        """ Connect to the camera and start the answer reading socket
+        Returns an error message or ""
         """
         if (type(ip) is str):
             _ip = bytearray(ip,encoding='ASCII')
         elif(type(ip) is bytes):
             _ip = ip
         else:
-            raise ValueError("Invalid IP address for camera. Should be sting or bytearray.")
+            raise ValueError("Invalid IP address for camera. Should be string or bytearray.")
         self.APDCAM_IP = ip
-        err = APDCAM10G_regCom.startReceiveAnswer(self)
+
+        print("########### Check this here  ##################")
+        #err = APDCAM10G_regCom.startReceiveAnswer(self)
+        err = self.startReceiveAnswer()  # Changed by D. Barna
+
         if (err != "") :
             self.close()
             return "Error connecting to camera: "+err
-        err = APDCAM10G_regCom.readStatus(self,dataOnly=True)
+        #err = APDCAM10G_regCom.readStatus(self,dataOnly=True)
+        err = self.readStatus(dataOnly=True) # Changed by D. Barna
         if (err != ""):
             self.close()
             return "Error connecting to camera: "+err
         #Extracting camera information
         d = self.status.CC_settings 
         self.status.firmware = d[APDCAM10G_codes_v1.CC_REGISTER_FIRMWARE:APDCAM10G_codes_v1.CC_REGISTER_FIRMWARE+14]
+        self.log("Firmware: " + self.status.firmware)
         if (self.status.firmware[0:11] != b"BSF12-0001-"):
             err = "Unknown camera firmware."
             self.close()
             return err
         v = int(self.status.firmware[11:14])
+
+        self.log("Firmware version: " + v)
+
+        # Set up firmware-dependent command codes
         if (v < 105):
             self.versionCode = 0
         else:
             self.versionCode = 1        
         
         if (self.versionCode == 0) :
-            self.codes_CC = APDCAM10G_codes_v1()
+            self.codes_CC  = APDCAM10G_codes_v1()
             self.codes_ADC = APDCAM10G_ADCcodes_v1()
-            self.codes_PC = APDCAM_PCcodes_v1()
+            self.codes_PC  = APDCAM_PCcodes_v1()
         else:
-            self.codes_CC = APDCAM10G_codes_v2()
+            self.codes_CC  = APDCAM10G_codes_v2()
             self.codes_ADC = APDCAM10G_ADCcodes_v1()
-            self.codes_PC = APDCAM_PCcodes_v1()
-        
+            self.codes_PC  = APDCAM_PCcodes_v1()
+
+        # Check the available ADC boards
         self.status.ADC_address = []
         self.status.ADC_serial = []
         self.status.ADC_FPGA_version = []
@@ -589,6 +601,7 @@ class APDCAM10G_regCom:
         for i in range(len(check_address_list)):
             d = data[i]
             if ((d[0] & 0xf0) == 0x20) :
+                self.log("Found ADC board at address: " + check_address_list[i])
                 self.status.ADC_address.append(check_address_list[i])
                 self.status.ADC_serial.append(int.from_bytes(d[3:5],byteorder='little',signed=False))
                 self.status.ADC_FPGA_version.append(str(int.from_bytes([d[5]],'little',signed=False))+\
@@ -1808,31 +1821,26 @@ class APDCAM10G_regCom:
 
         Parameters
         ----------
-        n : int
-            The HV generator number (1...).
+        n : int   -- The HV generator number (1...).
 
         Returns
         -------
         err: string
-            
-        value: float
-            The HV in Volts
+        value: float  --  The HV in Volts
 
         """
         err = self.readStatus()
         if (err != ""):
             return err, None
         return err, self.status.HV_act[n - 1]
-        
+
     def setHV(self,n,value):
         """ Set a detector voltage
         
         Parameters
         ----------
-        n: int
-            The HV generator number (1...)
-        value: int or float
-            The HV value in Volts.
+        n: int  -- The HV generator number (1...)
+        value: int or float  --  The HV value in Volts.
         
         Returns
         ------------
@@ -1848,7 +1856,7 @@ class APDCAM10G_regCom:
                             arrayData=False
                             )
         return err
-    
+
     def enableHV(self):
         """
         Enables the HV for the detectors.
@@ -1885,22 +1893,25 @@ class APDCAM10G_regCom:
                             )
         return err
 
-    def HVOn(self,n):
+    def hvOnOff(self,n,on):
         """
-        Switches on one detector HV on.
+        Switches on detector HV on or off
 
         Parameters
-        ----------
+        ^^^^^^^^^^
         n : int
-            The HV generator number (1...)
+            The HV teneratlr number (1...)
+
+        on: bool
+            If true, switches the given generator on. If false, switches off
 
         Returns
-        -------
+        ^^^^^^^
         error: string
-               "" if no error, otherwise error message
-
+            Error message, or empty string if no error
         """
 
+        # Read the actual status (bit-coded)
         err, d = self.readPDI(self.codes_PC.PC_CARD,
                               self.codes_PC.PC_REG_HVON,
                               1,
@@ -1909,7 +1920,15 @@ class APDCAM10G_regCom:
         if (err != ""):
             return err
         d = d[0]
-        d = d | 2**(n-1)
+
+        if on:
+            # Set the bit corresponding to this 'n' to 1, leave others unaltered
+            d = d | 2**(n-1)
+        else:
+            # Set the bit corresponding to this 'n' to 0, leave others unaltered
+            d = d & (2**(n-1) ^ 0xff)
+
+        # Write back the bit-coded value to the camera
         err = self.writePDI(self.codes_PC.PC_CARD,
                             self.codes_PC.PC_REG_HVON,
                             d,
@@ -1918,38 +1937,7 @@ class APDCAM10G_regCom:
                             )
         return err
 
-    def HVOff(self,n):
-        """
-        Switches on one detector HV off.
 
-        Parameters
-        ----------
-        n : int
-            The HV generator number (1...)
-
-        Returns
-        -------
-        error: string
-               "" if no error, otherwise error message
-
-        """
-
-        err, d = self.readPDI(self.codes_PC.PC_CARD,
-                              self.codes_PC.PC_REG_HVON,
-                              1,
-                              arrayData=False
-                              )
-        if (err != ""):
-            return err
-        d = d[0]
-        d = d & (2**(n-1) ^ 0xff)
-        err = self.writePDI(self.codes_PC.PC_CARD,
-                            self.codes_PC.PC_REG_HVON,
-                            d,
-                            numberOfBytes=1,
-                            arrayData=False
-                            )
-        return err
     
     def setInternalTrigger(self,channel=None,enable=True,level=None,polarity=None):
         """
@@ -2470,6 +2458,29 @@ class APDCAM10G_regCom:
             port = int.from_bytes(d_port,'big',signed=False)
             print("Stream {:d}...octet:{:d}... IP:{:d}.{:d}.{:d}.{:d}...port:{:d}".format(i+1,octet,\
                   int(d_ip[0]),int(d_ip[1]),int(d_ip[2]),int(d_ip[3]),port))
+
+    def setHv(self,n,ds):
+        """
+        Set the high voltage of a given ADC board
+
+        Parameters:
+        ^^^^^^^^^^^
+        n   -- board number (0..3)
+        ds  -- voltage in volts
+        """
+        
+        try:
+            d = float(ds)
+        except ValueError:
+            d = 0
+        d = int(d/self.HV_conversion[n-1])
+
+        err = self.writePDI(self.codes_PC.PC_CARD,\
+                            self.codes_PC.PC_REG_HV1SET+(n-1)*2,\
+                            d,numberOfBytes=2,arrayData=False)
+        if (self.commErrorResponse(err) != ""):
+               return  
+
            
  # end of class APDCAM10G_regComm
 

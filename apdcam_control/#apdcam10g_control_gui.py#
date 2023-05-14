@@ -969,7 +969,6 @@ class APDCAM10G_GUI_class:
         for i in range(10) :
             if (self.GUI_status.APDCAM_reg == None):
                 self.GUI_status.APDCAM_reg = APDCAM10G_regCom()
-            legyen az _in _out az apdcam10_control-bol
             self.GUI_status.APDCAM_reg.HV_conversion = [0.12,0.12,0.12,0.12]
             self.APDCAM_comm_widg.config(text="Trying...{:d}".format(i+1),bg=APDCAM10G_GUI_class.TryColor)
             self.APDCAM_comm_widg.update_idletasks()
@@ -1050,56 +1049,51 @@ class APDCAM10G_GUI_class:
             else:
                 err = self.GUI_status.APDCAM_reg.setClock(APDCAM10G_regCom.CLK_INTERNAL)
          
-
-    # presumablyu the hv enable/disable functions are ipmlemented as well. Comment it here. 
-                
-    # These function have been implemented in APDCAM10G_control as well.                 
-    # def HV_onOff(self,n,on):
-    #     if (self.GUI_status.APDCAM_connected):
-    #         # acquire the HV on status in the variable 'd'
-    #         err, d = self.GUI_status.APDCAM_reg.readPDI(self.GUI_status.APDCAM_reg.codes_PC.PC_CARD,\
-    #                                                    self.GUI_status.APDCAM_reg.codes_PC.PC_REG_HVON,\
-    #                                                    1,arrayData=False)
-    #         if (self.commErrorResponse(err) != ""):
-    #             # return  
-    #             return  err # changed by D. Barna
-    #         d = d[0]
-    #         if (on != 0):
-    #            d = d | 2**(n-1)  # set bit #(n-1) to 1 in the HV status byte
-    #         else:
-    #            d = d & (2**(n-1) ^ 0xff) # set bit #(n-1) to 0 in the HV status byte
+            
+    def HV_onOff(self,n,on):
+        if (self.GUI_status.APDCAM_connected):
+            # acquire the HV on status in the variable 'd'
+            err, d = self.GUI_status.APDCAM_reg.readPDI(self.GUI_status.APDCAM_reg.codes_PC.PC_CARD,\
+                                                       self.GUI_status.APDCAM_reg.codes_PC.PC_REG_HVON,\
+                                                       1,arrayData=False)
+            if (self.commErrorResponse(err) != ""):
+                return  
+            d = d[0]
+            if (on != 0):
+               d = d | 2**(n-1)  # set bit #(n-1) to 1 in the HV status byte
+            else:
+               d = d & (2**(n-1) ^ 0xff) # set bit #(n-1) to 0 in the HV status byte
                
-    #         # write the HV status to the camera
-    #         err = self.GUI_status.APDCAM_reg.writePDI(self.GUI_status.APDCAM_reg.codes_PC.PC_CARD,\
-    #                                                  self.GUI_status.APDCAM_reg.codes_PC.PC_REG_HVON,\
-    #                                                  d,numberOfBytes=1,arrayData=False)
-    #         if (self.commErrorResponse(err) != ""):
-    #            #return       
-    #            return err # changed by D. Barna
+            # write the HV status to the camera
+            err = self.GUI_status.APDCAM_reg.writePDI(self.GUI_status.APDCAM_reg.codes_PC.PC_CARD,\
+                                                     self.GUI_status.APDCAM_reg.codes_PC.PC_REG_HVON,\
+                                                     d,numberOfBytes=1,arrayData=False)
+            if (self.commErrorResponse(err) != ""):
+               return      
         
-    # def hv1_on(self):
-    #     self.HV_onOff(1,1)
+    def hv1_on(self):
+        self.HV_onOff(1,1)
         
-    # def hv2_on(self):
-    #     self.HV_onOff(2,1)
+    def hv2_on(self):
+        self.HV_onOff(2,1)
 
-    # def hv3_on(self):
-    #     self.HV_onOff(3,1)
+    def hv3_on(self):
+        self.HV_onOff(3,1)
 
-    # def hv4_on(self):
-    #     self.HV_onOff(4,1)
+    def hv4_on(self):
+        self.HV_onOff(4,1)
         
-    # def hv1_off(self):
-    #     self.HV_onOff(1,0) 
+    def hv1_off(self):
+        self.HV_onOff(1,0) 
         
-    # def hv2_off(self):
-    #     self.HV_onOff(2,0)
+    def hv2_off(self):
+        self.HV_onOff(2,0)
     
-    # def hv3_off(self):
-    #     self.HV_onOff(3,0)
+    def hv3_off(self):
+        self.HV_onOff(3,0)
     
-    # def hv4_off(self):
-    #     self.HV_onOff(4,0)
+    def hv4_off(self):
+        self.HV_onOff(4,0)
         
     def hv_en_ds(self,enable):
         if (self.GUI_status.APDCAM_connected):

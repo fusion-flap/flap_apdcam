@@ -13,6 +13,7 @@ from GuiMode import *
 
 class Infrastructure(QtWidgets.QWidget):
     def __init__(self,parent):
+        self.gui = parent
         super(Infrastructure,self).__init__(parent)
         layout = QtWidgets.QHBoxLayout()
         self.setLayout(layout)
@@ -22,8 +23,9 @@ class Infrastructure(QtWidgets.QWidget):
 
         hv = QVGroupBox("HV settings")
         l1.addWidget(hv)
-        self.readHvStatus = QtWidgets.QPushButton("Read HV Status")
-        hv.addWidget(self.readHvStatus)
+        self.readHvStatusButton = QtWidgets.QPushButton("Read HV Status")
+        self.readHvStatusButton.clicked.connect(self.readHvStatus)
+        hv.addWidget(self.readHvStatusButton)
 
         l = QtWidgets.QHBoxLayout()
         hv.addLayout(l)
@@ -32,30 +34,39 @@ class Infrastructure(QtWidgets.QWidget):
         self.hvMax = [None]*4
         self.hvOn = [None]*4
         self.hvOff = [None]*4
+        self.hvGroup = [None]*4
         for i in range(4):
-            g = QGridGroupBox()
-            l.addWidget(g)
-            g.addWidget(QtWidgets.QLabel("HV"+str(i+1)+" set"),0,0)
-            self.hvSet[i] = QtWidgets.QLineEdit()
+            self.hvGroup[i] = QGridGroupBox()
+            l.addWidget(self.hvGroup[i])
+            self.hvGroup[i].addWidget(QtWidgets.QLabel("HV"+str(i+1)+" set"),0,0)
+            self.hvSet[i] = QDoubleEdit()
             self.hvSet[i].setMaximumWidth(40)
-            self.hvSet[i].setEnabled(False)
-            g.addWidget(self.hvSet[i],0,1)
-            g.addWidget(QtWidgets.QLabel("HV"+str(i+1)+" act."),1,0)
+
+            self.hvSet[i].returnPressed.connect(self.gui.call(lambda i=i: self.gui.camera.setHV(i+1,self.hvSet[i].value())))
+
+            self.hvGroup[i].addWidget(self.hvSet[i],0,1)
+            self.hvGroup[i].addWidget(QtWidgets.QLabel("HV"+str(i+1)+" act."),1,0)
             self.hvActual[i] = QtWidgets.QLineEdit()
             self.hvActual[i].setMaximumWidth(40)
             self.hvActual[i].setEnabled(False)
-            g.addWidget(self.hvActual[i],1,1)
-            g.addWidget(QtWidgets.QLabel("HV"+str(i+1)+" max."),2,0)
+            self.hvGroup[i].addWidget(self.hvActual[i],1,1)
+            self.hvGroup[i].addWidget(QtWidgets.QLabel("HV"+str(i+1)+" max."),2,0)
             self.hvMax[i] = QtWidgets.QLineEdit()
             self.hvMax[i].setMaximumWidth(40)
-            g.addWidget(self.hvMax[i],2,1)
+            self.hvGroup[i].addWidget(self.hvMax[i],2,1)
             ll = QtWidgets.QHBoxLayout()
-            g.addLayout(ll,3,0,1,2)
+            self.hvGroup[i].addLayout(ll,3,0,1,2)
             self.hvOn[i] = QtWidgets.QPushButton("ON" + str(i+1))
             self.hvOn[i].setStyleSheet("padding:4px;")
+            self.hvOn[i].clicked.connect(self.gui.call(lambda i=i: self.gui.camera.hvOnOff(i+1,True), \
+                                                       name="self.gui.camera.hvOnOff(" + str(i+1) + ",True)", \
+                                                       where=__file__))
             ll.addWidget(self.hvOn[i])
             self.hvOff[i] = QtWidgets.QPushButton("OFF" + str(i+1))
             self.hvOff[i].setStyleSheet("padding:4px;")
+            self.hvOff[i].clicked.connect(self.gui.call(lambda i=i: self.gui.camera.hvOnOff(i+1,False), \
+                                                        name="self.gui.camera.hvOnOff(" + str(i+1) + ",False)", \
+                                                        where=__file__))
             ll.addWidget(self.hvOff[i])
         l.addStretch(1)
 
@@ -129,30 +140,46 @@ class Infrastructure(QtWidgets.QWidget):
 
         self.readTempsButton = QtWidgets.QPushButton("Read temps")
         g.addWidget(self.readTempsButton,len(tmp),0)
-        self.readWeightsButton = QtWidgets.QPushButton("Read weights")
-        g.addWidget(self.readWeightsButton,len(tmp),1)
+
+#        self.readWeightsButton = QtWidgets.QPushButton("Read weights")
+#        g.addWidget(self.readWeightsButton,len(tmp),1)
         g.setRowStretch(g.rowCount(),1)
 
-        g = QGridGroupBox("Fan 1")
-        layout.addWidget(g)
-        self.fan1Mode = QtWidgets.QComboBox()
-        self.fan1Mode.addItem("Auto")
-        self.fan1Mode.addItem("Manual")
-        g.addWidget(self.fan1Mode,0,0,1,2)
-        g.addWidget(QtWidgets.QLabel("Speed"),1,0)
-        self.fan1Speed = QtWidgets.QLineEdit()
-        g.addWidget(self.fan1Speed,1,1)
-        g.addWidget(QtWidgets.QLabel("Diff"),2,0)
-        self.fan1Diff = QtWidgets.QLineEdit()
-        g.addWidget(self.fan1Diff,2,1)
-        g.addWidget(QtWidgets.QLabel("Ref"),3,0)
-        self.fan1Ref = QtWidgets.QLineEdit()
-        g.addWidget(self.fan1Ref,3,1)
-        g.addWidget(QtWidgets.QLabel("Ctrl"),4,0)
-        self.fan1Ctrl = QtWidgets.QLineEdit()
-        g.addWidget(self.fan1Ctrl,4,1)
+        # g = QGridGroupBox("Fan 1")
+        # layout.addWidget(g)
+        # self.fan1Mode = QtWidgets.QComboBox()
+        # self.fan1Mode.addItem("Auto")
+        # self.fan1Mode.addItem("Manual")
+        # g.addWidget(self.fan1Mode,0,0,1,2)
+        # g.addWidget(QtWidgets.QLabel("Speed"),1,0)
+        # self.fan1Speed = QtWidgets.QLineEdit()
+        # g.addWidget(self.fan1Speed,1,1)
+        # g.addWidget(QtWidgets.QLabel("Diff"),2,0)
+        # self.fan1Diff = QtWidgets.QLineEdit()
+        # g.addWidget(self.fan1Diff,2,1)
+        # g.addWidget(QtWidgets.QLabel("Ref"),3,0)
+        # self.fan1Ref = QtWidgets.QLineEdit()
+        # g.addWidget(self.fan1Ref,3,1)
+        # g.addWidget(QtWidgets.QLabel("Ctrl"),4,0)
+        # self.fan1Ctrl = QtWidgets.QLineEdit()
+        # g.addWidget(self.fan1Ctrl,4,1)
         
         g.setRowStretch(g.rowCount(),1)
 
-
         layout.addStretch(1)
+
+    def readHvStatus(self):
+        self.gui.showError("Infrastructure.readHvStatus not implemented yet")
+
+    def setHvGroups(self,n):
+        """
+        Set the number of HV groups, i.e.the number of ADC Boards.
+        Instead of dynamically adding/removing them, the GUI creates the maximally possible 4 groups,
+        and disables those which are not in the hardware
+        """
+        for i in range(4):
+            if i >= n:
+                self.hvGroup[i].setEnabled(False)
+            else:
+                self.hvGroup[i].setEnabled(True)
+

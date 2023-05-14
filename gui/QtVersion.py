@@ -1,5 +1,5 @@
 import importlib
-QtVersion = "PyQt6"
+QtVersion = "PyQt5"
 Qt = importlib.import_module(QtVersion+".QtCore")
 
 AlignCenter = Qt.Qt.AlignCenter if QtVersion == "PyQt5" else Qt.Qt.AlignmentFlag.AlignCenter

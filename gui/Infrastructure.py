@@ -58,12 +58,14 @@ class Infrastructure(QtWidgets.QWidget):
             self.hvGroup[i].addLayout(ll,3,0,1,2)
             self.hvOn[i] = QtWidgets.QPushButton("ON" + str(i+1))
             self.hvOn[i].setStyleSheet("padding:4px;")
+            self.hvOn[i].setToolTip("Switch HV generatlr #" + str(i+1) + " on")
             self.hvOn[i].clicked.connect(self.gui.call(lambda i=i: self.gui.camera.hvOnOff(i+1,True), \
                                                        name="self.gui.camera.hvOnOff(" + str(i+1) + ",True)", \
                                                        where=__file__))
             ll.addWidget(self.hvOn[i])
             self.hvOff[i] = QtWidgets.QPushButton("OFF" + str(i+1))
             self.hvOff[i].setStyleSheet("padding:4px;")
+            self.hvOn[i].setToolTip("Switch HV generatlr #" + str(i+1) + " off")
             self.hvOff[i].clicked.connect(self.gui.call(lambda i=i: self.gui.camera.hvOnOff(i+1,False), \
                                                         name="self.gui.camera.hvOnOff(" + str(i+1) + ",False)", \
                                                         where=__file__))
@@ -73,8 +75,12 @@ class Infrastructure(QtWidgets.QWidget):
         l = QtWidgets.QHBoxLayout()
         hv.addLayout(l)
         self.hvEnableButton = QtWidgets.QPushButton("HV Enable")
+        self.hvEnableButton.setToolTip("Enable high voltage")
+        self.hvEnableButton.clicked.connect(self.gui.call(lambda: self.gui.camera.enableHV(), name='self.gui.camera.enableHV()',where=__file__))
         l.addWidget(self.hvEnableButton)
         self.hvDisableButton = QtWidgets.QPushButton("HV Disable")
+        self.hvDisableButton.setToolTip("Disable high voltage")
+        self.hvDisableButton.clicked.connect(self.gui.call(lambda: self.gui.camera.enableHV(), name='self.gui.camera.disableHV()',where=__file__))
         l.addWidget(self.hvDisableButton)
         self.hvEnabledStatus = QtWidgets.QLabel("HV Disabled")
         l.addWidget(self.hvEnabledStatus)

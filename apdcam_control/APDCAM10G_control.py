@@ -1807,6 +1807,48 @@ class APDCAM10G_regCom:
         err = self.writePDI(self.codes_PC.PC_CARD,self.codes_PC.PC_REG_SHSTATE,value,numberOfBytes=1,arrayData=False)
         return err  
 
+    def setAdcChannelEnable(self,channel,state):
+        """
+        Enable/Disable a given ADC channel
+
+        Parameters
+        ^^^^^^^^^^
+        channel: int
+            Channel number (1..128)
+        state: bool
+            True: enable, False: disable
+
+        Returns
+        ^^^^^^^
+        Error message in string, empty string if no error
+        """
+
+        adc_no = ((channel-1)//32)  # 0..3
+        ch_no  = ((channel-1)% 32)  # 0..31
+
+        reg = 0 # The register address. There are 4 registers, each handling 8 channels (8 bits)
+        if ch_no//8 == 0:
+            reg = self.codes_ADC.ADC_CHENABLE1
+        if ch_no//8 == 1:
+            reg = self.codes_ADC.ADC_CHENABLE2
+        if ch_no//8 == 2:
+            reg = self.codes_ADC.ADC_CHENABLE3
+        if ch_no//8 == 3:
+            reg = self.codes_ADC.ADC_CHENABLE4
+
+        # Read 1 byte of data from the given register
+        d = self.readPDI(self.status.ADC_address[adc_no],reg,1,arrayData=False)
+
+        ch_no %= 8 # modulo 8, channel is in the range 0..7
+        # Bit 0 in the data is the last channel. My interpretation: LSB (bit 0) is channel 7 (?), MSB is channel 0
+        ch_no = 7-ch_no
+
+        if state:  # Enable the given channel
+            d |= 1<<ch_no
+        else:
+            d &= ~(1<<ch_no)
+
+        return self.writePDI(self.status.ADC_address[adc_board-1],reg,d,1,arrayData=False)
 
     def getCallight(self):
         """ Get the current calibration  light setting.
@@ -1857,16 +1899,24 @@ class APDCAM10G_regCom:
                             )
         return err
 
-    def enableHV(self):
+    def hvEnable(self,state):
         """
-        Enables the HV for the detectors.
+        Enables/Disables the HV for the detectors.
+
+        Parameters
+        ^^^^^^^^^^
+        state: bool
+            If True, enables all HV generators. Otherwise it disables
 
         Returns
-        -------
+        ^^^^^^^
         err : string
             error text or ""
         """
-        d = 0xAB
+        if state:
+            d = 0xAB
+        else:
+            d = 0
         err = self.writePDI(self.codes_PC.PC_CARD,
                             self.codes_PC.PC_REG_HVENABLE,
                             d,
@@ -1875,23 +1925,6 @@ class APDCAM10G_regCom:
                             )
         return err
 
-    def disableHV(self):
-        """
-        Disables the HV for the detectors.
-
-        Returns
-        -------
-        err : string
-            error text or ""
-        """
-        d = 0
-        err = self.writePDI(self.codes_PC.PC_CARD,
-                            self.codes_PC.PC_REG_HVENABLE,
-                            d,
-                            numberOfBytes=1,
-                            arrayData=False
-                            )
-        return err
 
     def hvOnOff(self,n,on):
         """
@@ -1938,7 +1971,6 @@ class APDCAM10G_regCom:
         return err
 
 
-    
     def setInternalTrigger(self,channel=None,enable=True,level=None,polarity=None):
         """
         Sets the internal trigger for one channel, but does not enable internal trigger globally.

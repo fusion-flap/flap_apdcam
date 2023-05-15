@@ -17,44 +17,61 @@ class Adc(QtWidgets.QWidget):
         return "ADC " + str(self.number)
 
     def channelOnOff(self,i,state):
-        if i >= 32 or i < 0:
-            return
-        self.channelOn[i].setChecked(state)
+        if i > 32 or i <= 0:
+            return "Channel index " + str(i) + " out of range"
+        self.channelOn[i-1].setChecked(state)
 
     def allChannelsOn(self):
         for i in range(32):
-            self.channelOnOff(i,True)
+            self.channelOnOff(i+1,True)
+
     def allChannelsOff(self):
         for i in range(32):
-            self.channelOnOff(i,False)
+            self.channelOnOff(i+1,False)
 
     def internalTriggerEnable(self,i,state):
-        if i >= 32 or i < 0:
-            return
-        self.internalTriggerEnabled[i].setChecked(state)
+        if i > 32 or i <= 0:
+            return "Channel index " + str(i) + " out of range"
+        self.internalTriggerEnabled[i-1].setChecked(state)
+
     def allInternalTriggersEnabled(self):
         for i in range(32):
-            self.internalTriggerEnable(i,True)
+            self.internalTriggerEnable(i+1,True)
+
     def allInternalTriggersDisabled(self):
         for i in range(32):
-            self.internalTriggerEnable(i,False)
+            self.internalTriggerEnable(i+1,False)
 
     def setInternalTriggerPositive(self,i,state):
-        if i >= 32 or i < 0:
-            return
-        self.internalTriggerPositive[i].setChecked(state)
+        if i > 32 or i <= 0:
+            return "Channel index " + str(i) + " out of range"
+        self.internalTriggerPositive[i-1].setChecked(state)
+        
     def allInternalTriggersPositive(self):
         for i in range(32):
-            self.setInternalTriggerPositive(i,True)
+            self.setInternalTriggerPositive(i+1,True)
+
     def allInternalTriggersNegative(self):
         for i in range(32):
-            self.setInternalTriggerPositive(i,False)
+            self.setInternalTriggerPositive(i+1,False)
 
     def allTriggerLevels(self,value):
         for i in range(32):
             self.internalTriggerLevel[i].setValue(value)
 
     def __init__(self,parent,number):
+        """
+        Constructor
+
+        Parameters
+        ^^^^^^^^^^
+        parent: widget
+            The parent widget
+        number: int
+            ADC board number (1..4)
+        """
+
+        self.gui = parent.gui
         super(Adc,self).__init__(parent)
         self.number = number
 
@@ -136,10 +153,16 @@ class Adc(QtWidgets.QWidget):
             l.setColumnMinimumWidth(col,1)
             for row in range(rows):
                 l.setRowMinimumHeight(row,1)
-                self.channelOn[row*cols+col] = QtWidgets.QCheckBox(str(row*cols+col+1))
-                self.channelOn[row*cols+col].setStyleSheet("padding: 0px; margin: 0px; margin-top:0px; margin-bottom:0px;")
-                self.channelOn[row*cols+col].setContentsMargins(0,0,0,0)
-                l.addWidget(self.channelOn[row*cols+col],row,col)
+                channel = row*cols+col+1
+                chk = QtWidgets.QCheckBox(str(channel))
+                chk.setStyleSheet("padding: 0px; margin: 0px; margin-top:0px; margin-bottom:0px;")
+                chk.setContentsMargins(0,0,0,0)
+                chk.stateChanged.connect(self.gui.call(lambda channel=(self.number-1)*32+channel,chk=chk: \
+                                                              self.gui.camera.setAdcChannelEnable(channel,chk.isChecked()), \
+                                                       name = "APDCAM10G_control.setAdcChannelEnable(" + str(self.number) + "," + str(channel) + ",state)"
+                                                       ))
+                self.channelOn[row*cols+col] = chk
+                l.addWidget(chk,row,col)
         l.setRowStretch(l.rowCount(),1)
         h = QtWidgets.QHBoxLayout()
         channelStatusGroup.addLayout(h)
@@ -281,29 +304,42 @@ class Adc(QtWidgets.QWidget):
                 c.setStyleSheet("padding-top:-5px; padding-bottom:-5px;")
                 grid.addWidget(c,row,col)
                 h1 = QtWidgets.QHBoxLayout()
-                label = QtWidgets.QLabel("<b>" + str(row*cols+col+1) + "</b>")
+                channel = row*cols+col+1
+                label = QtWidgets.QLabel("<b>" + str(channel) + "</b>")
                 label.setStyleSheet("background-color: rgba(0,0,0,0.2); padding-left:5px; padding-right:5px; padding-top:-1px; padding-bottom:-1px; margin:0px;")
                 label.setAlignment(AlignCenter)
                 h1.addWidget(label)
                 c.addLayout(h1)
-                self.internalTriggerEnabled[row*cols+col] = QtWidgets.QCheckBox("En.")
-                self.internalTriggerEnabled[row*cols+col].setStyleSheet("padding: 0px; margin: 0px; margin-top:0px; margin-bottom:0px;")
-                self.internalTriggerEnabled[row*cols+col].setContentsMargins(0,0,0,0)
-                h1.addWidget(self.internalTriggerEnabled[row*cols+col])
-                self.internalTriggerPositive[row*cols+col] = QtWidgets.QCheckBox("+")
-                self.internalTriggerPositive[row*cols+col].setStyleSheet("padding: 0px; margin: 0px; margin-top:0px; margin-bottom:0px;")
-                self.internalTriggerPositive[row*cols+col].setContentsMargins(0,0,0,0)
-                h1.addWidget(self.internalTriggerPositive[row*cols+col])
+                en = QtWidgets.QCheckBox("En.")
+                en.setStyleSheet("padding: 0px; margin: 0px; margin-top:0px; margin-bottom:0px;")
+                en.setContentsMargins(0,0,0,0)
+                self.internalTriggerEnabled[row*cols+col] = en
+                h1.addWidget(en)
 
-#                h2 = QtWidgets.QHBoxLayout()
-#                c.addLayout(h2)
-#                h1.addWidget(QtWidgets.QLabel("Lev:"))
-                self.internalTriggerLevel[row*cols+col] = QtWidgets.QSpinBox()
-                self.internalTriggerLevel[row*cols+col].setMinimum(0)
-                self.internalTriggerLevel[row*cols+col].setMaximum(65535)
-                self.internalTriggerLevel[row*cols+col].setStyleSheet("padding: 0px; margin: 0px; margin-top:0px; margin-bottom:0px;")
-                self.internalTriggerLevel[row*cols+col].setContentsMargins(0,0,0,0)
-                h1.addWidget(self.internalTriggerLevel[row*cols+col])
+                polarity = QtWidgets.QCheckBox("+")
+                polarity.setStyleSheet("padding: 0px; margin: 0px; margin-top:0px; margin-bottom:0px;")
+                polarity.setContentsMargins(0,0,0,0)
+                h1.addWidget(polarity)
+                self.internalTriggerPositive[row*cols+col] = polarity
+
+                level = QtWidgets.QSpinBox()
+                level.setMinimum(0)
+                level.setMaximum(65535)
+                level.setStyleSheet("padding: 0px; margin: 0px; margin-top:0px; margin-bottom:0px;")
+                level.setContentsMargins(0,0,0,0)
+                h1.addWidget(level)
+                self.internalTriggerLevel[row*cols+col] = level
+
+                func = self.gui.call(lambda channel=(self.number-1)*32+channel,en=en,polarity=polarity,level=level : \
+                                                      self.gui.camera.setInternalTrigger(channel,\
+                                                                                         en.isChecked(),\
+                                                                                         level.value(), \
+                                                                                         self.codes_ADC.INT_TRIG_POSITIVE if polarity.isChecked() else self.codes_ADC.INT_TRIG_NEGATIVE))
+                en.stateChanged.connect(func) # enabled changes
+                polarity.stateChanged.connect(func)  # polarity changes
+                level.valueChanged.connect(func)
+
+
 
         g = QVGroupBox("DAC")
         layout.addWidget(g)
@@ -329,6 +365,7 @@ class Adc(QtWidgets.QWidget):
 
 class AdcControl(QtWidgets.QWidget):
     def __init__(self,parent):
+        self.gui = parent
         super(AdcControl,self).__init__(parent)
         self.layout = QtWidgets.QVBoxLayout()
         self.setLayout(self.layout)

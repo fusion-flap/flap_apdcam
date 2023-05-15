@@ -41,8 +41,8 @@ class Infrastructure(QtWidgets.QWidget):
             self.hvGroup[i].addWidget(QtWidgets.QLabel("HV"+str(i+1)+" set"),0,0)
             self.hvSet[i] = QDoubleEdit()
             self.hvSet[i].setMaximumWidth(40)
-
             self.hvSet[i].returnPressed.connect(self.gui.call(lambda i=i: self.gui.camera.setHV(i+1,self.hvSet[i].value())))
+            self.hvSet[i].setToolTip("Set the voltage of HV generator #" + str(i+1) + ". The command takes effect when you press enter")
 
             self.hvGroup[i].addWidget(self.hvSet[i],0,1)
             self.hvGroup[i].addWidget(QtWidgets.QLabel("HV"+str(i+1)+" act."),1,0)
@@ -54,47 +54,68 @@ class Infrastructure(QtWidgets.QWidget):
             self.hvMax[i] = QtWidgets.QLineEdit()
             self.hvMax[i].setMaximumWidth(40)
             self.hvGroup[i].addWidget(self.hvMax[i],2,1)
-            ll = QtWidgets.QHBoxLayout()
-            self.hvGroup[i].addLayout(ll,3,0,1,2)
-            self.hvOn[i] = QtWidgets.QPushButton("ON" + str(i+1))
-            self.hvOn[i].setStyleSheet("padding:4px;")
-            self.hvOn[i].setToolTip("Switch HV generatlr #" + str(i+1) + " on")
-            self.hvOn[i].clicked.connect(self.gui.call(lambda i=i: self.gui.camera.hvOnOff(i+1,True), \
-                                                       name="self.gui.camera.hvOnOff(" + str(i+1) + ",True)", \
-                                                       where=__file__))
-            ll.addWidget(self.hvOn[i])
-            self.hvOff[i] = QtWidgets.QPushButton("OFF" + str(i+1))
-            self.hvOff[i].setStyleSheet("padding:4px;")
-            self.hvOn[i].setToolTip("Switch HV generatlr #" + str(i+1) + " off")
-            self.hvOff[i].clicked.connect(self.gui.call(lambda i=i: self.gui.camera.hvOnOff(i+1,False), \
-                                                        name="self.gui.camera.hvOnOff(" + str(i+1) + ",False)", \
-                                                        where=__file__))
-            ll.addWidget(self.hvOff[i])
+
+            self.hvOn[i] = QtWidgets.QCheckBox("HV #" + str(i+1) + " On")
+            self.hvOn[i].stateChanged.connect(self.gui.call(lambda i=i: self.gui.camera.hvOnOff(i+1,self.hvOn[i].isChecked()), \
+                                                            name="self.gui.camera.hvOnOff(i+1,self.hvOn[i].isChecked()())", \
+                                                            where=__file__))
+            self.hvGroup[i].addWidget(self.hvOn[i],3,0,1,2)
+
+
+            # ll = QtWidgets.QHBoxLayout()
+            # self.hvGroup[i].addLayout(ll,3,0,1,2)
+            # self.hvOn[i] = QtWidgets.QPushButton("ON" + str(i+1))
+            # self.hvOn[i].setStyleSheet("padding:4px;")
+            # self.hvOn[i].setToolTip("Switch HV generator #" + str(i+1) + " on")
+            # self.hvOn[i].clicked.connect(self.gui.call(lambda i=i: self.gui.camera.hvOnOff(i+1,True), \
+            #                                            name="self.gui.camera.hvOnOff(" + str(i+1) + ",True)", \
+            #                                            where=__file__))
+            # ll.addWidget(self.hvOn[i])
+            # self.hvOff[i] = QtWidgets.QPushButton("OFF" + str(i+1))
+            # self.hvOff[i].setStyleSheet("padding:4px;")
+            # self.hvOff[i].setToolTip("Switch HV generator #" + str(i+1) + " off")
+            # self.hvOff[i].clicked.connect(self.gui.call(lambda i=i: self.gui.camera.hvOnOff(i+1,False), \
+            #                                             name="self.gui.camera.hvOnOff(" + str(i+1) + ",False)", \
+            #                                             where=__file__))
+            # ll.addWidget(self.hvOff[i])
         l.addStretch(1)
 
-        l = QtWidgets.QHBoxLayout()
-        hv.addLayout(l)
-        self.hvEnableButton = QtWidgets.QPushButton("HV Enable")
-        self.hvEnableButton.setToolTip("Enable high voltage")
-        self.hvEnableButton.clicked.connect(self.gui.call(lambda: self.gui.camera.enableHV(), name='self.gui.camera.enableHV()',where=__file__))
-        l.addWidget(self.hvEnableButton)
-        self.hvDisableButton = QtWidgets.QPushButton("HV Disable")
-        self.hvDisableButton.setToolTip("Disable high voltage")
-        self.hvDisableButton.clicked.connect(self.gui.call(lambda: self.gui.camera.enableHV(), name='self.gui.camera.disableHV()',where=__file__))
-        l.addWidget(self.hvDisableButton)
-        self.hvEnabledStatus = QtWidgets.QLabel("HV Disabled")
-        l.addWidget(self.hvEnabledStatus)
-        l.addStretch(1)
+        self.hvEnabled = QtWidgets.QCheckBox("HV enabled")
+        self.hvEnabled.setToolTip("Enable the high-voltage for all generators")
+        self.hvEnabled.stateChanged.connect(self.gui.call(lambda: self.gui.camera.hvEnable(self.hvEnabled.isChecked())))
+
+        hv.addWidget(self.hvEnabled)
+        
+        # l = QtWidgets.QHBoxLayout()
+        # hv.addLayout(l)
+        # self.hvEnableButton = QtWidgets.QPushButton("HV Enable")
+        # self.hvEnableButton.setToolTip("Enable high voltage")
+        # self.hvEnableButton.clicked.connect(self.gui.call(lambda: self.gui.camera.enableHV(), name='self.gui.camera.enableHV()',where=__file__))
+        # l.addWidget(self.hvEnableButton)
+        # self.hvDisableButton = QtWidgets.QPushButton("HV Disable")
+        # self.hvDisableButton.setToolTip("Disable high voltage")
+        # self.hvDisableButton.clicked.connect(self.gui.call(lambda: self.gui.camera.enableHV(), name='self.gui.camera.disableHV()',where=__file__))
+        # l.addWidget(self.hvDisableButton)
+        # self.hvEnabledStatus = QtWidgets.QLabel("HV Disabled")
+        # l.addWidget(self.hvEnabledStatus)
+        # l.addStretch(1)
 
         shutter = QHGroupBox("Shutter control")
         l1.addWidget(shutter)
-        self.shutterOpenButton = QtWidgets.QPushButton("Open")
-        shutter.addWidget(self.shutterOpenButton)
-        self.shutterCloseButton = QtWidgets.QPushButton("Close")
-        shutter.addWidget(self.shutterCloseButton)
-        self.shutterExternalControl = QtWidgets.QCheckBox()
-        self.shutterExternalControl.setText("External control")
+
+        # self.shutterOpenButton = QtWidgets.QPushButton("Open")
+        # shutter.addWidget(self.shutterOpenButton)
+        # self.shutterCloseButton = QtWidgets.QPushButton("Close")
+        # shutter.addWidget(self.shutterCloseButton)
+
+        self.shutterOpen = QtWidgets.QCheckBox("Shutter open")
+        self.shutterOpen.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setShutter(self.shutterOpen.isChecked())))
+        self.shutterOpen.setToolTip("Open/close the shutter")
+        shutter.addWidget(self.shutterOpen)
+
+        self.shutterExternalControl = QtWidgets.QCheckBox("External control")
         shutter.addWidget(self.shutterExternalControl)
+
         shutter.addStretch(1)
 
         calib = QHGroupBox("Calibration light control")
@@ -113,10 +134,13 @@ class Infrastructure(QtWidgets.QWidget):
         self.pcError.setReadOnly(True)
         l.addWidget(self.pcError)
 
+        l1.addStretch(1)
+
         self.controlFactoryResetButton = QtWidgets.QPushButton("Control factory reset")
         self.controlFactoryResetButton.guiMode = GuiMode.factory
         l1.addWidget(self.controlFactoryResetButton)
         
+        l1.addStretch(2)
 
         g = QGridGroupBox("Temperatures")
         layout.addWidget(g)
@@ -138,11 +162,16 @@ class Infrastructure(QtWidgets.QWidget):
             ["Power panel 2","tempPowerPanel2"]]
 
         for i in range(len(tmp)):
-            g.addWidget(QtWidgets.QLabel(tmp[i][0]),i,0)
+            row = i
+            col = 0
+            if i > 7:
+                row -= 8
+                col = 2
+            g.addWidget(QtWidgets.QLabel(tmp[i][0]),row,col)
             t = QtWidgets.QLineEdit()
             setattr(self,tmp[i][1],t)
             t.setEnabled(False)
-            g.addWidget(t,i,1)
+            g.addWidget(t,row,col+1)
 
         self.readTempsButton = QtWidgets.QPushButton("Read temps")
         g.addWidget(self.readTempsButton,len(tmp),0)

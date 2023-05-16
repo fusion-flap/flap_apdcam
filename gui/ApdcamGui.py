@@ -157,6 +157,28 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.show()
         self.setGuiMode(GuiMode.expert)
 
+    def beforeBackendCall(self,*,name="",where=""):
+        if not self.status.connected:
+            msg = "Camera is not connected. Failed to call '"
+            if name != "":
+                msg += name
+            else:
+                msg += '(no name provided)'
+            msg += "'"
+            if where != "":
+                msg += " [" + where + "]"
+            self.showError(msg)
+            return False
+        return True
+
+    def afterBackendCall(self,success,errors,*,n=1,name='no name given',showall=False):
+        if not success:
+            msg = "Function '" + name + "' failed " + str(n) + " times. ";
+            if not showall:
+                msg += "Last error: " + errors[len(errors)-1]
+            self.showError(msg)
+
+
     def call(self,function,*,n=1,wait=1,critial=False,showall=False,name='',where=''):
         """
         Creates a callable proxy object running the given function, to be used as push-button or other widget actions.
@@ -189,47 +211,50 @@ class ApdcamGui(QtWidgets.QMainWindow):
         """
 
         def wrapper():
-            if not self.status.connected:
-                msg = "Camera is not connected. Failed to call '"
-                if name != "":
-                    msg += name
-                else:
-                    msg += '(no name provided)'
-                msg += "'"
-                if where != "":
-                    msg += " [" + where + "]"
-                self.showError(msg)
+            if not self.beforeBackendCall(name=name,where=where):
                 return
 
             errors = []
             success = False
             ncalls = 0
             for i in range(n):
-                if all:
+                if showall:
                     self.showMessage("Calling " + function.__qualname__)
                 e = function()
+
+                if not isinstance(e,str):
+                    e = "Returned value from function is not an error string: '" + str(e) + "'"
+
                 ncalls += 1
                 if e == "":
                     success = True
                     break
                 else:
-                    if all:
+                    if showall:
                         self.showError(e)
-                        errors.append(e)
+                    errors.append(e)
                 if n > 1:
                     time.sleep(wait)
-            if not success:
-                msg = "Function " + function.__qualname__ + " failed " + str(n) + " times. ";
-                if not all:
-                    msg += "Last error: " + errors[len(errors)-1]
-                self.showError(msg)
+
+            print("Success: ")
+            print(success)
+            print("Errors: ")
+            print(errors)
+
+            self.afterBackendCall(success,errors,n=n,name=name,showall=showall)
 
         return wrapper
     
     def markFunctionlessControls(self):
         children = self.findChildren(QtWidgets.QWidget)
         for child in children:
-            if isinstance(child,QtWidgets.QPushButton) or isinstance(child,QtWidgets.QLineEdit) or isinstance(child,QtWidgets.QSpinBox) or isinstance(child,QDoubleEdit) or isinstance(child,QIntEdit) or isinstance(child,QtWidgets.QCheckBox) or isinstance(child,QtWidgets.QComboBox):
+            if isinstance(child,QtWidgets.QPushButton) or \
+               isinstance(child,QtWidgets.QLineEdit) or \
+               isinstance(child,QtWidgets.QSpinBox) or \
+               isinstance(child,QDoubleEdit) or \
+               isinstance(child,QIntEdit) or \
+               isinstance(child,QtWidgets.QCheckBox) or \
+               isinstance(child,QtWidgets.QComboBox):
                 if child.toolTip() == "":
                     child.setStyleSheet("background-color: red")
 

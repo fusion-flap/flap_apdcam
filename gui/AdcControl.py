@@ -1,4 +1,5 @@
 import sys
+from functools import partial
 
 import importlib
 from QtVersion import *
@@ -157,8 +158,9 @@ class Adc(QtWidgets.QWidget):
                 chk = QtWidgets.QCheckBox(str(channel))
                 chk.setStyleSheet("padding: 0px; margin: 0px; margin-top:0px; margin-bottom:0px;")
                 chk.setContentsMargins(0,0,0,0)
-                chk.stateChanged.connect(self.gui.call(lambda channel=(self.number-1)*32+channel,chk=chk: \
-                                                              self.gui.camera.setAdcChannelEnable(channel,chk.isChecked()), \
+                chk.stateChanged.connect(self.gui.call(partial(lambda channel,checkbox: self.gui.camera.setAdcChannelEnable(channel,checkbox.isChecked()),\
+                                                               (self.number-1)*32+channel,\
+                                                               chk), \
                                                        name = "APDCAM10G_control.setAdcChannelEnable(" + str(self.number) + "," + str(channel) + ",state)"
                                                        ))
                 self.channelOn[row*cols+col] = chk
@@ -330,11 +332,11 @@ class Adc(QtWidgets.QWidget):
                 h1.addWidget(level)
                 self.internalTriggerLevel[row*cols+col] = level
 
-                func = self.gui.call(lambda channel=(self.number-1)*32+channel,en=en,polarity=polarity,level=level : \
-                                                      self.gui.camera.setInternalTrigger(channel,\
-                                                                                         en.isChecked(),\
-                                                                                         level.value(), \
-                                                                                         self.codes_ADC.INT_TRIG_POSITIVE if polarity.isChecked() else self.codes_ADC.INT_TRIG_NEGATIVE))
+                func = self.gui.call(partial(lambda channel,en,polarity,level : self.gui.camera.setInternalTrigger(channel,\
+                                                                                                                   en.isChecked(),\
+                                                                                                                   level.value(), \
+                                                                                                                   self.codes_ADC.INT_TRIG_POSITIVE if polarity.isChecked() else self.codes_ADC.INT_TRIG_NEGATIVE),
+                                             (self.number-1)*32+channel,en,polarity,level))
                 en.stateChanged.connect(func) # enabled changes
                 polarity.stateChanged.connect(func)  # polarity changes
                 level.valueChanged.connect(func)
@@ -348,7 +350,11 @@ class Adc(QtWidgets.QWidget):
         h.setSpacing(0)
         self.dac = [None]*32
         for i in range(32):
-            self.dac[i] = QIntEdit(0,65535)
+            #self.dac[i] = QIntEdit(0,65535)
+            self.dac[i] = QtWidgets.QSpinBox()
+            self.dac[i].setMinimum(0)
+            self.dac[i].setMaximum(65535)
+            self.dac[i].setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
             self.dac[i].setMaximumWidth(54)
             h.addWidget(self.dac[i])
         h.addStretch(1)
@@ -356,6 +362,7 @@ class Adc(QtWidgets.QWidget):
         h = QtWidgets.QHBoxLayout()
         g.addLayout(h)
         self.setAllDacButton = QtWidgets.QPushButton("Set all values")
+        self.setAllDacButton.clicked.connect(lambda: [self.dac[i].setValue(self.allDacValues.value()) for i in range(32)])
         h.addWidget(self.setAllDacButton)
         self.allDacValues = QtWidgets.QSpinBox()
         self.allDacValues.setMinimum(0)

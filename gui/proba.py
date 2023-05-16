@@ -1,13 +1,19 @@
+from functools import partial
 
 class A:
     def __init__(self):
-        class B:
-            pass
-        self.a = B()
-        self.a.a = 1
-        self.a.b  ="egy"
+        self.value = 1
+
+    def f(self,arg):
+        print(self.value)
+        print(arg)
+        print("")
 
 
 a = A()
-print(a.a.a)
-print(a.a.b)
+a.value = 2
+b = A()
+b.value = 10
+
+f = partial(a.f,123)
+f()

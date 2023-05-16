@@ -74,15 +74,19 @@ class QGridGroupBox(QtWidgets.QGroupBox):
 class QDoubleEdit(QtWidgets.QLineEdit):
     def __init__(self,min=None,max=None):
         super(QDoubleEdit,self).__init__()
-        #self.setMaximumWidth(60)
-        validator = QtGui.QDoubleValidator()
+        self.validator = QtGui.QDoubleValidator()
         if not min is None:
-            validator.setBottom(min)
+            self.validator.setBottom(min)
         if not max is None:
-            validator.setTop(max)
-        self.setValidator(validator)
+            self.validator.setTop(max)
+        self.setValidator(self.validator)
+        
     def value(self):
         return float(text())
+    def setMinimum(self,v):
+        self.validator.setBottom(v)
+    def setMaximum(self,v):
+        self.validator.setTop(v)
 
 class QIntEdit(QtWidgets.QLineEdit):
     def __init__(self,min=None,max=None):

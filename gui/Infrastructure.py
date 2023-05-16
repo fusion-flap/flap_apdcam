@@ -1,4 +1,5 @@
 import sys
+from functools import partial
 
 import importlib
 from QtVersion import QtVersion
@@ -38,46 +39,43 @@ class Infrastructure(QtWidgets.QWidget):
         for i in range(4):
             self.hvGroup[i] = QGridGroupBox()
             l.addWidget(self.hvGroup[i])
-            self.hvGroup[i].addWidget(QtWidgets.QLabel("HV"+str(i+1)+" set"),0,0)
-            self.hvSet[i] = QDoubleEdit()
-            self.hvSet[i].setMaximumWidth(40)
-            self.hvSet[i].returnPressed.connect(self.gui.call(lambda i=i: self.gui.camera.setHV(i+1,self.hvSet[i].value())))
-            self.hvSet[i].setToolTip("Set the voltage of HV generator #" + str(i+1) + ". The command takes effect when you press enter")
 
+            self.hvGroup[i].addWidget(QtWidgets.QLabel("HV"+str(i+1)+" set"),0,0)
+            self.hvSet[i] = QtWidgets.QDoubleSpinBox()
+            self.hvSet[i].setMinimum(0)
+            self.hvSet[i].setMaximum(4095*self.gui.camera.HV_conversion[i])
+            self.hvSet[i].valueChanged.connect(self.gui.call(partial(lambda i:self.gui.camera.setHV(i+1,self.hvSet[i].value()),i)))
+            self.hvSet[i].setToolTip("Set the voltage of HV generator #" + str(i+1) + ". The command takes effect immediately when the value is changed.")
             self.hvGroup[i].addWidget(self.hvSet[i],0,1)
+
             self.hvGroup[i].addWidget(QtWidgets.QLabel("HV"+str(i+1)+" act."),1,0)
             self.hvActual[i] = QtWidgets.QLineEdit()
             self.hvActual[i].setMaximumWidth(40)
             self.hvActual[i].setEnabled(False)
             self.hvGroup[i].addWidget(self.hvActual[i],1,1)
-            self.hvGroup[i].addWidget(QtWidgets.QLabel("HV"+str(i+1)+" max."),2,0)
-            self.hvMax[i] = QtWidgets.QLineEdit()
-            self.hvMax[i].setMaximumWidth(40)
+
+            #self.hvGroup[i].addWidget(QtWidgets.QLabel("HV"+str(i+1)+" max."),2,0)
+
+            setMaxButton = QtWidgets.QPushButton("Set max.")
+            setMaxButton.guiMode = GuiMode.factory
+            setMaxButton.setToolTip("Set the maximum in the camera hardware, and apply it to the above numerical input")
+            self.hvGroup[i].addWidget(setMaxButton,2,0)
+
+            self.hvMax[i] = QtWidgets.QDoubleSpinBox()
+            self.hvMax[i].setMinimum(0)
+            self.hvMax[i].setMaximum(4095*self.gui.camera.HV_conversion[i])
+            self.hvMax[i].setToolTip("Maximum value for the high voltage of a detector")
+            self.hvMax[i].guiMode = GuiMode.factory
             self.hvGroup[i].addWidget(self.hvMax[i],2,1)
+            setMaxButton.clicked.connect(partial(self.setHvMax,i+1))
 
             self.hvOn[i] = QtWidgets.QCheckBox("HV #" + str(i+1) + " On")
-            self.hvOn[i].stateChanged.connect(self.gui.call(lambda i=i: self.gui.camera.hvOnOff(i+1,self.hvOn[i].isChecked()), \
+            self.hvOn[i].stateChanged.connect(self.gui.call(partial(lambda i: self.gui.camera.hvOnOff(i+1,self.hvOn[i].isChecked()),i), \
                                                             name="self.gui.camera.hvOnOff(i+1,self.hvOn[i].isChecked()())", \
                                                             where=__file__))
+            self.hvOn[i].setToolTip("Switch on this HV generator")
             self.hvGroup[i].addWidget(self.hvOn[i],3,0,1,2)
 
-
-            # ll = QtWidgets.QHBoxLayout()
-            # self.hvGroup[i].addLayout(ll,3,0,1,2)
-            # self.hvOn[i] = QtWidgets.QPushButton("ON" + str(i+1))
-            # self.hvOn[i].setStyleSheet("padding:4px;")
-            # self.hvOn[i].setToolTip("Switch HV generator #" + str(i+1) + " on")
-            # self.hvOn[i].clicked.connect(self.gui.call(lambda i=i: self.gui.camera.hvOnOff(i+1,True), \
-            #                                            name="self.gui.camera.hvOnOff(" + str(i+1) + ",True)", \
-            #                                            where=__file__))
-            # ll.addWidget(self.hvOn[i])
-            # self.hvOff[i] = QtWidgets.QPushButton("OFF" + str(i+1))
-            # self.hvOff[i].setStyleSheet("padding:4px;")
-            # self.hvOff[i].setToolTip("Switch HV generator #" + str(i+1) + " off")
-            # self.hvOff[i].clicked.connect(self.gui.call(lambda i=i: self.gui.camera.hvOnOff(i+1,False), \
-            #                                             name="self.gui.camera.hvOnOff(" + str(i+1) + ",False)", \
-            #                                             where=__file__))
-            # ll.addWidget(self.hvOff[i])
         l.addStretch(1)
 
         self.hvEnabled = QtWidgets.QCheckBox("HV enabled")
@@ -86,35 +84,19 @@ class Infrastructure(QtWidgets.QWidget):
 
         hv.addWidget(self.hvEnabled)
         
-        # l = QtWidgets.QHBoxLayout()
-        # hv.addLayout(l)
-        # self.hvEnableButton = QtWidgets.QPushButton("HV Enable")
-        # self.hvEnableButton.setToolTip("Enable high voltage")
-        # self.hvEnableButton.clicked.connect(self.gui.call(lambda: self.gui.camera.enableHV(), name='self.gui.camera.enableHV()',where=__file__))
-        # l.addWidget(self.hvEnableButton)
-        # self.hvDisableButton = QtWidgets.QPushButton("HV Disable")
-        # self.hvDisableButton.setToolTip("Disable high voltage")
-        # self.hvDisableButton.clicked.connect(self.gui.call(lambda: self.gui.camera.enableHV(), name='self.gui.camera.disableHV()',where=__file__))
-        # l.addWidget(self.hvDisableButton)
-        # self.hvEnabledStatus = QtWidgets.QLabel("HV Disabled")
-        # l.addWidget(self.hvEnabledStatus)
-        # l.addStretch(1)
 
         shutter = QHGroupBox("Shutter control")
         l1.addWidget(shutter)
 
-        # self.shutterOpenButton = QtWidgets.QPushButton("Open")
-        # shutter.addWidget(self.shutterOpenButton)
-        # self.shutterCloseButton = QtWidgets.QPushButton("Close")
-        # shutter.addWidget(self.shutterCloseButton)
-
         self.shutterOpen = QtWidgets.QCheckBox("Shutter open")
-        self.shutterOpen.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setShutter(self.shutterOpen.isChecked())))
+        self.shutterOpen.stateChanged.connect(self.gui.call(lambda: self.gui.camera.shutterOpen(self.shutterOpen.isChecked())))
         self.shutterOpen.setToolTip("Open/close the shutter")
         shutter.addWidget(self.shutterOpen)
 
-        self.shutterExternalControl = QtWidgets.QCheckBox("External control")
-        shutter.addWidget(self.shutterExternalControl)
+        self.shutterMode = QtWidgets.QCheckBox("External control")
+        self.shutterMode.stateChanged.connect(lambda: self.setShutterMode(self.shutterMode.isChecked()))
+        self.shutterMode.setToolTip("If checked, shutter is driven by the state of 'shutter control input'. If unchecked (manual), the 'Open shutter' control to the left is driving the shutter")
+        shutter.addWidget(self.shutterMode)
 
         shutter.addStretch(1)
 
@@ -124,6 +106,10 @@ class Infrastructure(QtWidgets.QWidget):
         self.calibrationLightIntensity = QtWidgets.QSpinBox()
         self.calibrationLightIntensity.setMinimum(0)
         self.calibrationLightIntensity.setMaximum(4095)
+        self.calibrationLightIntensity.valueChanged.connect(self.gui.call(lambda: self.gui.camera.setCallight(self.calibrationLightIntensity.value()),\
+                                                                          name="APDCAM10G_control.setCallight(...)",\
+                                                                          where=__file__))
+        self.calibrationLightIntensity.setToolTip("Set the current of the calibration LED. 0 is complete darkness, maximum value is 4096")
         calib.addWidget(self.calibrationLightIntensity)
         calib.addStretch(1)
 
@@ -202,6 +188,57 @@ class Infrastructure(QtWidgets.QWidget):
         g.setRowStretch(g.rowCount(),1)
 
         layout.addStretch(1)
+
+    def setHvMax(self,n):
+        """
+        Sets the maximum value of the high voltage for a detector both on the hardware, and in the gui.
+        The maximum value is taken from the corresponding GUI entry.
+
+        Parameters
+        ^^^^^^^^^^
+        n: int
+            HV generator number (1..4)
+        """
+
+        value = self.hvMax[n-1].value()
+
+        # First, apply it to the HV input field
+        self.hvSet[n-1].setMaximum(value)
+
+        # Then make standard checks before calling the hardware function
+        if not self.gui.beforeBackendCall(name="setHvMax(" + str(n) + ")",where=__file__):
+            return
+
+        # call the hardware function
+        err = self.gui.camera.setHVMax(n,value)
+
+        # Then report errors
+        self.gui.afterBackendCall(True if err=="" else False, [err],name="self.gui.camera.setHVMax(" + str(n) + "," + str(value) + ")")
+
+    def setShutterMode(self,mode):
+        """
+        Set the shutter mode. Disables the "Open" checkbox if mode is External (1)
+
+        Parameters
+        ^^^^^^^^^^
+        mode: int
+            0 - Manual, the 'Open' manual control checkbox is enabled
+            1 - External, 'Open' manual control checkbox is disabled
+
+        """
+
+        # External mode
+        if mode:
+            self.shutterOpen.setEnabled(False)
+        else:
+            self.shutterOpen.setEnabled(True)
+        
+        if not self.gui.beforeBackendCall(name="setShutterMode(" + str(mode) + ")",where=__file__):
+            return
+
+        err = self.gui.camera.shutterMode(mode)
+
+        self.gui.afterBackendCall(True if err=="" else False, [err],name="self.gui.camera.shutterMode(" + str(mode) + ")")
 
     def readHvStatus(self):
         self.gui.showError("Infrastructure.readHvStatus not implemented yet")

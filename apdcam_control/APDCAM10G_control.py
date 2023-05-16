@@ -350,10 +350,14 @@ class APDCAM_PCcodes_v1 :
     PC_REG_FW_VERSION = 0x0002
     PC_REG_HV1SET = 0x56
     PC_REG_HV2SET = 0x58
+    PC_REG_HV3SET = 0x5A
+    PC_REG_HV4SET = 0x5C
     PC_REG_HV1MON = 0x04
     PC_REG_HV2MON = 0x06
     PC_REG_HV1MAX = 0x102
     PC_REG_HV2MAX = 0x104
+    PC_REG_HV3MAX = 0x106
+    PC_REG_HV4MAX = 0x108
     PC_REG_HVENABLE = 0x60
     PC_REG_HVON = 0x5E
     PC_REG_SHSTATE = 0x82
@@ -529,8 +533,9 @@ class APDCAM10G_regCom:
         self.status = APDCAM10G_status()
         self.measurePara = measurePara_class()
         self.versionCode = None;  # code for firmware type 0: before 105, 1: from 105
-        self.HV_conversion_out = [0.12, 0.12, 0.12, 0.12] # V/digit
-        self.HV_conversion_in = [0.12, 0.12, 0.12, 0.12] # V/digit
+#        self.HV_conversion_out = [0.12, 0.12, 0.12, 0.12] # V/digit   # Removed by D. Barna
+#        self.HV_conversion_in  = [0.12, 0.12, 0.12, 0.12] # V/digit   # Removed by D. Barna
+        self.HV_conversion  = [0.12, 0.12, 0.12, 0.12] # V/digit       # Added by D. Barna
         self.lock = threading.RLock()
         self.repeatNumber=5 # Number of times a read/write operation is repeated before an error is indicated
         self.CAMTIMER = APDCAM_timer()
@@ -850,7 +855,8 @@ class APDCAM10G_regCom:
             return err
         d = data[0]
         for i in range(4):
-            self.status.HV_set[i] = (d[0+i*2]+d[1+i*2]*255)*self.HV_conversion_out[i]
+            #self.status.HV_set[i] = (d[0+i*2]+d[1+i*2]*255)*self.HV_conversion_out[i]   # Replacedby D. Barna
+            self.status.HV_set[i] = (d[0+i*2]+d[1+i*2]*255)*self.HV_conversion[i]
         d = data[2]
         for i in range(16):
             self.status.temps[i] = (d[0+i*2]+d[1+i*2]*255)*0.1
@@ -858,7 +864,8 @@ class APDCAM10G_regCom:
 
         d = data[1]
         for i in range(4):
-            self.status.HV_act[i] = (d[0+i*2]+d[1+i*2]*255)*self.HV_conversion_in[i]          
+            #self.status.HV_act[i] = (d[0+i*2]+d[1+i*2]*255)*self.HV_conversion_in[i]     # Replaced by D. Barna
+            self.status.HV_act[i] = (d[0+i*2]+d[1+i*2]*255)*self.HV_conversion[i]   
         if (HV_repeat > 1):
             for i in range(HV_repeat-1):  
                 err, data = APDCAM10G_regCom.readPDI(self,self.codes_PC.PC_CARD,self.codes_PC.PC_REG_HV1MON,8,arrayData=True)
@@ -866,7 +873,8 @@ class APDCAM10G_regCom:
                     return err
                 d = data[0]
                 for j in range(4):
-                    self.status.HV_act[j]  += (d[0+j*2]+d[1+j*2]*255)*self.HV_conversion_in[j]   
+                    #self.status.HV_act[j]  += (d[0+j*2]+d[1+j*2]*255)*self.HV_conversion_in[j]   # Replaced by D. Barna
+                    self.status.HV_act[j]  += (d[0+j*2]+d[1+j*2]*255)*self.HV_conversion[j]
             for j in range(4):
                 self.status.HV_act[j] /= HV_repeat        
         return ""
@@ -1730,9 +1738,21 @@ class APDCAM10G_regCom:
         return err  
     
     def setCallight(self,value):
-        """ Set the calibration light.
+        """
+        Set the calibration light.
+
+        Parameters
+        ^^^^^^^^^^
+        value: int
+            Light intensity. 0 is complete dark, maximum is 4095
+
         """    
+        if value > 4095:
+            value = 4095
+        if value < 0:
+            value = 0
         err = self.writePDI(self.codes_PC.PC_CARD,self.codes_PC.PC_REG_CALLIGHT,value,numberOfBytes=2,arrayData=False)
+
         return err  
 
     def setAnalogPower(self,value):
@@ -1788,9 +1808,10 @@ class APDCAM10G_regCom:
         else:
             return "", 1
 
-    def setShutter(self,value):
+    def shutterOpen(self,value):
         """
-        Set the shutter state.        
+        Set the shutter state. This function does not check whether shutter mode is manual (i.e. when
+        the user can use this function to control the shutter)!
 
         Parameters
         ----------
@@ -1807,6 +1828,26 @@ class APDCAM10G_regCom:
         err = self.writePDI(self.codes_PC.PC_CARD,self.codes_PC.PC_REG_SHSTATE,value,numberOfBytes=1,arrayData=False)
         return err  
 
+    def shutterMode(self,value):
+        """
+        Set the shutter mode.
+
+        Parameters
+        ----------
+        value : int
+            0: Manual, open/close is done by shutterOpen
+            1: External
+
+        Returns
+        -------
+        err : string
+            "" or error text.
+        """
+        
+        err = self.writePDI(self.codes_PC.PC_CARD,self.codes_PC.PC_REG_SHMODE,value,numberOfBytes=1,arrayData=False)
+        return err  
+
+    
     def setAdcChannelEnable(self,channel,state):
         """
         Enable/Disable a given ADC channel
@@ -1877,11 +1918,37 @@ class APDCAM10G_regCom:
         return err, self.status.HV_act[n - 1]
 
     def setHV(self,n,value):
-        """ Set a detector voltage
+        """
+        Set a detector high voltage
         
         Parameters
         ----------
-        n: int  -- The HV generator number (1...)
+        n: int
+            The HV generator number (1...)
+        value: int or float
+            The HV value in Volts.
+        
+        Returns
+        ------------
+        error text or ""
+        """
+
+        d = int(value/self.HV_conversion[n-1])  # This line was here before D. Barna replaced HV_conversion_in and HV_conversion_out by HV_conversion
+
+        return self.writePDI(self.codes_PC.PC_CARD,
+                            self.codes_PC.PC_REG_HV1SET+(n-1)*2,
+                            d,
+                            numberOfBytes=2,
+                            arrayData=False
+                            )
+
+    def setHVMax(self,n,value):
+        """
+        Set the maximum for a detector high voltage
+        
+        Parameters
+        ----------
+        n: int  -- The HV generator number (1..4)
         value: int or float  --  The HV value in Volts.
         
         Returns
@@ -1889,16 +1956,16 @@ class APDCAM10G_regCom:
         error text or ""
         """
         
-        d = int(value/self.HV_conversion[n-1])
+        d = int(value/self.HV_conversion[n-1])  
 
-        err = self.writePDI(self.APDCAM_reg.codes_PC.PC_CARD,
-                            self.APDCAM_reg.codes_PC.PC_REG_HV1SET+(n-1)*2,
-                            d,
-                            numberOfBytes=2,
-                            arrayData=False
-                            )
-        return err
+        return self.writePDI(self.codes_PC.PC_CARD,
+                             self.codes_PC.PC_REG_HV1MAX+(n-1)*2,
+                             d,
+                             numberOfBytes=2,
+                             arrayData=False
+                             )
 
+    
     def hvEnable(self,state):
         """
         Enables/Disables the HV for the detectors.
@@ -2491,27 +2558,6 @@ class APDCAM10G_regCom:
             print("Stream {:d}...octet:{:d}... IP:{:d}.{:d}.{:d}.{:d}...port:{:d}".format(i+1,octet,\
                   int(d_ip[0]),int(d_ip[1]),int(d_ip[2]),int(d_ip[3]),port))
 
-    def setHv(self,n,ds):
-        """
-        Set the high voltage of a given ADC board
-
-        Parameters:
-        ^^^^^^^^^^^
-        n   -- board number (0..3)
-        ds  -- voltage in volts
-        """
-        
-        try:
-            d = float(ds)
-        except ValueError:
-            d = 0
-        d = int(d/self.HV_conversion[n-1])
-
-        err = self.writePDI(self.codes_PC.PC_CARD,\
-                            self.codes_PC.PC_REG_HV1SET+(n-1)*2,\
-                            d,numberOfBytes=2,arrayData=False)
-        if (self.commErrorResponse(err) != ""):
-               return  
 
            
  # end of class APDCAM10G_regComm

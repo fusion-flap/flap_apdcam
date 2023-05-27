@@ -40,7 +40,8 @@ def ADC_DAC_channel_mapping():
 
 
 class APDCAM10G_codes_v1:
-    """ Instruction codes and other defines for V1 of the 10G communication card
+    """
+    Instruction codes and other defines for V1 of the 10G communication card
     """    
     # Opcodeswr
     # General instructions:
@@ -217,8 +218,8 @@ class APDCAM10G_codes_v1:
 
   
 class APDCAM10G_codes_v2:
-    """ Instruction codes and other defines for V2 (Firmware 105 and up) 
-    of the 10G communication card
+    """
+    Instruction codes and other defines for V2 (Firmware 105 and up) of the 10G communication card
     """
     # Opcodes
     # General instructions:
@@ -312,7 +313,8 @@ class APDCAM10G_codes_v2:
     AN_PDIDATA=0xFF04
 
 class APDCAM10G_ADCcodes_v1 :  
-    """ Register addresses and other defines for the 10G ADC board V1
+    """
+    Register addresses and other defines for the 10G ADC board V1
     """
     ADC_REG_MC_VERSION = 0x01
     ADC_REG_SERIAL = 0x03
@@ -357,7 +359,8 @@ class APDCAM10G_ADCcodes_v1 :
     
 
 class APDCAM_PCcodes_v1 :
-    """ Register addresses and other defines for the APDCAM control board
+    """
+    Register addresses and other defines for the APDCAM control board
     """
     PC_CARD = 2
     PC_REG_BOARD_SERIAL = 0x0100
@@ -399,7 +402,8 @@ class APDCAM_PCcodes_v1 :
     PC_REG_PELT_MANUAL = 0x4e
 
 class APDCAM_onetimer:
-    """ Settings of one timer in CAMTIMER
+    """
+    Settings of one timer in CAMTIMER
     """
     def __init__(self):
         self.delay = 0
@@ -411,9 +415,10 @@ class APDCAM_onetimer:
         self.used = False  
         
 class APDCAM_timer:
-    """ This contains the APDCAM CAMTIMER settings and methods.
-        All methods operate on the data in memory. Use the loadSetup
-        method to load the settings to APDCAM.
+    """
+    This contains the APDCAM CAMTIMER settings and methods.
+    All methods operate on the data in memory. Use the loadSetup
+    method to load the settings to APDCAM.
     """
     MODE_RETURN_IDLE = 0
     MODE_RETURN_ARMED = 1
@@ -500,7 +505,8 @@ class apdcamXml:
                 
     
 class APDCAM10G_status :
-    """ This class stores data read from APDCAM10G
+    """
+    This class stores data read from APDCAM10G
     """
     def __init__(self):
         self.firmware = ""
@@ -521,12 +527,13 @@ class APDCAM10G_status :
         self.CC_variables = None
         
 class APDCAM10G_regCom:
-    """ This class is for reading/writing APDCAM-10G registers and sending commands
-        Create an instance and call the connect() method
-        before reading/writing registers, this starts the UDP packet read.
-        When the instance is deleted the UDP read is stopped and registers
-        cannot be read/written any more.
-        For receiving measurement data create an APDCAM10G_data instance.
+    """
+    This class is for reading/writing APDCAM-10G registers and sending commands
+    Create an instance and call the connect() method
+    before reading/writing registers, this starts the UDP packet read.
+    When the instance is deleted the UDP read is stopped and registers
+    cannot be read/written any more.
+    For receiving measurement data create an APDCAM10G_data instance.
     """ 
     # The port where UPD is sent
     # This can be any port except HTTP
@@ -671,8 +678,12 @@ class APDCAM10G_regCom:
         return self.APDCAM_IP
 
     def startReceiveAnswer(self):
-        """Starts the receiver socket
-            Returns "" or error message
+        """
+        Starts the receiver socket
+
+        Returns
+        ^^^^^^^
+        Error message or empty string
         """
         
         # Return is socket already allocated
@@ -695,10 +706,15 @@ class APDCAM10G_regCom:
     
     def getAnswer(self):
         
-        """ Get an answer sent by APDCAM-10G in one UDP packet
-            Returns err, data.
-            err: Error string or ""
-            data: bytes of data
+        """
+        Get an answer sent by APDCAM-10G in one UDP packet
+
+        Returns 
+        ^^^^^^^
+        err
+            Error string or ""
+        data
+            bytes of data
         """
         if (self.commSocket == None):
             return "APDCAM is not connected.",None
@@ -772,12 +788,19 @@ class APDCAM10G_regCom:
         return ""
  
     def readCCdata(self,dataType=0):
-        """ Reads the Settings or the Variables data block from the 10G (CC) card. 
+        """
+        Reads the Settings or the Variables data block from the 10G (CC) card. 
         Stores the result in self.status.CC_settings or self.status.CC_variables.
-        dataType: 0: Settings
-                  1: Variables
+
+        Parameters
+        ^^^^^^^^^^
+        dataType:
+            0: Settings
+            1: Variables
                   
-        Returns error text or ""
+        Returns
+        ^^^^^^^
+        Error message or empty string
         """
         
         if (dataType == 0) :
@@ -835,10 +858,17 @@ class APDCAM10G_regCom:
     
     
     def readStatus(self,dataOnly=False,HV_repeat=1):
-        """Reads the status of APDCAM (Settings and Variables tables and some Control
+        """
+        Reads the status of APDCAM (Settings and Variables tables and some Control
         card and ADC data and stores in the status variable which is an APDCAM10G_status class.
+
+        Parameters
+        ^^^^^^^^^^
+        .... to be written
         
-        Returns an error text or ""
+        Returns
+        ^^^^^^^
+        Error message or empty string
         """
         # Read DIT and Settings
         err = self.readCCdata(dataType=0)
@@ -894,9 +924,13 @@ class APDCAM10G_regCom:
         return ""
        
     def clearAnswerQueue(self):
-        """ Reads answers from the camera until a timeout occurs.
+        """
+        Reads answers from the camera until a timeout occurs.
         This is used for clearing the answers if an error happened
-        Returns an error text or ""
+
+        Returns
+        ^^^^^^^
+        Error message or empty string
         """
         while 1 :
             err, d = APDCAM10G_regCom.getAnswer(self)
@@ -910,14 +944,13 @@ class APDCAM10G_regCom:
         Do factory reset for all components of the camera.
 
         Parameters
-        ----------
+        ^^^^^^^^^^
         reset_bool : bool
             Does reset only if this is True.
 
         Returns
-        -------
-        str
-            Error string or ""
+        ^^^^^^^
+        Error message or empty string
 
         """
         if (self.commSocket is None):
@@ -978,27 +1011,28 @@ class APDCAM10G_regCom:
 
 
     def readPDI(self,cardAddress=None,registerAddress=None,numberOfBytes=None,arrayData=None,byteOrder=None,waitTime=None):       
-        """Reads data through the Parallel Data Interface (PDI). Can do multiple reads in succession.
-           Waits a given time after each read. Returns data in a list, each element is the result 
-           of one read operation. Returns data either as array of bytes or integer, as defined by the
-           arrayData and byteOrder input.
+        """
+        Reads data through the Parallel Data Interface (PDI). Can do multiple reads in succession.
+        Waits a given time after each read. Returns data in a list, each element is the result 
+        of one read operation. Returns data either as array of bytes or integer, as defined by the
+        arrayData and byteOrder input.
 
-           Parameters
-           ^^^^^^^^^^
-           cardAddress: Card addresses (one or more)
-           registerAddress: Register start address (list length should be equal to cardAddress length)
-           numberOfBytes:   Read length (list length should be equal to cardAddress length)
-           arrayData : For each read operation sets whether the data should be returned as one 
-                       integer or byte array. False: return integer, True: return byte array.
-                       Default is that all reads are integer.
-           byteOrder:  defines the byte order for converting to integer. 
-                       List with 'MSB' or LSB' elements. LSB means LSB first.  Default is LSB.         
-           waitTime:   Wait time between register read commands in ms. Will insert a wait command
-                       between the read commands and also after the last one. If 0 no wait commands will be generated.
+        Parameters
+        ^^^^^^^^^^
+        cardAddress: Card addresses (one or more)
+        registerAddress: Register start address (list length should be equal to cardAddress length)
+        numberOfBytes:   Read length (list length should be equal to cardAddress length)
+        arrayData : For each read operation sets whether the data should be returned as one 
+                    integer or byte array. False: return integer, True: return byte array.
+                    Default is that all reads are integer.
+        byteOrder:  defines the byte order for converting to integer. 
+                    List with 'MSB' or LSB' elements. LSB means LSB first.  Default is LSB.         
+        waitTime:   Wait time between register read commands in ms. Will insert a wait command
+                    between the read commands and also after the last one. If 0 no wait commands will be generated.
 
-           Returns
-           ^^^^^^^
-           Error text and data in list of bytarrays       
+        Returns
+        ^^^^^^^
+        Error text and data in list of bytarrays       
         """ 
         
         #Ensuring that input values are not modified
@@ -1104,28 +1138,38 @@ class APDCAM10G_regCom:
   
     def writePDI(self,cardAddress=None,registerAddress=None,data=None,numberOfBytes=None,\
              arrayData=None,byteOrder=None,waitTime=None, noReadBack=False):       
-        """Writes data through the Parallel Data Interface (PDI). Can do multiple writes in succession.
-            Waits a given time after each write. Accepts data either as array of bytes or integer, as defined by the
-            arrayData and byteOrder input.
+        """
+        Writes data through the Parallel Data Interface (PDI). Can do multiple writes in succession.
+        Waits a given time after each write. Accepts data either as array of bytes or integer, as defined by the
+        arrayData and byteOrder input.
     
-            INPUT:
-                cardAddress: Card addresses (list, one or more address) 
-                registerAddress: Register start address list (list length should be equal to cardAddress length)
-                data: Data to write. If it is a list should be the same length as cardAddress. Each element is either
-                      an integer or bytearray.
-                numberOfBytes: Write length for each write operation. 
-                               (List length should be equal to cardAddress length)
-                               If all writes are arrayData then this is optional.
-                arrayData : For each write operation sets whether the data should be inteprepted as one 
-                                integer or byte array. False: integer, True: byte array.
-                                Default is that all data are integer. If arrayData == False
-                                then the integer is converted to a byte array of numberOfBytes 
-                byteOrder: defines the byte order for converting from integer to register data. 
-                       List with 'MSB' or LSB' elements. LSB means LSB first.  Default is LSB.          
-                waitTime: Wait time between register write commands in ms. Will insert a wait command
-                      between the read commands and also after the last one. If 0 no wait commands will be generated.
-                noReadBack: if True will read back the written data and compare to the input   
-            Returns error text      
+        Parameters
+        ^^^^^^^^^^
+        cardAddress: Card addresses (list, one or more address) 
+        registerAddress: Register start address list (list length should be equal to cardAddress length)
+        data
+            Data to write. If it is a list should be the same length as cardAddress.
+            Each element is either an integer or bytearray.
+        numberOfBytes
+            Write length for each write operation. (List length should be equal to cardAddress length)
+            If all writes are arrayData then this is optional.
+        arrayData
+            For each write operation sets whether the data should be inteprepted as one 
+            integer or byte array. False: integer, True: byte array.
+            Default is that all data are integer. If arrayData == False
+            then the integer is converted to a byte array of numberOfBytes 
+        byteOrder
+            defines the byte order for converting from integer to register data. 
+            List with 'MSB' or LSB' elements. LSB means LSB first.  Default is LSB.          
+        waitTime
+            Wait time between register write commands in ms. Will insert a wait command
+            between the read commands and also after the last one. If 0 no wait commands will be generated.
+        noReadBack
+            if False, it will read back the written data and compare to the input   
+
+        Returns
+        ^^^^^^^
+        Error message or empty string
         """ 
         # Ensuring that input values are not modified
         cardAddress = copy.deepcopy(cardAddress)

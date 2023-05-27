@@ -21,9 +21,23 @@ import numpy as np
 
 
 def DAC_ADC_channel_mapping():
-    """ returns the ADC channel numbers (1...32) for each of the 32 DAC channel numbers     
+    """
+    Returns an array, which maps the ADC channel numbers (1...32) to the 32 DAC channel numbers (-1)
+    That is, ch_adc = DAC_ADC_channel_mapping()[ch_dac-1], where both channel numbers are 1-based
     """
     return [30, 32, 31, 1, 2, 3 ,14 ,4 , 16, 13, 21, 19, 17, 20, 15, 18, 22, 24, 23, 9, 10, 11, 12, 6, 8, 5, 29, 25, 27, 28, 7, 26]
+
+def ADC_DAC_channel_mapping():
+    """
+    Returns an array, which maps the DAC channel numbers (1...32) to the 32 ADC channel numbers (-1)
+    That is, ch_dac = ADC_DAC_channel_mapping()[ch_adc-1], where both channel numbers are 1-based
+    """
+    data1 = DAC_ADC_channel_mapping()
+    data2 = [0]*32
+    for i in range(32):
+        data2[data1[i]-1] = i+1
+    return data2
+
 
 class APDCAM10G_codes_v1:
     """ Instruction codes and other defines for V1 of the 10G communication card
@@ -569,14 +583,14 @@ class APDCAM10G_regCom:
         #Extracting camera information
         d = self.status.CC_settings 
         self.status.firmware = d[APDCAM10G_codes_v1.CC_REGISTER_FIRMWARE:APDCAM10G_codes_v1.CC_REGISTER_FIRMWARE+14]
-        self.log("Firmware: " + self.status.firmware)
+        self.log("Firmware: " + str(self.status.firmware))
         if (self.status.firmware[0:11] != b"BSF12-0001-"):
             err = "Unknown camera firmware."
             self.close()
             return err
         v = int(self.status.firmware[11:14])
 
-        self.log("Firmware version: " + v)
+        self.log("Firmware version: " + str(v))
 
         # Set up firmware-dependent command codes
         if (v < 105):
@@ -606,7 +620,7 @@ class APDCAM10G_regCom:
         for i in range(len(check_address_list)):
             d = data[i]
             if ((d[0] & 0xf0) == 0x20) :
-                self.log("Found ADC board at address: " + check_address_list[i])
+                self.log("Found ADC board at address: " + str(check_address_list[i]))
                 self.status.ADC_address.append(check_address_list[i])
                 self.status.ADC_serial.append(int.from_bytes(d[3:5],byteorder='little',signed=False))
                 self.status.ADC_FPGA_version.append(str(int.from_bytes([d[5]],'little',signed=False))+\
@@ -704,7 +718,7 @@ class APDCAM10G_regCom:
         If opCode is None then will add no data just send if sendImmediately is set True
         
         Parameters
-        ----------
+        ^^^^^^^^^^
         opCode: int or bytes 
             The operation code OP_... (see class APDCAM10G_codes_...)
         userData: bytearray
@@ -715,7 +729,7 @@ class APDCAM10G_regCom:
             Time to wait after sending the command [s]. The default is 0.01s.
         
         Return values
-        -------------
+        ^^^^^^^^^^^^^^
         str
             "" If no error
             "Too much data": Too much data, cannot fit into present UDP packet
@@ -970,7 +984,7 @@ class APDCAM10G_regCom:
            arrayData and byteOrder input.
 
            Parameters
-           ----------
+           ^^^^^^^^^^
            cardAddress: Card addresses (one or more)
            registerAddress: Register start address (list length should be equal to cardAddress length)
            numberOfBytes:   Read length (list length should be equal to cardAddress length)
@@ -983,7 +997,7 @@ class APDCAM10G_regCom:
                        between the read commands and also after the last one. If 0 no wait commands will be generated.
 
            Returns
-           -------
+           ^^^^^^^
            Error text and data in list of bytarrays       
         """ 
         
@@ -1362,7 +1376,7 @@ class APDCAM10G_regCom:
         Stores ther result in self.interface
         
         Returns
-        -------
+        ^^^^^^^
         str
             "" or error txt
 
@@ -1478,8 +1492,12 @@ class APDCAM10G_regCom:
         return "",f,source
             
     def syncADC(self):
-        """ Synchronizes the ADC blocks in the ADC cards.
-            Returns an error text. 
+        """
+        Synchronizes the ADC blocks in the ADC cards.
+
+        Returns
+        ^^^^^^^
+        Error message or empty string
         """
             
         n_adc = len(self.status.ADC_address)
@@ -1534,10 +1552,10 @@ class APDCAM10G_regCom:
         Reads the dual SATA state from the communications card.
         Does not check dual SATA setting in the ADCs.
         
-        Return value
-        ------------
-        str
-            error text or "" if no error
+        Returns
+        ^^^^^^^
+        error
+            Error text or "" if no error
         bool
            True if dual SATA
            False if not dual SATA
@@ -1556,17 +1574,16 @@ class APDCAM10G_regCom:
                
     def setDualSATA(self, dual_SATA_state=True):
         """
-            Sets the dual SATA state of the whole system, 10G card and ADCs
+        Sets the dual SATA state of the whole system, 10G card and ADCs
             
-            Parameters
-            ----------
-            dual_SATA_state: bool
-                True: set dual SATA
-                False: clear dual SATA
-            Return value
-            ------------
-            str:
-                Returns an error text or "" of no error 
+        Parameters
+        ^^^^^^^^^^
+        dual_SATA_state: bool
+            True: set dual SATA
+            False: clear dual SATA
+        Returns
+        ^^^^^^^
+        Error message or empty string   
         """
         if (self.commSocket is None):
             return "Not connected."
@@ -1581,17 +1598,17 @@ class APDCAM10G_regCom:
         
     def setADCDualSATA(self,dual_SATA_state=True):
         """
-            Sets the dual SATA state in all ADCs.
+        Sets the dual SATA state in all ADCs.
             
-            Parameters
-            ----------
-            dual_SATA_state: bool
-                True: set dual SATA bits
-                False: clear dual SATA bits
-            Return value
-            ------------
-            str:
-                Returns an error text or "" of no error 
+        Parameters
+        ^^^^^^^^^^
+        dual_SATA_state: bool
+            True: set dual SATA bits
+            False: clear dual SATA bits
+        Return value
+        ^^^^^^^^^^^^
+        str:
+            Returns an error text or "" of no error 
         """
         self.lock.acquire()
         while (True):
@@ -1605,8 +1622,7 @@ class APDCAM10G_regCom:
                     data |= 0x03
                 else:
                     data &= 0xfd
-                err = self.writePDI(adc,reg,data,\
-                                    numberOfBytes=1,arrayData=False,noReadBack=False)
+                err = self.writePDI(adc,reg,data,numberOfBytes=1,arrayData=False,noReadBack=False)
                 if (err != ""):
                     break
                 time.sleep(1)
@@ -1625,53 +1641,216 @@ class APDCAM10G_regCom:
         data[5:5+len(instruction)] = instruction
         err = self.sendCommand(self.codes_CC.OP_WRITEPDI,data,sendImmediately=True)
         return err
- 
+
+    def setRingBufferSize(self,adcBoardNo,size):
+        """
+        Sets the ring buffer size
+
+        Parameters
+        ^^^^^^^^^^
+        adcBoardNo: int (1..4)
+            The ADC board number
+        size: int
+            The buffer size. Ring buffer is disabled if zero
+
+        Returns
+        ^^^^^^^
+        Error message or empty string
+        """
+
+        if adcBoardNo<1 or len(self.status.ADC_address)<adcBoardNo:
+            return "Bad ADC board number: " + str(adcBoardNo)
+        error =  self.writePDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_RINGBUFSIZE,size,numberOfBytes=2,arrayData=False)
+
+        time.sleep(1)
+        eee,bs = self.getRingBufferSize(adcBoardNo)
+        print("Bufsize read back: " + str(bs))
+
+        return error
+
+    def getRingBufferSize(self,adcBoardNo):
+        """
+        Get the ring buffer size
+
+        Parameters
+        ^^^^^^^^^^
+        adcBoardNo: int (1..4)
+            The ADC board number
+
+        Returns
+        ^^^^^^^
+        error
+            Error message, or empty string
+        buffersize
+            The size of the ring buffer
+        """
+
+        if adcBoardNo<1 or len(self.status.ADC_address)<adcBoardNo:
+            return "Bad ADC board number: " + str(adcBoardNo)
+        err,bufsize= self.readPDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_RINGBUFSIZE,numberOfBytes=2,arrayData=False)
+        return err,bufsize
+        
+    
     def initDAC(self,address):
         """ Sets the configuration of the DAC chips
         address: ADC card address
         """
         dac_instr = bytes([0x11,0x00,0x03,0x0C,0x34,0x00])
         return self.sendADCIstruction(address,dac_instr)
+
         
-        
-    def setOffsets(self,offsets):
-        """ Sets all the offsets of the ADC channels
-            offsets should be a list of offsets (integers) for the ADC channels
-            returns error message or ""
+    def setOffsets(self,adcBoardNo,offsets):
         """
+        Sets all the offsets of the ADC channels
+
+        Parameters
+        ^^^^^^^^^^
+        adcBoardNo: int (1..)
+            The ADC board number, in the range 1..4, should correspond to a physically existing board
+
+        offsets
+            List of offsets (integers) for the ADC channels
+
+        Returns
+        ^^^^^^^
+        Returns error message or empty string if no error
+        """
+        
         n_adc = len(self.status.ADC_address)
+        if adcBoardNo > n_adc or adcBoardNo < 1:
+            return "Bad ADC board number: " + str(adcBoardNo)
+
         adcmap = DAC_ADC_channel_mapping()
 
-        for i_adc in range(n_adc):
-            self.initDAC(self.status.ADC_address[i_adc])
-            data = bytearray(64)
-            for i in range(32):
-                dac_addr = adcmap[i]-1
-                data[i*2:i*2+2] = offsets[dac_addr+32*i_adc].to_bytes(2,'little',signed=False)
-            err = self.writePDI(self.status.ADC_address[i_adc],self.codes_ADC.ADC_REG_DAC1,data,numberOfBytes=64,arrayData=True)
-            if (err != ""):
-                return "Error in setOffsets, ADC {:d}: {:s}".format(i_adc+1,err)
-            time.sleep(0.1)
+        self.initDAC(self.status.ADC_address[adcBoardNo-1])
+        data = bytearray(64)
+        for i in range(32):
+            dac_addr = adcmap[i]-1
+            data[i*2:i*2+2] = offsets[dac_addr].to_bytes(2,'little',signed=False)
+        err = self.writePDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_DAC1,data,numberOfBytes=64,arrayData=True)
+        if (err != ""):
+            return "Error in setOffsets, ADC {:d}: {:s}".format(adcBoardNo,err)
+        time.sleep(0.1)
+
         return ""
-    
-    def getOffsets(self):
-        """ Get all of the offset values on the channels.
-            Returns an error message and list of offsets.
+
+    def setOffset(self,adcBoardNo,channel,offset):
         """
+        Sets all the offsets of the ADC channels
+
+        Parameters
+        ^^^^^^^^^^
+        adcBoardNo: int (1..)
+            The ADC board number, in the range 1..4, should correspond to a physically existing board
+
+        channel: int (1..32)
+            Channel number
+
+        offsets
+            List of offsets (integers) for the ADC channels
+
+        Returns
+        ^^^^^^^
+        Returns error message or empty string if no error
+        """
+        
         n_adc = len(self.status.ADC_address)
+        if adcBoardNo > n_adc or adcBoardNo < 1:
+            return "Bad ADC board number: " + str(adcBoardNo)
+
+        if channel<1 or 32<channel:
+            return "Bad channel number; " + str(channel)
+
+        adcmap = ADC_DAC_channel_mapping()
+
+        self.initDAC(self.status.ADC_address[adcBoardNo-1])
+
+        dac_addr = self.codes_ADC.ADC_REG_DAC1+2*(adcmap[channel-1]-1)
+
+        err = self.writePDI(self.status.ADC_address[adcBoardNo-1],dac_addr,offset,numberOfBytes=2,arrayData=False)
+        if (err != ""):
+            return "Error in setOffset, ADC {:d}: {:s}".format(adcBoardNo,err)
+        time.sleep(0.1)
+
+        return ""
+
+    
+    def getOffsets(self,adcBoardNo):
+        """
+        Get all of the offset values on the channels.
+
+        Parameters
+        ^^^^^^^^^^
+        adcBoardNo
+            ADC board number, in the range (1..4). Must correspond to a physically existing board
+        
+        Returns
+        ^^^^^^^
+        error:string
+            Error string, or an empty string if no problem
+        offsets
+            An array of 32 offset values
+
+        """
+
+        n_adc = len(self.status.ADC_address)
+        if adcBoardNo > n_adc or adcBoardNo < 1:
+            return "Bad ADC board number: " + str(adcBoardNo)
+
         adcmap = DAC_ADC_channel_mapping()
         data = []
-        for i_adc in range(n_adc):
-            err,offsets = self.readPDI(self.status.ADC_address[i_adc],self.codes_ADC.ADC_REG_DAC1,numberOfBytes=64,arrayData=True)
-            if (err != ""):
-                return "Error in setOffsets, ADC {:d}: {:s}".format(i_adc+1,err),None
-            offsets = offsets[0]
-            for i in range(32):
-                dac_addr = adcmap[i]-1
-                data.append(int.from_bytes(offsets[dac_addr * 2:dac_addr * 2 + 2], 'little'))
-            time.sleep(0.1)
+
+        err,offsets = self.readPDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_DAC1,numberOfBytes=64,arrayData=True)
+        if (err != ""):
+            return "Error in setOffsets, ADC {:d}: {:s}".format(adcBoardNo,err),None
+        offsets = offsets[0]
+        for i in range(32):
+            dac_addr = adcmap[i]-1
+            data.append(int.from_bytes(offsets[dac_addr * 2:dac_addr * 2 + 2], 'little'))
+        time.sleep(0.1)
         return "",data
 
+    # Original code by S. Zoletnik
+    #
+    # def setOffsets(self,offsets):
+    #     """ Sets all the offsets of the ADC channels
+    #         offsets should be a list of offsets (integers) for the ADC channels
+    #         returns error message or ""
+    #     """
+    #     n_adc = len(self.status.ADC_address)
+    #     adcmap = DAC_ADC_channel_mapping()
+
+    #     for i_adc in range(n_adc):
+    #         self.initDAC(self.status.ADC_address[i_adc])
+    #         data = bytearray(64)
+    #         for i in range(32):
+    #             dac_addr = adcmap[i]-1
+    #             data[i*2:i*2+2] = offsets[dac_addr+32*i_adc].to_bytes(2,'little',signed=False)
+    #         err = self.writePDI(self.status.ADC_address[i_adc],self.codes_ADC.ADC_REG_DAC1,data,numberOfBytes=64,arrayData=True)
+    #         if (err != ""):
+    #             return "Error in setOffsets, ADC {:d}: {:s}".format(i_adc+1,err)
+    #         time.sleep(0.1)
+    #     return ""
+    
+    # def getOffsets(self):
+    #     """ Get all of the offset values on the channels.
+    #         Returns an error message and list of offsets.
+    #     """
+    #     n_adc = len(self.status.ADC_address)
+    #     adcmap = DAC_ADC_channel_mapping()
+    #     data = []
+    #     for i_adc in range(n_adc):
+    #         err,offsets = self.readPDI(self.status.ADC_address[i_adc],self.codes_ADC.ADC_REG_DAC1,numberOfBytes=64,arrayData=True)
+    #         if (err != ""):
+    #             return "Error in setOffsets, ADC {:d}: {:s}".format(i_adc+1,err),None
+    #         offsets = offsets[0]
+    #         for i in range(32):
+    #             dac_addr = adcmap[i]-1
+    #             data.append(int.from_bytes(offsets[dac_addr * 2:dac_addr * 2 + 2], 'little'))
+    #         time.sleep(0.1)
+    #     return "",data
+
+    
     def getTestPattern(self):
         """ 
         Get all of the test pattern settings in the ADCs
@@ -1808,6 +1987,250 @@ class APDCAM10G_regCom:
         else:
             return "", 1
 
+    def setRegisterBit(self,adcBoardNo,register,bit,state):
+        """
+        Set a single bit in the CONTROL (0x000B) register of the ADC
+
+        Parameters
+        ^^^^^^^^^^
+        adcBoardNo: int (1..4) or string
+            The ADC board number (1..4) or 'all' to indicate that it should be made for all ADCs
+        bit: int (0..7)
+            The bit to be set
+        state:
+            True/False
+
+        Returns
+        ^^^^^^^
+        Error (or empty) string
+
+        """
+
+        adcAddresses = []
+        if adcBoardNo == 'all':
+            adcAddresses = self.status.ADC_address
+        else:
+            if adcBoardNo < 1 or len(self.status.ADC_address) < adcBoardNo:
+                return "Bad ADC board number: " + str(adcBoardNo)
+            adcAddresses = [self.status.ADC_address[adcBoardNo-1]]
+
+        if len(adcAddresses) > 1:
+            self.lock.acquire()
+
+        for adcAddress in adcAddresses:
+            err,d = self.readPDI(adcAddress,register,1,arrayData=False)
+            if err != "":
+                if len(adcAddresses) > 1:
+                    self.lock.release()
+                return err
+            d = d[0]
+            if state:
+                d |= 1<<bit
+            else:
+                d &= ~(1<<bit)
+
+            err = self.writePDI(adcAddress,register,d,1,arrayData=False)
+            if err != "":
+                if len(adcAddresses) > 1:
+                    self.lock.release()
+                return err
+
+        if len(adcAddresses) > 1:
+            self.lock.release()
+
+        return ""
+        
+    def setSataOn(self,adcBoardNo,state):
+        """
+        Switches the SATA channels on/off for the given ADC board
+
+        Parameters
+        ^^^^^^^^^^
+        adcBoardNo: int (1..4) or string
+            The ADC board number (1..4) or 'all' to indicate that it should be made for all ADCs
+        state:bool
+            Switch the SATA channel on if True, off if False
+
+        Returns
+        ^^^^^^^
+        Error message or empty string
+        
+        """
+
+        return self.setRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,0,state)
+
+    def setDualSata(self,adcBoardNo,state):
+        """
+        Switches the Dual SATA mode on/off for the given ADC board
+
+        Parameters
+        ^^^^^^^^^^
+        adcBoardNo: int (1..4) or string
+            The ADC board number (1..4) or 'all' to indicate that it should be made for all ADCs
+        state:bool
+            Switch the dual SATA mode on if True, off if False
+
+        Returns
+        ^^^^^^^
+        Error message or empty string
+        
+        """
+
+        return self.setRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,1,state)
+
+    def setSataSync(self,adcBoardNo,state):
+        """
+        Switches the SATA sync mode on/off for the given ADC board
+
+        Parameters
+        ^^^^^^^^^^
+        adcBoardNo: int (1..4) or string
+            The ADC board number (1..4) or 'all' to indicate that it should be made for all ADCs
+        state:bool
+            Switch the SATA sync mode on if True, off if False
+
+        Returns
+        ^^^^^^^
+        Error message or empty string
+        
+        """
+
+        return self.setRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,2,state)
+    
+    def setTestPatternMode(self,adcBoardNo,state):
+        """
+        Switches the Test mode on/off for the given ADC board
+
+        Parameters
+        ^^^^^^^^^^
+        adcBoardNo: int (1..4) or string
+            The ADC board number (1..4) or 'all' to indicate that it should be made for all ADCs
+        state:bool
+            Switch the Test mode on if True, off if False
+
+        Returns
+        ^^^^^^^
+        Error message or empty string
+        
+        """
+
+        return self.setRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,3,state)
+    
+    
+    def setFilterOn(self,adcBoardNo,state):
+        """
+        Switches the filter on or off for the given board
+
+        Parameters
+        ^^^^^^^^^^
+        adcBoardNo: int (1..4) or string
+            The ADC board number (1..4) or 'all' to indicate that it should be made for all ADCs
+        state:bool
+            Switch the filter on if True, off if False
+
+        Returns
+        ^^^^^^^
+        Error message or empty string
+        
+        """
+
+        return self.setRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,4,state)
+
+    def setReverseBitord(self,adcBoardNo,state):
+        """
+        Switches reverse bit order on/off
+
+        Parameters
+        ^^^^^^^^^^
+        adcBoardNo: int (1..4) or string
+            The ADC board number (1..4) or 'all' to indicate that it should be made for all ADCs
+        state:bool
+            Switch reverse bit order if true. 
+
+        Returns
+        ^^^^^^^
+        Error message or empty string
+        
+        """
+
+        return self.setRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,6,state)
+
+    
+
+    def setFilterCoeffs(self,adcBoardNo,values):
+        """
+        Sets the FIR/IIR filter coefficients
+
+        Parameters
+        ^^^^^^^^^^
+        adcBoardNo : int (1..4)
+            ADC Board number
+        values: array[8]
+            Filter coefficient values
+
+        Returns
+        ^^^^^^^
+        Error message or empty string
+        """
+
+        if adcBoardNo < 1 or len(self.status.ADC_address) < adcBoardNo:
+            return "Bad ADC board number: " + str(adcBoardNo)
+
+        if len(values) != 8:
+            return "The number of values must be 8!"
+
+        err = ""
+        # This code segment attempted to write the 8 values in one go. It did not work, only the first COEFF_01 was written
+        # data = bytearray(16)
+        # print("///>>>")
+        # for i in range(8):
+        #     print(values[i])
+        #     data[i*2:i*2+2] = values[i].to_bytes(2,'little',signed=False)
+
+        # err = self.writePDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_COEFF_01,data,numberOfBytes=16,arrayData=True)
+
+        # Loop over all coeffs, and write them one-by-one to the camera. Upon writing the last one, the values are
+        # written from the camera registers to the FPGA
+        for i in range(8):
+            err = self.writePDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_COEFF_01+2*i,values[i],numberOfBytes=2,arrayData=False)
+            if err != "":
+                return err
+            time.sleep(0.005) # for safety, too quick writes may fail... I don't know (D. Barna)
+        
+        return err
+
+    def getFilterCoeffs(self,adcBoardNo):
+        """
+        Gets the FIR/IIR filter coefficients
+
+        Parameters
+        ^^^^^^^^^^
+        adcBoardNo : int (1..4)
+            ADC Board number
+
+        Returns
+        ^^^^^^^
+        error:str
+            Error message, or empty string
+        coeffs:array
+            The 8 coefficients (0-4: FIR, 5: IIR, 6: dummy, 7: filter div)
+        """
+
+        if adcBoardNo < 1 or len(self.status.ADC_address) < adcBoardNo:
+            return "Bad ADC board number: " + str(adcBoardNo)
+
+        # Here, in contrast to writing, a block-read (i.e. 2x8 bytes) works. 
+        err,rawData = self.readPDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_COEFF_01,16,arrayData=True)
+        if err != "":
+            return err
+
+        rawData = rawData[0]
+        data = []
+        for i in range(8):
+            data.append(int.from_bytes(rawData[2*i:2*i+2],'little'))
+        return "",data
+
+    
     def shutterOpen(self,value):
         """
         Set the shutter state. This function does not check whether shutter mode is manual (i.e. when
@@ -2558,8 +2981,57 @@ class APDCAM10G_regCom:
             print("Stream {:d}...octet:{:d}... IP:{:d}.{:d}.{:d}.{:d}...port:{:d}".format(i+1,octet,\
                   int(d_ip[0]),int(d_ip[1]),int(d_ip[2]),int(d_ip[3]),port))
 
+    def getAdcPllLocked(adcBoardNo):
+        """
+        Get the PLL locked status (truefalse)
+        """
+        (err,pllLocked) = self.readPDI(self.status.ADC_address[adcBoardNo-1],ADC_REG_STATUS1,1,arrayData=False)
+        return (err,bool(pllLocked & 1))
 
-           
+
+    def getAdcPowerVoltages(adcBoardNo):
+        """
+        Get the power voltages
+
+        Returns
+        ^^^^^^^
+        (error,dvdd33,dvdd25,avdd33,avdd18)
+
+        """
+        errors = ""
+        (err,dvdd33) = self.readPDI(self.status.ADC_address[adcBoardNo-1],ADC_REG_DVDD33,2,arrayData=False)
+        if err != "":
+            errors += err + ";"
+        (err,dvdd25) = self.readPDI(self.status.ADC_address[adcBoardNo-1],ADC_REG_DVDD25,2,arrayData=False)
+        if err != "":
+            errors += err + ";"
+        (err,avdd33) = self.readPDI(self.status.ADC_address[adcBoardNo-1],ADC_REG_AVDD33,2,arrayData=False)
+        if err != "":
+            errors += err + ";"
+        (err,avdd18) = self.readPDI(self.status.ADC_address[adcBoardNo-1],ADC_REG_AVDD18,2,arrayData=False)
+        if err != "":
+            errors += err + ";"
+        return (errors,dvdd33,dvdd25,avdd33,avdd18)
+
+    def getAdcTemperature(adcBoardNo):
+        (err,T) = self.readPDI(self.status.ADC_address[adcBoardNo-1],ADC_REG_TEMP,1,arrayData=False)
+        return (err,T)
+        
+    def getAdcOverload(adcBoardNo):
+        """
+        Return True/False if any of the channels went to overload. It clears the latched bit
+        corresponding to this event
+        
+        """
+        # Read the status
+        (error,status) = self.readPDI(self.status.ADC_address[adcBoardNo-1],ADC_REG_OVDSTATUS,1,arrayData=False)
+
+        # Clear the status byte (the latched bit 0, which is indicating the overload stsatus)
+        self.writePDI(self.status.ADC_address[adcBoardNo-1],ADC_REG_OVDSTATUS,0,1)
+
+        #return True/False
+        return bool(status&1)
+
  # end of class APDCAM10G_regComm
 
 class APDCAM10G_data:

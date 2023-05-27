@@ -1,1 +1,18 @@
+APDCAM10G_control.getDualSATA() returns whether dual sata or not, without checking same for ADCs. This status should be shown somewhere in the GUI (or controlled as well?)
+
+fir frequency: ebbol ki lesz szamolva a coeff-ek. Keruljon be azok melle. 
+
+QSpinBox - changes should take immediate effect?
+for clock, stb, ne menjen egybol kamerara. Fir maradhat. 
+
+ADC set offsets - changed to board-by-board control
+legyen egy olyanm, ami osszes adc osszes channelje. 
+
+APDCAM10G_control.setADCDualSATA is now for all boards. Should it be like this? Then update the gui
+igen, maradjon igy, factory beallitas, es board-onkent legyen (implementalni apdcam10g_control-ban. )
+
+AdcControl has an "Internal trigger" checkbox globally, and also for all channels individually.
+
+Should Int. Fitler be renamed IIR Filter? Should FIR and IIR coeffs go to the same block? What is divide? Can we use arrayDAta=True write for all coeffs in one go? (doc says we must write sequentially, values are sent to the fpga after writing coeff8)
+
 APDCAM10G_control class has HV_conversion_in and HV_conversion_out, used at one place. In setHV method, however, HV_conversion is used, which is only set from the GUI.

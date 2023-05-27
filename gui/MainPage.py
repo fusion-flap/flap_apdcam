@@ -69,7 +69,8 @@ class MainPage(QtWidgets.QWidget):
         """
         Connects to APDCAM
         """
-        self.messages.setText("") # clear previous messages
+        #self.messages.setText("") # clear previous messages
+        self.cameraType.setText("")
 
         # Check if the IP Address if of the right format: 4 integers separated by dot
         if not re.search("^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$",self.addressEntry.text()):
@@ -98,16 +99,20 @@ class MainPage(QtWidgets.QWidget):
             return
         self.cameraConnectedStatus.setText("Camera status: connected")
         self.gui.status.connected = True
-        self.cameraType.setText(" Firmware: {:s}".format(self.GUI_status.APDCAM_reg.status.firmware.decode('utf-8')))
+        #self.cameraType.setText(" Firmware: {:s}".format(self.GUI_status.APDCAM_reg.status.firmware.decode('utf-8')))
+        self.cameraType.append("Firmware: {:s}".format(self.gui.camera.status.firmware.decode('utf-8')))
         
         nAdcBoards = len(self.gui.camera.status.ADC_address) 
-        txt = ""
+        self.cameraType.append("")
         for i in range(nAdcBoards):
-            txt = txt + str(self.gui.camera.status.ADC_address[i])+" "
-        self.messages.append(" No of ADCs: {:d}, Addresses: {:s}".format(nAdcBoards,txt))
-        #self.gui.offsetNoise.setAdcBoards(nAdcBoards)
+            self.cameraType.append("ADC " + str(i+1))
+            self.cameraType.append("   Address:      " +  str(self.gui.camera.status.ADC_address[i]))
+            self.cameraType.append("   FPGA Version: " +  self.gui.camera.status.ADC_FPGA_version[i])
+            self.cameraType.append("   MC Version:   " +  self.gui.camera.status.ADC_MC_version[i])
         self.gui.adcControl.setAdcs(nAdcBoards)
-        #self.gui.infrastructure.setHvGroups(nAdcBoards)
+
+        self.cameraType.append("")
+        self.cameraType.append("PC Firmware Version: " + self.gui.camera.status.PC_FW_version)
 
         err = self.gui.camera.readStatus()
         if (err != "") :
@@ -116,14 +121,10 @@ class MainPage(QtWidgets.QWidget):
             self.cameraOff()
             return
 
-        # self.GUI_status.APDCAM_status = self.GUI_status.APDCAM_reg.status
-        # self.var_HV1_set.set("{:5.1f}".format(self.GUI_status.APDCAM_status.HV_set[0]))
-        # self.var_HV2_set.set("{:5.1f}".format(self.GUI_status.APDCAM_status.HV_set[1]))
-        # self.var_HV3_set.set("{:5.1f}".format(self.GUI_status.APDCAM_status.HV_set[2]))
-        # self.var_HV4_set.set("{:5.1f}".format(self.GUI_status.APDCAM_status.HV_set[3]))
         for i in range(4):
-            self.gui.infrastructure.hvSet[i].setText("{:5.1f}".format(self.gui.camera.status.HV_set[0]))
+            self.gui.infrastructure.hvSet[i].setValue(self.gui.camera.status.HV_set[0])
 
+        print(" This needs to be implemented in " + __file__)
         # self.var_detTemp_set.set("---")
         # self.var_detTemp_set.set("{:5.1f}".format(self.GUI_status.APDCAM_status.ref_temp))
         # if (self.var_clocksource.get() == 'External'): 
@@ -131,23 +132,19 @@ class MainPage(QtWidgets.QWidget):
         # else:
         #     err = self.GUI_status.APDCAM_reg.setClock(APDCAM10G_regCom.CLK_INTERNAL)
 
-        err,d = self.gui.camera.getOffsets()
-        if (err != ""):
-            self.gui.showError("Error reading offsets: {:s}".format(err))
-        else:
-            # Assuming all offsets are the same, using the first one
-            gui.showMessage("Updated ADC offsets in the tab 'Offset/noise'")
-            for adc in range(len(gui.offsetNoise.adc)):
+        for adcBoardNo in range(nAdcBoards):
+            err,offsets = self.gui.camera.getOffsets(adcBoardNo+1)
+            if (err != ""):
+                self.gui.showError("Error reading offsets for board {:i}: {:s}".format(adcBoardNo+1,err))
+            else:
                 for channel in range(32):
-                    gui.offsetNoise.adc[adc].dac[channel].setText(str(d[0]))
+                    self.gui.adcControl.adc[adcBoardNo].dac[channel].setValue(offsets[channel])
 
         err,d = self.gui.camera.getCallight()
         if (err != ""):
             self.gui.showError("Error reading calibration light: {:s}".format(err))
         else:
-            gui.showMessage("Updated calibration light intensity value in the GUI from the camera")
+            self.gui.showMessage("Updated calibration light intensity value in the GUI from the camera")
             self.gui.infrastructure.calibrationLightIntensity.setValue(d)
 
-            
-
-        # self.GUI_status.GUI_top.APDCAM_settings_widg.update()
+        print("HEY, implement reading other data from the camera, and update the GUI !!!!!")

@@ -13,9 +13,7 @@ Qt = importlib.import_module(QtVersion+".QtCore")
 from ApdcamUtils import *
 
 from MainPage import MainPage
-# from CameraControl import CameraControl
 from Infrastructure import Infrastructure
-#from OffsetNoise import OffsetNoise
 from AdcControl import AdcControl
 from ControlTiming import ControlTiming
 from CameraTimer import CameraTimer
@@ -91,6 +89,9 @@ class ApdcamGui(QtWidgets.QMainWindow):
         exitAction = QAction("&Exit",self)
         exitAction.triggered.connect(sys.exit)
         fileMenu.addAction(exitAction)
+        restartAction = QAction("&Restart",self)
+        restartAction.triggered.connect(lambda: sys.exit(1))
+        fileMenu.addAction(restartAction)
 
         # Run mode menu ------------------
         modeMenu = menuBar.addMenu("&GUI Mode")
@@ -130,7 +131,8 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.infrastructure = Infrastructure(self)
         self.expertTabs.addTab(self.infrastructure,"Infrastructure")
 
-        self.expertTabs.addTab(AdcControl(self),"ADC control")
+        self.adcControl = AdcControl(self)
+        self.expertTabs.addTab(self.adcControl,"ADC control")
         self.expertTabs.addTab(ControlTiming(self),"Control timing")
         self.expertTabs.addTab(CameraTimer(self),"Camera timer")
         self.expertTabs.addTab(CameraConfig(self),"Camera configuration")
@@ -236,11 +238,6 @@ class ApdcamGui(QtWidgets.QMainWindow):
                 if n > 1:
                     time.sleep(wait)
 
-            print("Success: ")
-            print(success)
-            print("Errors: ")
-            print(errors)
-
             self.afterBackendCall(success,errors,n=n,name=name,showall=showall)
 
         return wrapper
@@ -249,7 +246,6 @@ class ApdcamGui(QtWidgets.QMainWindow):
         children = self.findChildren(QtWidgets.QWidget)
         for child in children:
             if isinstance(child,QtWidgets.QPushButton) or \
-               isinstance(child,QtWidgets.QLineEdit) or \
                isinstance(child,QtWidgets.QSpinBox) or \
                isinstance(child,QDoubleEdit) or \
                isinstance(child,QIntEdit) or \
@@ -257,6 +253,15 @@ class ApdcamGui(QtWidgets.QMainWindow):
                isinstance(child,QtWidgets.QComboBox):
                 if child.toolTip() == "":
                     child.setStyleSheet("background-color: red")
+            if isinstance(child,QtWidgets.QLineEdit):
+                withinSpinBox = False
+                for child2 in children:
+                    if (isinstance(child2,QtWidgets.QSpinBox) or isinstance(child2,QtWidgets.QDoubleSpinBox)) and child2.isAncestorOf(child):
+                        withinSpinBox = True
+                        break
+                if not withinSpinBox and child.toolTip() == "":
+                    child.setStyleSheet("background-color: red")
+
 
     def showMessageWithTime(self,msg):
         time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -350,17 +355,4 @@ class ApdcamGuiApp(QtWidgets.QApplication):
         
 if __name__ == '__main__':
     app = ApdcamGuiApp()
-
-    def criticalDoBefore(func):
-        app.showMessage("Calling " + func.__qualname__)
-        
-    def criticalDoAfter(func,err):
-        if type(err) is tuple:
-            err = err[0]
-        if err != "":
-            app.showError(err)
-
-    critical.doBefore = criticalDoBefore
-    critical.doAfter  = criticalDoAfter
-
     app.run()

@@ -85,6 +85,16 @@ class Adc(QtWidgets.QWidget):
         values[7] = self.internalFilterDiv.value()
         self.gui.camera.setFilterCoeffs(self.number,values)
 
+    def setTestPattern(self):
+        values = self.testPattern.text().split()
+        if len(values) == 1:
+            self.gui.camera.setTestPattern(values[0],adcBoardNo=self.number)
+        else:
+            if len(values) != 4:
+                self.gui.showError("Test pattern must be a single or four integers")
+                return
+            self.gui.camera.setTestPattern(values,adcBoadNo=self.number)
+
     def __init__(self,parent,number):
         """
         Constructor
@@ -263,7 +273,10 @@ class Adc(QtWidgets.QWidget):
         self.sataClkDiv = QtWidgets.QSpinBox()
         g.addWidget(self.sataClkDiv,3,1)
         g.addWidget(QtWidgets.QLabel("Test pattern:"),4,0)
+
         self.testPattern = QtWidgets.QLineEdit()
+        self.testPattern.returnPressed.connect(self.gui.call(self.setTestPattern))
+        self.testPattern.setToolTip("Test pattern for this ADC. Either an integer (value for all four 8-channel blocks), or 4 integers (for the blocks separately)")
         g.addWidget(self.testPattern,4,1)
         g.setRowStretch(g.rowCount(),1)
 

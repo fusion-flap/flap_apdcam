@@ -1,17 +1,9 @@
-from functools import partial
 
-class A:
-    def __init__(self):
-        self.value = 1
-        def fff():
-            print(self.value)
-        self.f = fff
+def func(values):
+    print(values)
+    values = [1,2,3]
+    print(values)
 
-
-a = A()
-a.value = 2
-b = A()
-b.value = 10
-
-a.f()
-b.f()
+a = [10,20,30]
+func(a)
+print(a)

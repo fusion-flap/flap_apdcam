@@ -1900,13 +1900,11 @@ class APDCAM10G_regCom:
         Get all of the test pattern settings in the ADCs
             
         Parameters
-        ----------
+        ^^^^^^^^^^
             None
             
-        Return value
-        ------------
         Returns
-        -------
+        ^^^^^^^
         string
             "" or error text.
         list
@@ -1923,42 +1921,72 @@ class APDCAM10G_regCom:
             data.append(d[0])
         return "",data
 
-    def setTestPattern(self,value):
+    def setTestPattern(self,value,*,adcBoardNo='all'):
         """ Set the test pattern of the ADCs.
         
         Parameters
-        ----------
-        value : list or int
-            If int all ADCs will be set to this test pattern
-            If list then each list element corresponds to one ADC block.
-            If a list element is a single number then each 8-block in the ADC is set to this value.
-            If a list element is a 4-element list the 8-channel blocks are set to these test patterns.
+        ^^^^^^^^^^
+        adcBoardNo
+            The number of the ADC (1..4), or the string 'all' to set the pattern for all ADCs
+        value : list or int/string
+            If adcBoardNo is 'all', then
+              If int all ADCs will be set to this test pattern
+              If list then each list element corresponds to one ADC block.
+              If a list element is a single number then each 8-block in the ADC is set to this value.
+              If a list element is a 4-element list the 8-channel blocks are set to these test patterns.
+            If adcBoardNo is a number, then
+              If a single number, all ADC blocks of the board will be set to this number
+              If a list with 4 elements, the 8-channel blocks are set to these values
+            The values can be given as strings as well, in which case they are safely converted to integers,
+            returning an error if the conversion fails
         """   
-        n_adc = len(self.status.ADC_address)
-        if (type(value) is list):
-            if (len(value) != n_adc):
-                return "Bad input in setTestPattern. Should be scalar or list with number of elements equal to number of ADCs."
-            _value = value
+
+        adcAddresses = []
+
+        # First transform the values into a list with n_adc elements, each list member being a list of 4 numbers
+        if adcBoardNo == 'all':
+            adcAddresses = self.status.ADC_address # take all ADC addresses
+            n_adc = len(self.status.ADC_address)
+            if type(value) is list:
+                if (len(value) != n_adc):
+                    return "Bad input in setTestPattern. Should be scalar or list with number of elements equal to number of ADCs."
+            else:
+                try:
+                    value = [int(value)] * n_adc
+                except ValueError:
+                    return "Bad input in setTestPattern."
+
+            for i_adc in range(n_adc):
+                if type(value[i_adc]) is list:
+                    if len(value[i_adc]) != 4:
+                        return "Bad input in setTestPattern"
+                else:
+                    try:
+                        value[i_adc] = [int(value[i_adc])]*4
+                    except ValueError:
+                        return "Can not convert to integer: " + str(value[i_adc])
         else:
-            try:
-                _value = [int(value)] * n_adc
-            except ValueError:
-                return "Bad input in setTestPattern."
+            if adcBoardNo < 1 or len(self.status.ADC_address) < adcBoardNo:
+                return "Bad ADC board number"
+            adcAddresses = [self.status.ADC_address[adcBoardNo]]
+            if type(value) is list:
+                if len(value) != 4:
+                    return "Bad input in setTestPattern. Should be scalar or list with 4 numbers"
+            else:
+                try:
+                    value = [int(value)]*4
+                except ValueError:
+                    return "Can not convert to integer: " + str(value)
+
         for i_adc in range(n_adc):  
             d = bytearray(4)
-            if (type(_value[i_adc]) is list):
-                if (len(_value[i_adc]) != 4):
-                    return "Bad input in setTestPattern."
-                for i in range(4):
-                    d[i] = _value[i]
-            else:
-                for i in range(4):
-                    d[i] = _value[i_adc]                
-            err = self.writePDI(self.status.ADC_address[i_adc],self.codes_ADC.ADC_REG_AD1TESTMODE,d,numberOfBytes=4,arrayData=True)
+            for i in range(4):
+                d[i] = value[i_adc][i]
+            err = self.writePDI(adcAddresses[i_adc],self.codes_ADC.ADC_REG_AD1TESTMODE,d,numberOfBytes=4,arrayData=True)
             if (err != ""):
-                break
+                return err
             time.sleep(0.1)
-        return err  
+        return ""
     
     def setCallight(self,value):
         """

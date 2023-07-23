@@ -74,7 +74,7 @@ class APDCAM10G_codes_v1:
     OP_SETMACMODE=0x0025
     
     #Control Instructions
-    OP_PROGRAMBASICPLL=0x0100
+    OP_PROGRAMBASICPLL=0x0100  # The internal ADC clock's associated PLL 
     OP_PROGRAMEXTDCM=0x0101
     OP_SETCLOCKCONTROL=0x0102
     OP_SETCLOCKENABLE=0x0103
@@ -203,8 +203,13 @@ class APDCAM10G_codes_v1:
     CC_DATATYPE_33V = 1
     CC_REGISTER_25V = 281-7
     CC_DATATYPE_25V = 1
-    CC_REGISTER_12VXC = 283-7
-    CC_DATATYPE_12VXC = 1
+
+    # Must be a typo... 1.8 V and not 1.2 V! (corrected by D. Barna)
+#    CC_REGISTER_12VXC = 283-7
+#    CC_DATATYPE_12VXC = 1
+    CC_REGISTER_18VXC = 283-7
+    CC_DATATYPE_18VXC = 1
+
     CC_REGISTER_12VST = 285-7
     CC_DATATYPE_12VST = 1
     CC_REGISTER_PLLSTAT = 194-7
@@ -215,7 +220,6 @@ class APDCAM10G_codes_v1:
     CC_DATATYPE_STATUS = 1
     CC_REGISTER_STREAM_TX_FRAMES = 127 - 7
     CC_DATATYPE_STREAM_TX_FRAMES = 1
-
   
 class APDCAM10G_codes_v2:
     """
@@ -575,9 +579,9 @@ class APDCAM10G_regCom:
             raise ValueError("Invalid IP address for camera. Should be string or bytearray.")
         self.APDCAM_IP = ip
 
-        print("########### Check this here  ##################")
-        #err = APDCAM10G_regCom.startReceiveAnswer(self)
-        err = self.startReceiveAnswer()  # Changed by D. Barna
+#        print("########### Check this here  ##################")
+        err = APDCAM10G_regCom.startReceiveAnswer(self)
+        #err = self.startReceiveAnswer()  # Changed by D. Barna
 
         if (err != "") :
             self.close()
@@ -660,7 +664,7 @@ class APDCAM10G_regCom:
         err = self.getInterface()
         if (err != ""):
             return err
-        ret, ds = self.getDualSATA()
+        ret, ds = self.getDualSata()
         if (ret != ""):
             return ret
         self.dualSATA = ds
@@ -959,7 +963,7 @@ class APDCAM10G_regCom:
             return
 
         # Read the SATA state as it will be changed by the factory reset in V1
-        err,dual_SATA_state = self.getDualSATA()
+        err,dual_SATA_state = self.getDualSata()
         if (err != ""):
             return err
         # Reset the ADCs
@@ -1004,7 +1008,7 @@ class APDCAM10G_regCom:
         if (err != ""):
            return err
         time.sleep(5)
-        err = self.setDualSATA(dual_SATA_state=dual_SATA_state)
+        err = self.setDualSata(dual_SATA_state=dual_SATA_state)
         if (err != ""):
             err = "Could not set dual SATA setting to original state after reset. Camera was not on default address?"
         return ""
@@ -1463,24 +1467,46 @@ class APDCAM10G_regCom:
         return ""
 
         
-    def setClock(self,source,adcdiv=33, adcmult=33, extdiv=20, extmult=20,autoExternal=False):
-        """ Set external clock.
-            source: APDCAM10G_regCom.CLK_INTERNAL or APDCAM10G_regCom.CLK_EXTERNAL
-            extdiv: EXTRDCM divider
-            extmult: EXTDCM multiplier
-            adcdiv: ADC clock divider
-            adcmult: ADC clock multiplier
-            autoExternal: False or True
+    def setClock(self,source, adcmult=33, adcdiv=33, extmult=20, extdiv=20, autoExternal=False, externalSample=False):
+        """
+        Set ADC digitization clock source and multiplier/divider values
+
+        Parameters
+        ^^^^^^^^^^
+        source: int
+            APDCAM10G_regCom.CLK_INTERNAL or APDCAM10G_regCom.CLK_EXTERNAL
+        extmult: int (2..33)
+            Multiplier for the external clock signal
+        extdiv: int (1..32)
+            Divider for the external clock signal
+        adcmult: int (20..50)
+            Multiplier for the internal ADC clock frequency
+        adcdiv: int (8..100)
+            Divider for the internal ADC clock frequency
+        autoExternal: bool
+            Only effective if source specifies to use external clock.
+            False - normal external clock mode, always external clock is used
+            True - the external clock is used if quality is good and the PLL can lock, but will fall back to internal
+            if the PLL can not lock
+        externalSample: bool
+            If True, use the external source for sampling
             
             Does not check clock quality, just sets. Use getAdcClock() to get status.
-            
-            Returns an error code. 
+
+        Returns
+        ^^^^^^^
+        Error message or empty string
         """
+
         d = 0
-        if (source == APDCAM10G_regCom.CLK_EXTERNAL):
-            d |= 0x04
-        if (autoExternal):    
-            d |= 0x08
+        if source == APDCAM10G_regCom.CLK_EXTERNAL:
+            #d |= 0x04
+            d |= 1<<2
+        if autoExternal:    
+            #d |= 0x08
+            d |= 1<<3
+        if externalSample:
+            d |= 1<<4
         err = self.sendCommand(self.codes_CC.OP_SETCLOCKCONTROL,bytes([d]),sendImmediately=True)
         if (err != ""):
             return err
@@ -1503,9 +1529,10 @@ class APDCAM10G_regCom:
         return ""
         
     def getAdcClock(self):
-        """ Determines the ADC clock frequency. Handles external/internal clock.
-            Returns err,f,mode[MHz]
-            source: APDCAM10G_regCom.CLK_INTERNAL or APDCAM10G_regCom.CLK_EXTERNAL
+        """
+        Determines the ADC clock frequency. Handles external/internal clock.
+        Returns err,f,mode[MHz]
+        source: APDCAM10G_regCom.CLK_INTERNAL or APDCAM10G_regCom.CLK_EXTERNAL
         """
         err = self.readStatus(dataOnly=True)   
         if (err != ""):
@@ -1589,9 +1616,29 @@ class APDCAM10G_regCom:
             d[5 - i] = (sampleNumber // 2 ** (i * 8)) % 256
         err = self.sendCommand(self.codes_CC.OP_SETSAMPLECOUNT,d,sendImmediately=True)
         return err
+
+    def setSerialPll(self,mult,div):
+        """
+        Set the serial PLL multiplier/divider
+
+        Parameters
+        ^^^^^^^^^^
+        mult: int (range???) - multiplier
+        div:  int (range???) - divider
+
+        Returns
+        ^^^^^^^
+        Error message or empty string
+
+        """
+
+        d=bytearray(2)
+        d[0] = mult
+        d[1] = div
+        return self.sendCommand(self.codes_CC.OP_PROGRAMSERIALPLL,d,sendImmediately=True)
         
 
-    def getDualSATA(self):
+    def getDualSata(self):
         """
         Reads the dual SATA state from the communications card.
         Does not check dual SATA setting in the ADCs.
@@ -1616,7 +1663,7 @@ class APDCAM10G_regCom:
         else:
             return "",False
                
-    def setDualSATA(self, dual_SATA_state=True):
+    def setDualSata(self, dual_SATA_state=True):
         """
         Sets the dual SATA state of the whole system, 10G card and ADCs
             
@@ -1638,41 +1685,44 @@ class APDCAM10G_regCom:
         err = self.sendCommand(self.codes_CC.OP_SETSATACONTROL,d,sendImmediately=True)
         if (err != ""):
            return err
-        return self.setADCDualSATA(dual_SATA_state=dual_SATA_state)      
-        
-    def setADCDualSATA(self,dual_SATA_state=True):
-        """
-        Sets the dual SATA state in all ADCs.
+        return self.setAdcDualSata('all',dual_SATA_state)
+       # the old implementation
+       #return self.setADCDualSATA(dual_SATA_state=dual_SATA_state)      
+
+    # This is the old function by S. Zoletnik. Reimplemented by D. Barna as setAdcDualSata using the more general setRegisterBit utility function
+    # def setADCDualSATA(self,dual_SATA_state=True):
+    #     """
+    #     Sets the dual SATA state in all ADCs.
             
-        Parameters
-        ^^^^^^^^^^
-        dual_SATA_state: bool
-            True: set dual SATA bits
-            False: clear dual SATA bits
-        Return value
-        ^^^^^^^^^^^^
-        str:
-            Returns an error text or "" of no error 
-        """
-        self.lock.acquire()
-        while (True):
-            for adc in self.status.ADC_address:
-                reg = self.codes_ADC.ADC_REG_CONTROL
-                err,data = self.readPDI(adc,reg,1,arrayData=False)
-                data = data[0]
-                if (err != ""):
-                    break
-                if (dual_SATA_state):
-                    data |= 0x03
-                else:
-                    data &= 0xfd
-                err = self.writePDI(adc,reg,data,numberOfBytes=1,arrayData=False,noReadBack=False)
-                if (err != ""):
-                    break
-                time.sleep(1)
-            break
-        self.lock.release()
-        return err
+    #     Parameters
+    #     ^^^^^^^^^^
+    #     dual_SATA_state: bool
+    #         True: set dual SATA bits
+    #         False: clear dual SATA bits
+    #     Return value
+    #     ^^^^^^^^^^^^
+    #     str:
+    #         Returns an error text or "" of no error 
+    #     """
+    #     self.lock.acquire()
+    #     while (True):
+    #         for adc in self.status.ADC_address:
+    #             reg = self.codes_ADC.ADC_REG_CONTROL
+    #             err,data = self.readPDI(adc,reg,1,arrayData=False)
+    #             data = data[0]
+    #             if (err != ""):
+    #                 break
+    #             if (dual_SATA_state):
+    #                 data |= 0x03
+    #             else:
+    #                 data &= 0xfd
+    #             err = self.writePDI(adc,reg,data,numberOfBytes=1,arrayData=False,noReadBack=False)
+    #             if (err != ""):
+    #                 break
+    #             time.sleep(1)
+    #         break
+    #     self.lock.release()
+    #     return err
 
     def sendADCIstruction(self,address,instruction):    
         """ Sends an instruction in to the ADC board. 
@@ -1686,6 +1736,52 @@ class APDCAM10G_regCom:
         err = self.sendCommand(self.codes_CC.OP_WRITEPDI,data,sendImmediately=True)
         return err
 
+    def setAdcResolution(self,adcBoardNo,bits):
+        """
+        Set the data resolution
+
+        Parameters
+        ^^^^^^^^^^
+        adcBoardNo: int(1..4) or string
+            The ADC board number (1..4) or 'all' if the resolution of all ADC boards is to be set
+        bits: 8, 12 or 14
+            The number of bits (resolution)
+
+        Returns
+        ^^^^^^^
+        Error message or empty string
+        """
+
+        if bits != 14 and bits != 12 and bits != 8:
+            return "ADC resolution must be 14, 12 or 8 bits"
+
+        value = 0
+        if bits == 12:
+            value = 1
+        if bits == 8:
+            value = 2
+        return self.setAdcRegister(adcBoardNo,self.codes_ADC.ADC_REG_RESOLUTION,value)
+
+    def getAdcResolution(self,adcBoardNo):
+        """
+        Get the resolution of the ADC board(s)
+
+        Parameters
+        ^^^^^^^^^^
+        adcBoardNo: int(1..4) or the string 'all'
+
+        Returns
+        ^^^^^^^
+        err
+            Error message, or empty string
+
+        value[s]
+            The single numerical value if adcBoardNo is a number, or the list of values if adcBoardNo=='all'
+        
+        """
+
+        return self.getAdcRegister(adcBoardNo,self.codes_ADC.ADC_REG_RESOLUTION)
+        
     def setRingBufferSize(self,adcBoardNo,size):
         """
         Sets the ring buffer size
@@ -1702,15 +1798,13 @@ class APDCAM10G_regCom:
         Error message or empty string
         """
 
-        if adcBoardNo<1 or len(self.status.ADC_address)<adcBoardNo:
-            return "Bad ADC board number: " + str(adcBoardNo)
-        error =  self.writePDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_RINGBUFSIZE,size,numberOfBytes=2,arrayData=False)
+        return self.setAdcRegister(adcBoardNo,self.codes_ADC.ADC_REG_RINGBUFSIZE,size,2)
 
-        time.sleep(1)
-        eee,bs = self.getRingBufferSize(adcBoardNo)
-        print("Bufsize read back: " + str(bs))
+        # if adcBoardNo<1 or len(self.status.ADC_address)<adcBoardNo:
+        #     return "Bad ADC board number: " + str(adcBoardNo)
+        # error =  self.writePDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_RINGBUFSIZE,size,numberOfBytes=2,arrayData=False)
 
-        return error
+        # return error
 
     def getRingBufferSize(self,adcBoardNo):
         """
@@ -1921,7 +2015,7 @@ class APDCAM10G_regCom:
             data.append(d[0])
         return "",data
 
-    def setTestPattern(self,value,*,adcBoardNo='all'):
+    def setTestPattern(self,adcBoardNo='all',value=123):
         """ Set the test pattern of the ADCs.
         
         Parameters
@@ -1930,7 +2024,7 @@ class APDCAM10G_regCom:
             The number of the ADC (1..4), or the string 'all' to set the pattern for all ADCs
         value : list or int/string
             If adcBoardNo is 'all', then
-              If int all ADCs will be set to this test pattern
+              If single integer, all block of all ADCs will be set to this test pattern
               If list then each list element corresponds to one ADC block.
               If a list element is a single number then each 8-block in the ADC is set to this value.
               If a list element is a 4-element list the 8-channel blocks are set to these test patterns.
@@ -2059,14 +2153,159 @@ class APDCAM10G_regCom:
         else:
             return "", 1
 
-    def setRegisterBit(self,adcBoardNo,register,bit,state):
+    def adcAddresses(self,adcBoardNo):
         """
-        Set a single bit in the CONTROL (0x000B) register of the ADC
+        Get the addresses of the given ADC boards
 
         Parameters
         ^^^^^^^^^^
-        adcBoardNo: int (1..4) or string
+        adcBoardNo
+            If a single number (starting from 1, up to the number of actual cards in the camera, max 4),
+            return the address of that ADC board as a list of length 1
+            If a list of numbers, return ther addresses
+            If 'all', return the addresses of all actually present ADC boards
+
+        Returns
+        ^^^^^^^
+        err
+            Error message or empty string
+        addresses
+            A list of addresses (with a length of 1 if adcBoardNo is a single number)
+        """
+
+        # if 'all', then generate a sequence of numbers [1..#adcs] inclusivew
+        if adcBoardNo == 'all':
+            adcBoardNo = list(range(1,1+len(self.status.ADC_address)))
+
+        # if adcBoardNo is not a list (i.e. hopefully it is a simple number), make it a list
+        if type(adcBoardNo) is not list:
+            adcBoardNo = [adcBoardNo]
+
+        addresses = []
+        for adc in adcBoardNo:
+            if adc<1 or len(self.status.ADC_address)<adc:
+                return "Bad ADC board number: " + str(adc),[]
+            addresses.append(self.status.ADC_address[adc-1])
+        return "",addresses
+
+    def getAdcRegister(self,adcBoardNo,register,numberOfBytes=1):
+        """
+        Get the value of a register
+
+        Parameters
+        ^^^^^^^^^^
+        adcBoardNo: int(1..4) or string
             The ADC board number (1..4) or 'all' to indicate that it should be made for all ADCs
+        register:
+            Address of the register
+
+        Returns
+        ^^^^^^^
+        err
+            Error message or empty string
+        value[s]
+            The value of the register if a single ADC board is queried (i.e. adcBoardNo is an integer)
+            The list of values if multiple ADC boards are queried (even if adcBoardNo is a list of length 1!)
+        """
+
+        err,adcAddresses = self.adcAddresses(adcBoardNo)
+
+        if type(adcBoardNo) is int:
+            return self.readPDI(adcAddresses[0],register,numberOfBytes=numberOfBytes,arrayData=False)
+
+        values = []
+        for adcAddress in adcAddresses:
+            err,d = self.readPDI(adcAddress,register,numberOfBytes=numberOfBytes,arrayData=False)
+            time.sleep(0.005)
+            values.append(d)
+        return values
+        
+    def gePCRegister(self,register,numberOfBytes=1):
+        """
+        Get the value of a register
+
+        Parameters
+        ^^^^^^^^^^
+        register:
+            Address of the register
+
+        Returns
+        ^^^^^^^
+        err
+            Error message or empty string
+        value
+            The value of the register 
+        """
+
+        err,adcAddresses = self.adcAddresses(adcBoardNo)
+
+        return self.readPDI(self.codes_PC.PC_CARD,register,numberOfBytes=numberOfBytes,arrayData=False)
+    
+
+    def setAdcRegister(self,adcBoardNo,register,value,numberOfBytes=1):
+        """
+        Set a given register to a given value
+
+        Parameters
+        ^^^^^^^^^^
+        adcBoardNo: int(1..4) or string
+            The ADC board number (1..4) or 'all' to indicate that it should be made for all ADCs
+        register:
+            Address of the register
+        value:
+            Value to be written to the register
+
+        Returns
+        ^^^^^^^
+        Error message or empty string
+
+        """
+
+        err,adcAddresses = self.adcAddresses(adcBoardNo)
+        if len(adcAddresses) > 1:
+            self.lock.acquire()
+
+        for adcAddress in adcAddresses:
+            err,d = self.writePDI(adcAddress,register,value,numberOfBytes=numberOfBytes,arrayData=False)
+            if err!="":
+                return err
+
+        if len(adcAddresses) > 1:
+            self.lock.release()
+
+        return ""
+
+    def setPCRegister(self,register,value,numberOfBytes=1):
+        """
+        Set a given register of the Power and Control unit to a given value
+
+        Parameters
+        ^^^^^^^^^^
+        register:
+            Address of the register
+        value:
+            Value to be written to the register
+
+        Returns
+        ^^^^^^^
+        Error message or empty string
+
+        """
+
+        return self.writePDI(self.codes_PC.PC_CARD,register,value,numberOfBytes=numberOfBytes,arrayData=False)
+
+    
+    def setAdcRegisterBit(self,adcBoardNo,register,bit,state):
+        """
+        Set a single bit in the CONTROL (0x000B) register of the ADC. To do so, it first reads the value of the register,
+        changes the given bit to the desired value, and then writes it back to the register
+
+        Parameters
+        ^^^^^^^^^^
+        adcBoardNo: int (1..4) or the string 'all'
+            The ADC board number (1..4) or 'all' to indicate that it should be made for all ADCs
+        register:
+            The address of the register
         bit: int (0..7)
             The bit to be set
         state:
@@ -2078,13 +2317,7 @@ class APDCAM10G_regCom:
 
         """
 
-        adcAddresses = []
-        if adcBoardNo == 'all':
-            adcAddresses = self.status.ADC_address
-        else:
-            if adcBoardNo < 1 or len(self.status.ADC_address) < adcBoardNo:
-                return "Bad ADC board number: " + str(adcBoardNo)
-            adcAddresses = [self.status.ADC_address[adcBoardNo-1]]
+        adcAddresses = self.adcAddresses(adcBoardNo)
 
         if len(adcAddresses) > 1:
             self.lock.acquire()
@@ -2129,11 +2362,11 @@ class APDCAM10G_regCom:
         
         """
 
-        return self.setRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,0,state)
+        return self.setAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,0,state)
 
-    def setDualSata(self,adcBoardNo,state):
+    def setAdcDualSata(self,adcBoardNo,state):
         """
-        Switches the Dual SATA mode on/off for the given ADC board
+        Switches the Dual SATA mode on/off for the given ADC board, or all boards
 
         Parameters
         ^^^^^^^^^^
@@ -2148,7 +2381,7 @@ class APDCAM10G_regCom:
         
         """
 
-        return self.setRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,1,state)
+        return self.setAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,1,state)
 
     def setSataSync(self,adcBoardNo,state):
         """
@@ -2167,7 +2400,7 @@ class APDCAM10G_regCom:
         
         """
 
-        return self.setRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,2,state)
+        return self.setAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,2,state)
     
     def setTestPatternMode(self,adcBoardNo,state):
         """
@@ -2186,7 +2419,7 @@ class APDCAM10G_regCom:
         
         """
 
-        return self.setRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,3,state)
+        return self.setAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,3,state)
     
     
     def setFilterOn(self,adcBoardNo,state):
@@ -2206,7 +2439,7 @@ class APDCAM10G_regCom:
         
         """
 
-        return self.setRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,4,state)
+        return self.setAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,4,state)
 
     def setReverseBitord(self,adcBoardNo,state):
         """
@@ -2225,7 +2458,7 @@ class APDCAM10G_regCom:
         
         """
 
-        return self.setRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,6,state)
+        return self.setAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,6,state)
 
     
 
@@ -2302,10 +2535,30 @@ class APDCAM10G_regCom:
             data.append(int.from_bytes(rawData[2*i:2*i+2],'little'))
         return "",data
 
+    def setSampleDivider(self,sampleDiv):
+        """
+        Set the sample divider value (to reduce the number of samples sent by the communication card,
+        compared to the ADC clock frequench), see Fig. 6 of 'APDCAM-10G Users Guide'
+
+        Parameters
+        ^^^^^^^^^^
+        sampleDiv: int (what range?)
+            The divider value. For an ADC clock frequency of 20 MHz and sampleDiv=10, for example,
+            the sampling is at 2 MHz.
+
+        Returns
+        ^^^^^^^
+        Error message or empty string
+
+        """
+
+        sd = round(sampleDiv)
+        userData = sd.to_bytes(2,'big',signed=False)
+        return self.sendCommand(self.codes_CC.OP_PROGRAMSAMPLEDIVIDER,userData,sendImmediately=True)
     
     def shutterOpen(self,value):
         """
-        Set the shutter state. This function does not check whether shutter mode is manual (i.e. when
+        Set the shutter state. This function does not check whether shutter mode is manual (i.e. if
         the user can use this function to control the shutter)!
 
         Parameters
@@ -2417,15 +2670,15 @@ class APDCAM10G_regCom:
         Set a detector high voltage
         
         Parameters
-        ----------
+        ^^^^^^^^^^
         n: int
             The HV generator number (1...)
         value: int or float
             The HV value in Volts.
         
         Returns
-        ------------
-        error text or ""
+        ^^^^^^^
+        Error message or empty string
         """
 
         d = int(value/self.HV_conversion[n-1])  # This line was here before D. Barna replaced HV_conversion_in and HV_conversion_out by HV_conversion
@@ -2539,9 +2792,9 @@ class APDCAM10G_regCom:
         Use setTrigger to set up the global trigger scheme.
 
         Parameters
-        ----------
+        ^^^^^^^^^^
         channel : int
-            The ADC channel. (1...)
+            The ADC channel. (1..128 [or the maximum physically existing channels])
         level : int
             The level in 14 bit resolution. This is the scale of the ADC sigals. The final output signlas from the measurement 
             are 16384 - signal. Valid range: 0...16383
@@ -2551,9 +2804,8 @@ class APDCAM10G_regCom:
             If True enables trigger on this channel. The default is True
 
         Returns
-        -------
-        err
-            Error text or "".
+        ^^^^^^^
+        Error message or empty string
 
         """
         
@@ -2580,82 +2832,118 @@ class APDCAM10G_regCom:
             return "Error setting internal trigger:"+err
         return ""
 
-    def setInternalTriggerADC(self,enable=True):
+    def setInternalTriggerADC(self, adcBoard='all', enable=True):
         """
-        Enable/Disable trigger output in all ADC blocks.
+        Enable/Disable trigger output in one or all ADC blocks.
 
         Parameters
-        ----------
+        ^^^^^^^^^^
+        adcBoard: int(1..4) or the string 'all'
+            The ADC board number
         enable : boolean, optional
             True: Enable trigger. 
             False: Disable trigger.
                    The default is True.
 
         Returns
-        -------
-        err : string
-            "" or error message.
+        ^^^^^^^
+        Error message or empty string
 
         """
-        n_adc = len(self.status.ADC_address)
-        reg = [self.codes_ADC.ADC_REG_CONTROL] * n_adc           
-        err,ret = self.readPDI(self.status.ADC_address,
-                               reg,
-                               numberOfBytes=[1]*n_adc,
-                               arrayData=[False]*n_adc
-                               )
-        for i in range(len(ret)):
-            if (enable):
-                ret[i] |= 0x20
-            else:
-                ret[i] &= 0xff - 0x20
-        err = self.writePDI(self.status.ADC_address,
-                            reg,
-                            ret,
-                            numberOfBytes=[1]*n_adc,
-                            arrayData=[False]*n_adc,
-                            noReadBack=False
-                            )
-        return err
-        
+
+        return self.setAdcRegisterBit(adcBoard,self.codes_ADC.ADC_REG_CONTROL,5,enable)
+
     
-    def setTrigger(self,externalTriggerPolarity=None,internalTrigger=False,triggerDelay = 0):
+    # def setTrigger(self,externalTriggerPolarity=None,internalTrigger=False,triggerDelay = 0):
+    #     """
+    #     Sets the trigger scheme in the camera. Old implementation by S. Zoletnik
+
+    #     Parameters
+    #     ----------
+    #     externalTriggerPolarity: None: no external trigger
+    #                                 0: Positive edge
+    #                                 1: Negative edge
+    #     internalTrigger: True enables internal trigger
+    #     triggerDelay:  Trigger with this delay [microsec]
+
+    #     Returns
+    #     -------
+    #     error: string
+    #            "" if no error, otherwise error message
+
+    #     """
+
+    #     if (triggerDelay < 0):
+    #         td = int(0)
+    #     else:
+    #         td = int(triggerDelay)
+    #     d = 0x40
+    #     if (externalTriggerPolarity is not None):
+    #         if (externalTriggerPolarity == 0):
+    #             d = d | 0x01
+    #         else:
+    #             d = d | 0x02
+    #     if (internalTrigger):
+    #         d = d | 0x04
+    #     userData = bytes([d]) + td.to_bytes(4,'big',signed=False) 
+    #     err = self.sendCommand(self.codes_CC.OP_SETTRIGGER,userData,sendImmediately=True)
+    #     if (err != ""):
+    #         return err
+    #     return  self.setInternalTriggerADC(enable=internalTrigger)        
+
+    def setTrigger(self, externalTrigger='', internalTrigger=False, triggerDelay = 0, disableWhileStreamsOff = True):
         """
-        Sets the trigger scheme in the camera.
+        Sets the trigger scheme in the camera. New implementation by D. Barna
 
         Parameters
-        ----------
-        externalTriggerPolarity: None: no external trigger
-                                    0: Positive edge
-                                    1: Negative edge
-        internalTrigger: True enables internal trigger
-        triggerDelay:  Trigger with this delay [microsec]
+        ^^^^^^^^^^
+        externalTrigger: string
+            Define if triggering on the rising and/or falling edge of the external trigger signal is enabled
+            "positive" - enable triggering on rising edge
+            "negative" - enable triggering on falling edge
+            "both"     - enable triggering on both rising/falling edge
+            anything else - disable external trigger
+        
+        internalTrigger: boolean
+            If True, internal triggering (trigger signal coming from any of the ADC boards) is enabled
+        
+        triggerDelay:       Trigger with this delay [microsec]
+
+        disableWhileStreamsOff: ???
 
         Returns
-        -------
-        error: string
-               "" if no error, otherwise error message
-
+        ^^^^^^^
+        Error message or empty string
         """
 
         if (triggerDelay < 0):
             td = int(0)
         else:
             td = int(triggerDelay)
-        d = 0x40
-        if (externalTriggerPolarity is not None):
-            if (externalTriggerPolarity == 0):
-                d = d | 0x01
-            else:
-                d = d | 0x02
-        if (internalTrigger):
-            d = d | 0x04
+
+        d=0
+        if disableWhileStreamsOff:
+            d |= 1<<6 # disable trigger events while streams are off
+
+        # external trigger
+        if externalTrigger == 'positive' or externalTrigger == 'both':
+            d |= 1<<0
+        if externalTrigger == 'negative' or externalTrigger == 'both':
+            d |= 1<<1
+
+        # enable accepting internal triggers coming from any of the ADC boards
+        if internalTrigger:
+            d |= 1<<2
+            
         userData = bytes([d]) + td.to_bytes(4,'big',signed=False) 
         err = self.sendCommand(self.codes_CC.OP_SETTRIGGER,userData,sendImmediately=True)
         if (err != ""):
             return err
+
+        # enable outputting the internal trigger on all ADC boards as well (still not on the channel-level!)
         return  self.setInternalTriggerADC(enable=internalTrigger)        
         
+
     def clearAllInternalTrigger(self):
         """
         Clears all internal trigger settings but does not disable internal trigger.
@@ -2674,20 +2962,34 @@ class APDCAM10G_regCom:
                return "Error clearing internal trigger"
         return ""
            
-    def measure(self,numberOfSamples=100000, channelMasks=[0xffffffff,0xffffffff, 0xffffffff, 0xffffffff], \
-                sampleDiv=10, datapath="data", bits=14, waitForResult=0, externalTriggerPolarity=None,\
-                internalTrigger=False, internalTriggerADC=None,  triggerDelay=0, data_receiver='APDTest'):
+    # def measure(self,numberOfSamples=100000, channelMasks=[0xffffffff,0xffffffff, 0xffffffff, 0xffffffff], \
+    #             sampleDiv=10, datapath="data", bits=14, waitForResult=0, externalTriggerPolarity=None,\
+    #             internalTrigger=False, internalTriggerADC=None,  triggerDelay=0, data_receiver='APDTest'):
+    def measure(self,numberOfSamples=100000, \
+                channelMasks=None, \
+                sampleDiv=None, \
+                datapath="data",
+                bits=None, \
+                waitForResult=0, \
+                externalTrigger=None, \
+                internalTrigger=None, \
+                internalTriggerADC=None,  \
+                triggerDelay=0, \
+                data_receiver='APDTest'):
         """
-        
         Start measurement in APDCAM.
         
         Parameters
-        ----------
+        ^^^^^^^^^^
         numberOfSamples : int, optional
             The number of samples to measure in one ADC channel. The default is 100000.
         channelMasks : list of four integers, optional
-            Channel masks to enable ASC channel. Each bit enables one channel. 
-            The default is [0xffffffff,0xffffffff, 0xffffffff, 0xffffffff].
+            Channel masks to enable ADC channel. Each bit enables one channel. 
+            If omitted, the status is obtained from the registers CHENABLEx (x=1..4)
+            Each element of this list corresponds to one ADC board
+            MSB in each number is channel 1, LSB in each number is channel 32
+            The most significant byte in the number corresponds to CHENABLE1, the
+            least significant byte in th enumber corresponds to CHENABLE4 (I hope it is correct like this)
         sampleDiv : int, optional
             The sample clock divider.
             The default is 10. For the default ADC clock setting this means 2 MHz sampling.
@@ -2700,10 +3002,12 @@ class APDCAM10G_regCom:
                    Measurement status can be checked with measurementStatus or 
                    waited for with waiMeasurement.
              > 0 : Wait this much seconds
-        externalTriggerPolarity: None or integer.
-            None: no external trigger
-            0: Positive edge
-            1: Negative edge
+        externalTrigger: None | False | string
+            If None, use the existing settings from the camera, do not change.
+            If 'positive', triggering on the rising edge is enabled
+            If 'negative', triggering on the falling edge is enabled
+            If 'both', triggering on both the rising and falling edge is enabled
+            If False (or anything else not listed above), external trigger is disabled
         internalTrigger: boolean
             True enables internal trigger, False disables.
             If internalTriggerADC is None internal trigger enable in all ADCs
@@ -2720,74 +3024,94 @@ class APDCAM10G_regCom:
                            and will be called to collect data into files.
                 'Python': Python code inside this method. (Might still call some external C program.)
 
-       Returns
-        -------
+        Returns
+        ^^^^^^^
         str
             "" or error message
         str
             Warning. "" if no warning.
 
         """
+
         self.readStatus(dataOnly=True)
-        
-        chmask = copy.deepcopy(channelMasks)
-        if (len(chmask) < 4):
-            for i in range(4-len(chmask)):
-                chmask = [chmask, 0]
+
+        chmask = None
+
+        # If no channel mask was given by the user, read the CHENABLEx (x=1..4) registers from the camera
+        # and set the mask from these values
+        if channelMasks is None:
+            chmask = [bytearray(4)]*4
+            for adc in range(len(self.status.ADC_address)):
+                for i in range(4):
+                    err,r = self.getAdcRegister(adc+1,self.codes_ADC.ADC_REG_CHENABLE1+i)
+                    if err != "":
+                        return "Error reading the channel enabled status from the camera: " + err
+                    chmask[adc][i] = r
+        else:
+            chmask = copy.deepcopy(channelMasks)
+            if (len(chmask) < 4):
+                for i in range(4-len(chmask)):
+                    chmask.append(0)
+                    #chmask = [chmask, 0]
+                    #this (old code) is probably wrong, we want to append zeros??? this will create nested lists
+        self.measurePara.channelMasks = copy.deepcopy(chmask)
                 
+
         if (sampleDiv != None):
-            sd = round(sampleDiv)
-            userData = sd.to_bytes(2,'big',signed=False)
-            err = self.sendCommand(self.codes_CC.OP_PROGRAMSAMPLEDIVIDER,userData,sendImmediately=True)
-            if (err != ""):
-                return err,""
+            self.setSampleDivider(sampleDiv)
             self.measurePara.sampleDiv = sampleDiv
         else:
             self.measurePara.sampleDiv =  int(self.status.CC_settings[self.codes_CC.CC_REGISTER_SAMPLEDIV])
             
         if (bits != None):
-            if (round(bits) == 14):
-                res = 0
-            elif (round(bits) == 12):
-                res = 1
-            elif (round(bits) == 8):    
-                res = 2
-            else:
-                return "Invalid resolution",""
-            n_adc = len(self.status.ADC_address)
-            reg = [self.codes_ADC.ADC_REG_RESOLUTION]*n_adc
-            l = [res]*n_adc
-            err = self.writePDI(self.status.ADC_address,reg,l,numberOfBytes=[1]*n_adc,arrayData=[False]*n_adc)
-            if (err != ""):
-                return err,""
+            err = self.setAdcResolution('all',bits)
+            if err!='':
+                return err
             self.measurePara.bits = bits
         else:
-            n_adc = len(self.status.ADC_address)
-            reg = [self.codes_ADC.ADC_REG_RESOLUTION]*n_adc
-            err,data = self.readPDI(self.status.ADC_address,reg,[1]*n_adc,arrayData=[False]*n_adc)
-            if (err != ""):
-                return err,""
-            if (n_adc != 1):
-                for i in range(n_adc):
-                    if (data[0] != data[i]):
-                        return "ADC blocks have different resolution setting.",""
-            if (data[0] == 0):
-                self.measurePara.bits = 14
-            elif (data[0] == 1):
-                self.measurePara.bits = 12
-            elif (data[0] == 2):
-                self.measurePara.bits = 8
-            else:
+            resolutions = self.getAdcResolution('all')
+            for i in range(len(self.status.ADC_address)-1):
+                if resolutions[0] != resolutions[i+1]:
+                    return "ADC blocks have different resolution setting.",""
+            if resolutions[0] != 0 and resolutions[0] != 1 and resolutions[0] != 2:
                return "Invalid bit resolution setting in ADCs." ,""
-                
-        err = self.setTrigger(externalTriggerPolarity=externalTriggerPolarity,
-                              internalTrigger=internalTrigger,triggerDelay=triggerDelay
-                              )
+            self.measurePara.bits = [14,12,8][resolutions[0]]
+
+
+        print("read the trigger settings from the camera, and depending on which parameter was provided in the call to this measure(...) function, set the bits/value")
+        sys.exit(123)
+
+        # Trigger settings
+        if externalTrigger is None: # default value, i.e. parameter not specified, then take it from the camera
+            pos = self.status.CC_settings[self.CC_REGISTER_TRIGSTATE] & (1<<0)
+            neg = self.status.CC_settings[self.CC_REGISTER_TRIGSTATE] & (1<<1)
+            if pos and neg:
+                externalTrigger = 'both'
+            elif pos:
+                externalTrigger = 'positive'
+            elif neg:
+                externalTrigger = 'negative'
+        if internalTrigger is None: # default value, i.e. parameter not specified, then take it from the camera
+            internalTrigger = bool(self.status.CC_settings[self.CC_REGISTER_TRIGSTATE] & (1<<2))
+
+        if triggerDelay is None: # default value, i.e. parameter not specified, then take it from the camera
+            triggerDelay = int.from_bytes(self.status.CC_settings[self.CC_REGISTER_TRIGDELAY:self.CC_REGISTER_TRIGDELAY+4],'big')
+
+        err = self.setTrigger(externalTrigger=externalTrigger,
+                              internalTrigger=internalTrigger,
+                              triggerDelay=triggerDelay)
+
+        self.measurePara.externalTriggerPolarity = externalTriggerPolarity
+        self.measurePara.internalTrigger = internalTrigger
+        self.measurePara.triggerDelay = triggerDelay
+
+        self.measurePara.numberOfSamples = numberOfSamples
+        
         if (err != ""):
             return err,""
         
         if (internalTriggerADC is not None):
-            self.setInternalTriggerADC(enable=internalTriggerADC)
+            self.setInternalTriggerADC(adcBoard='all', enable=internalTriggerADC)
     
         err = self.syncADC()
         if (err != ""):
@@ -2804,10 +3128,13 @@ class APDCAM10G_regCom:
             
             ip = self.getIP()
             interface = self.interface.decode('ascii')
+
+            # Calculate the number of active channels
             chnum = 0
             for i in range(n_adc):
                 chnum += bin(chmask[i]).count("1")
-                
+
+            # add some safety margin to the buffer
             numberOfSamples_plus = numberOfSamples + 10000    
             buflen = numberOfSamples_plus * chnum * 2
             min_buflen = 2e8
@@ -2815,7 +3142,6 @@ class APDCAM10G_regCom:
                 buflen = round(min_buflen/float(buflen)*100)
             else:
                 buflen = 100    
-            
             
             try:
                 f.write("Open "+ip+"\n")
@@ -2838,12 +3164,11 @@ class APDCAM10G_regCom:
                 return "Error writing command file " + cmdfile,""
                 f.close()
         
-            self.measurePara.numberOfSamples = numberOfSamples
-            self.measurePara.channelMasks = copy.deepcopy(chmask)
-            self.measurePara.externalTriggerPolarity = externalTriggerPolarity
-            self.measurePara.internalTrigger = internalTrigger
-            self.measurePara.triggerDelay = triggerDelay
-            
+            #self.measurePara.numberOfSamples = numberOfSamples
+            #self.measurePara.channelMasks = copy.deepcopy(chmask)
+            #self.measurePara.externalTriggerPolarity = externalTriggerPolarity
+            #self.measurePara.internalTrigger = internalTrigger
+            #self.measurePara.triggerDelay = triggerDelay
             
             time.sleep(1)
             thisdir = os.path.dirname(os.path.realpath(__file__))
@@ -2986,6 +3311,8 @@ class APDCAM10G_regCom:
                      value= self.measurePara.bits,\
                      value_type='long',\
                      comment="The bit resolution of the ADC")
+
+
         if (self.measurePara.externalTriggerPolarity == None):
             trig = -1
         else:
@@ -3053,15 +3380,15 @@ class APDCAM10G_regCom:
             print("Stream {:d}...octet:{:d}... IP:{:d}.{:d}.{:d}.{:d}...port:{:d}".format(i+1,octet,\
                   int(d_ip[0]),int(d_ip[1]),int(d_ip[2]),int(d_ip[3]),port))
 
-    def getAdcPllLocked(adcBoardNo):
+    def getAdcPllLocked(self,adcBoardNo):
         """
-        Get the PLL locked status (truefalse)
+        Get the PLL locked status (true/false)
         """
-        (err,pllLocked) = self.readPDI(self.status.ADC_address[adcBoardNo-1],ADC_REG_STATUS1,1,arrayData=False)
-        return (err,bool(pllLocked & 1))
+        (err,pllLocked) = self.readPDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_STATUS1,1,arrayData=False)
+        return (err,bool(pllLocked[0] & 1))
 
 
-    def getAdcPowerVoltages(adcBoardNo):
+    def getAdcPowerVoltages(self,adcBoardNo):
         """
         Get the power voltages
 
@@ -3071,38 +3398,40 @@ class APDCAM10G_regCom:
 
         """
         errors = ""
-        (err,dvdd33) = self.readPDI(self.status.ADC_address[adcBoardNo-1],ADC_REG_DVDD33,2,arrayData=False)
-        if err != "":
-            errors += err + ";"
-        (err,dvdd25) = self.readPDI(self.status.ADC_address[adcBoardNo-1],ADC_REG_DVDD25,2,arrayData=False)
-        if err != "":
-            errors += err + ";"
-        (err,avdd33) = self.readPDI(self.status.ADC_address[adcBoardNo-1],ADC_REG_AVDD33,2,arrayData=False)
-        if err != "":
-            errors += err + ";"
-        (err,avdd18) = self.readPDI(self.status.ADC_address[adcBoardNo-1],ADC_REG_AVDD18,2,arrayData=False)
-        if err != "":
-            errors += err + ";"
-        return (errors,dvdd33,dvdd25,avdd33,avdd18)
 
-    def getAdcTemperature(adcBoardNo):
-        (err,T) = self.readPDI(self.status.ADC_address[adcBoardNo-1],ADC_REG_TEMP,1,arrayData=False)
+        (err,dvdd33) = self.readPDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_DVDD33,2,arrayData=False)
+        if err != "":
+            errors += err + ";"
+        (err,dvdd25) = self.readPDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_DVDD25,2,arrayData=False)
+        if err != "":
+            errors += err + ";"
+        (err,avdd33) = self.readPDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_AVDD33,2,arrayData=False)
+        if err != "":
+            errors += err + ";"
+        (err,avdd18) = self.readPDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_AVDD18,2,arrayData=False)
+        if err != "":
+            errors += err + ";"
+        #return (errors,dvdd33,dvdd25,avdd33,avdd18)
+        return (errors,dvdd33[0],dvdd25[0],avdd33[0],avdd18[0])  # Changed by D. Barna
+
+    def getAdcTemperature(self,adcBoardNo):
+        (err,T) = self.readPDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_TEMP,1,arrayData=False)
         return (err,T)
         
-    def getAdcOverload(adcBoardNo):
+    def getAdcOverload(self,adcBoardNo):
         """
         Return True/False if any of the channels went to overload. It clears the latched bit
         corresponding to this event
         
         """
         # Read the status
-        (error,status) = self.readPDI(self.status.ADC_address[adcBoardNo-1],ADC_REG_OVDSTATUS,1,arrayData=False)
+        (error,status) = self.readPDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_OVDSTATUS,1,arrayData=False)
 
         # Clear the status byte (the latched bit 0, which is indicating the overload stsatus)
-        self.writePDI(self.status.ADC_address[adcBoardNo-1],ADC_REG_OVDSTATUS,0,1)
+        self.writePDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_OVDSTATUS,0,1)
 
         #return True/False
-        return bool(status&1)
+        return (error,bool(status[0] & 1))
 
  # end of class APDCAM10G_regComm
 

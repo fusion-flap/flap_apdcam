@@ -1,3 +1,17 @@
+Now ADC tab has "SATA CLK Mult" and "SATA CLK Div", and ControlTiming tab has "Serial PLL Mult" and "Serial PLL Div". They seem to be redundant, should they be merged?
+OP_PROGRAMSERIALPLL (a.k.a. SETSATACONTROL) sets sata pll mult/div values. For all ADC cards (i.e. settings the DSLVCLKMUL and DSLVCLKDIV registers of all ADC boards, + registers 287, 288 on the CC as well)?
+
+In the old gui there were "Base PLL Mult/Div", "Serial PLL Mult/Div" and "EXT CLK Mult/Div". The last one is clear, the first two? Which is the "ADC PLL" in Fig. 6 of APDCAM User Guide?
+
+CC registers are set using dedicated operations, not register writes. Do these operations do something else beyond setting these registers? readCCdata etc dump the whole settings table (register table) into a python array. When writing the registers of the CC card, and not updating this python array, they could get out of sync. Should this be checked, corrected?
+
+SAMPLEDIVIDER of the CC card is also set using a special instruction, but when it is read back (in case of default 'None' argument of measure func), then the  self.status.CC_settings[self.codes_CC.CC_REGISTER_SAMPLEDIV] variable is used, rather than reading it from the camera. Where is the TRIGGER register located in this array?
+
+
+setTrigger(...) method: externalTriggerPolarity can either indicate 'no external trigger', positive or negative slop, exclusively, in its current implementation. However, from the documentation I deduce that there are two separate bits in the register, one enabling the positive, the other one enabling the negative slope. So this method restricts the user to choose independently positive and negative slope.
+
+'Bits' input in the gui --> 0x001C RESOLUTION ?
+
 APDCAM10G_control.getDualSATA() returns whether dual sata or not, without checking same for ADCs. This status should be shown somewhere in the GUI (or controlled as well?)
 
 fir frequency: ebbol ki lesz szamolva a coeff-ek. Keruljon be azok melle. 

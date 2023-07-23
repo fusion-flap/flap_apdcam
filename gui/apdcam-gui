@@ -3,7 +3,7 @@
 while true; do
     python3 ApdcamGui.py
     status=$?
-    if [ $status != 1 ] ; then
+    if [ $status != 123 ] ; then
         break
     fi
 done

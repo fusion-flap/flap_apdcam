@@ -24,9 +24,9 @@ class Infrastructure(QtWidgets.QWidget):
 
         hv = QVGroupBox("HV settings")
         l1.addWidget(hv)
-        self.readHvStatusButton = QtWidgets.QPushButton("Read HV Status")
-        self.readHvStatusButton.clicked.connect(self.readHvStatus)
-        hv.addWidget(self.readHvStatusButton)
+#        self.readHvStatusButton = QtWidgets.QPushButton("Read HV Status")
+#        self.readHvStatusButton.clicked.connect(self.readHvStatus)
+#        hv.addWidget(self.readHvStatusButton)
 
         l = QtWidgets.QHBoxLayout()
         hv.addLayout(l)
@@ -50,8 +50,8 @@ class Infrastructure(QtWidgets.QWidget):
 
             self.hvGroup[i].addWidget(QtWidgets.QLabel("HV"+str(i+1)+" act."),1,0)
             self.hvActual[i] = QtWidgets.QLineEdit()
-            self.hvActual[i].setMaximumWidth(40)
-            self.hvActual[i].setEnabled(False)
+            self.hvActual[i].setReadOnly(True)
+            self.hvActual[i].setToolTip("Actual value of the high-voltage generator #" + str(i+1))
             self.hvGroup[i].addWidget(self.hvActual[i],1,1)
 
             #self.hvGroup[i].addWidget(QtWidgets.QLabel("HV"+str(i+1)+" max."),2,0)
@@ -128,25 +128,31 @@ class Infrastructure(QtWidgets.QWidget):
         
         l1.addStretch(2)
 
-        g = QGridGroupBox("Temperatures")
-        layout.addWidget(g)
-        tmp = [["01","temp01"],
-            ["02","temp02"],
-            ["03","temp03"],
-            ["04","temp04"],
-            ["Detector 1","tempDetector1"],
-            ["Analog panel 1","tempAnalog1"],
-            ["Analog panel 2","tempAnalog2"],
-            ["Detector 2","tempDetector2"],
-            ["Analog panel 3","tempAnalog3"],
-            ["Analog panel 4","tempAnalog4"],
-            ["Baseplate","tempBasePlate"],
-            ["12","temp12"],
-            ["13","temp13"],
-            ["PC card heatsink","tempPcCardHeatsink"],
-            ["Power panel 1","tempPowerPanel1"],
-            ["Power panel 2","tempPowerPanel2"]]
+        vv = QtWidgets.QVBoxLayout()
+        layout.addLayout(vv)
 
+        g = QGridGroupBox("Temperatures")
+        vv.addWidget(g)
+        vv.addStretch(1)
+        tmp = [["01","temp01"],
+               ["02","temp02"],
+               ["03","temp03"],
+               ["04","temp04"],
+               ["Detector 1","tempDetector1"],
+               ["Analog panel 1","tempAnalog1"],
+               ["Analog panel 2","tempAnalog2"],
+               ["Detector 2","tempDetector2"],
+               ["Analog panel 3","tempAnalog3"],
+               ["Analog panel 4","tempAnalog4"],
+               ["Baseplate","tempBasePlate"],
+               ["12","temp12"],
+               ["13","temp13"],
+               ["PC card heatsink","tempPcCardHeatsink"],
+               ["Power panel 1","tempPowerPanel1"],
+               ["Power panel 2","tempPowerPanel2"]]
+
+        # The list of temperature reading display widgets
+        self.temps = [None]*16  # placeholders
         for i in range(len(tmp)):
             row = i
             col = 0
@@ -155,16 +161,20 @@ class Infrastructure(QtWidgets.QWidget):
                 col = 2
             g.addWidget(QtWidgets.QLabel(tmp[i][0]),row,col)
             t = QtWidgets.QLineEdit()
-            setattr(self,tmp[i][1],t)
-            t.setEnabled(False)
+            #setattr(self,tmp[i][1],t)
+            self.temps[i] = t
+            self.temps[i].setToolTip(tmp[0][0] + " temperature")
+            t.setReadOnly(True)
             g.addWidget(t,row,col+1)
 
-        self.readTempsButton = QtWidgets.QPushButton("Read temps")
-        g.addWidget(self.readTempsButton,len(tmp),0)
+#        self.readTempsButton = QtWidgets.QPushButton("Read temps")
+#        g.addWidget(self.readTempsButton,len(tmp),0)
+#        self.readTempsButton.setToolTip("Read the temperature sensors of the camera and display their values here")
+#        self.readTempsButton.clicked.connect(self.readTemperatures)
 
 #        self.readWeightsButton = QtWidgets.QPushButton("Read weights")
 #        g.addWidget(self.readWeightsButton,len(tmp),1)
-        g.setRowStretch(g.rowCount(),1)
+#        g.setRowStretch(g.rowCount(),1)
 
         # g = QGridGroupBox("Fan 1")
         # layout.addWidget(g)
@@ -185,9 +195,25 @@ class Infrastructure(QtWidgets.QWidget):
         # self.fan1Ctrl = QtWidgets.QLineEdit()
         # g.addWidget(self.fan1Ctrl,4,1)
         
-        g.setRowStretch(g.rowCount(),1)
 
         layout.addStretch(1)
+
+    def updateGui(self):
+        for i in range(4):
+            self.hvActual[i]="{:5.1f}".format(self.gui.camera.status.HV_act[i])
+
+        # probably no need to call this, since readStatus() has been called from the topmost element, i.e. the gui's update function
+        # and this reads the temperatures as well. 
+        # self.readTemperatures()
+
+        for i in range(16):
+            T = self.gui.camera.status.temps[i]
+            self.temps[i].setText("{:3.1f}".format(T) if T<100 else "---")
+
+
+
+#    def readTemperatures(self):
+#        self.gui.showError("Infrastructure.readTemperatures is not yet implemented")
 
     def setHvMax(self,n):
         """
@@ -240,8 +266,8 @@ class Infrastructure(QtWidgets.QWidget):
 
         self.gui.afterBackendCall(True if err=="" else False, [err],name="self.gui.camera.shutterMode(" + str(mode) + ")")
 
-    def readHvStatus(self):
-        self.gui.showError("Infrastructure.readHvStatus not implemented yet")
+#    def readHvStatus(self):
+#        self.gui.showError("Infrastructure.readHvStatus not implemented yet")
 
     def setHvGroups(self,n):
         """

@@ -12,6 +12,9 @@ Qt = importlib.import_module(QtVersion+".QtCore")
 from ApdcamUtils import *
 
 class CameraConfig(QtWidgets.QWidget):
+    def updateGui(self):
+        pass
+
     def __init__(self,parent):
         super(CameraConfig,self).__init__(parent)
         layout = QtWidgets.QVBoxLayout()

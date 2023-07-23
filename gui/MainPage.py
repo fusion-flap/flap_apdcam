@@ -46,6 +46,10 @@ class MainPage(QtWidgets.QWidget):
         self.connectCameraButton.setToolTip("Connect to the camera at the given IP address, and update the GUI control values from the actual camera settings, whereever possible")
         l.addWidget(self.connectCameraButton)
 
+        # aaa = QtWidgets.QPushButton("Start GUI Update")
+        # aaa.clicked.connect(lambda: self.gui.startGuiUpdate())
+        # l.addWidget(aaa)
+
         self.disconnectCameraButton = QtWidgets.QPushButton("Disconnect camera")
         self.disconnectCameraButton.clicked.connect(self.cameraOff)
         self.disconnectCameraButton.setToolTip("Disconnect from the camera")
@@ -64,6 +68,7 @@ class MainPage(QtWidgets.QWidget):
         self.gui.status.connected = False
         self.gui.camera.close()  # APDCAM10G_control should handle the case if camera is on or off when calling close()
         self.gui.showMessage("Camera disconnected")
+        self.gui.stopGuiUpdate()
 
     def cameraOn(self):
         """
@@ -103,13 +108,14 @@ class MainPage(QtWidgets.QWidget):
         self.cameraType.append("Firmware: {:s}".format(self.gui.camera.status.firmware.decode('utf-8')))
         
         nAdcBoards = len(self.gui.camera.status.ADC_address) 
+        self.gui.adcControl.clearAdcs()
         self.cameraType.append("")
         for i in range(nAdcBoards):
             self.cameraType.append("ADC " + str(i+1))
             self.cameraType.append("   Address:      " +  str(self.gui.camera.status.ADC_address[i]))
             self.cameraType.append("   FPGA Version: " +  self.gui.camera.status.ADC_FPGA_version[i])
             self.cameraType.append("   MC Version:   " +  self.gui.camera.status.ADC_MC_version[i])
-        self.gui.adcControl.setAdcs(nAdcBoards)
+            self.gui.adcControl.addAdc(i+1,self.gui.camera.status.ADC_address[i])
 
         self.cameraType.append("")
         self.cameraType.append("PC Firmware Version: " + self.gui.camera.status.PC_FW_version)
@@ -123,14 +129,6 @@ class MainPage(QtWidgets.QWidget):
 
         for i in range(4):
             self.gui.infrastructure.hvSet[i].setValue(self.gui.camera.status.HV_set[0])
-
-        print(" This needs to be implemented in " + __file__)
-        # self.var_detTemp_set.set("---")
-        # self.var_detTemp_set.set("{:5.1f}".format(self.GUI_status.APDCAM_status.ref_temp))
-        # if (self.var_clocksource.get() == 'External'): 
-        #     err = self.GUI_status.APDCAM_reg.setClock(APDCAM10G_regCom.CLK_EXTERNAL,extmult=4,extdiv=2,autoExternal=True)
-        # else:
-        #     err = self.GUI_status.APDCAM_reg.setClock(APDCAM10G_regCom.CLK_INTERNAL)
 
         for adcBoardNo in range(nAdcBoards):
             err,offsets = self.gui.camera.getOffsets(adcBoardNo+1)
@@ -147,4 +145,5 @@ class MainPage(QtWidgets.QWidget):
             self.gui.showMessage("Updated calibration light intensity value in the GUI from the camera")
             self.gui.infrastructure.calibrationLightIntensity.setValue(d)
 
-        print("HEY, implement reading other data from the camera, and update the GUI !!!!!")
+        self.gui.startGuiUpdate()
+

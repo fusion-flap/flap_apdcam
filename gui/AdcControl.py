@@ -14,12 +14,12 @@ from ApdcamUtils import *
 from GuiMode import *
 
 class Adc(QtWidgets.QWidget):
-    def updateFromCamera():
+    def updateGui(self):
         (error,dvdd33,dvdd25,avdd33,avdd18) = self.gui.camera.getAdcPowerVoltages(self.number)
-        self.dvdd33.setText(str(dvdd33))
-        self.dvdd25.setText(str(dvdd25))
-        self.avdd33.setText(str(avdd33))
-        self.avdd18.setText(str(avdd18))
+        self.dvdd33.setText("{:.3f}".format(dvdd33/1000.0))
+        self.dvdd25.setText("{:.3f}".format(dvdd25/1000.0))
+        self.avdd33.setText("{:.3f}".format(avdd33/1000.0))
+        self.avdd18.setText("{:.3f}".format(avdd18/1000.0))
 
         (error,pllLocked) = self.gui.camera.getAdcPllLocked(self.number)
         self.pllLocked.setChecked(pllLocked)
@@ -30,8 +30,15 @@ class Adc(QtWidgets.QWidget):
         (error,overload) = self.gui.camera.getAdcOverload(self.number)
         self.overload.setChecked(overload)
 
+        error,status2 = self.gui.camera.getAdcRegister(self.number,self.gui.camera.codes_ADC.ADC_REG_STATUS2)
+        status2 = status2[0]
+        self.led1.setChecked((status2>>2)&1) 
+        self.led2.setChecked((status2>>3)&1)
+        self.internalTriggerDisplay.setChecked((status2>>0)&1)
+            #itt vagyok most meg kell irni
+        
     def name(self):
-        return "ADC " + str(self.number)
+        return "ADC " + str(self.number) + " (" + str(self.address) + ")"
 
     def channelOnOff(self,i,state):
         if i > 32 or i <= 0:
@@ -88,14 +95,37 @@ class Adc(QtWidgets.QWidget):
     def setTestPattern(self):
         values = self.testPattern.text().split()
         if len(values) == 1:
-            self.gui.camera.setTestPattern(values[0],adcBoardNo=self.number)
+            self.gui.camera.setTestPattern(adcBoardNo=self.number,value=values[0])
         else:
             if len(values) != 4:
                 self.gui.showError("Test pattern must be a single or four integers")
                 return
-            self.gui.camera.setTestPattern(values,adcBoadNo=self.number)
+            self.gui.camera.setTestPattern(adcBoadNo=self.number,value=values)
 
-    def __init__(self,parent,number):
+    def calculateFilterCoeffs(self,f_fir,f_recurs):
+        print("This function should be crosschecked")
+        sys.exit(1);
+        f_adc = 10e6
+        gain = 1
+        Nyquist_freq = f_adc/2
+        tau = f_adc/f_recurs/2/math.pi
+        c = math.exp(-1./double(tau))
+        c = long(c*4096)
+        order = 5
+        r = digital_filter(0,f_fir/(f_adc/2)<1,50,order)
+        s1 = [0]*(order*10)
+        s1[2*order]=1000
+        s2=convol(s1,r)
+        coeff1 = s2[2*order:3*order-1]
+        coeff=fix(coeff1/total(coeff1)*(4096-c)/16)*2^gain
+        filt = [0]*8
+        for i in range(5):
+            filt[i] = coeff[i]
+        filt[5] = c
+        filt[7] = 8+gain
+
+
+    def __init__(self,parent,number,address):
         """
         Constructor
 
@@ -111,6 +141,7 @@ class Adc(QtWidgets.QWidget):
         self.gui = parent.gui
         super(Adc,self).__init__(parent)
         self.number = number
+        self.address = address
 
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
@@ -122,22 +153,26 @@ class Adc(QtWidgets.QWidget):
         topRow.addWidget(g)
         g.addWidget(QtWidgets.QLabel("DVDD33:"),1,0)
         self.dvdd33 = QtWidgets.QLineEdit()
-        self.dvdd33.setEnabled(False)
+        self.dvdd33.setReadOnly(True)
+        self.dvdd33.setToolTip("DVDD 3.3 V")
         g.addWidget(self.dvdd33,1,1)
         
         g.addWidget(QtWidgets.QLabel("AVDD33:"),2,0)
         self.avdd33 = QtWidgets.QLineEdit()
-        self.avdd33.setEnabled(False)
+        self.avdd33.setReadOnly(True)
+        self.avdd33.setToolTip("AVDD 3.3 V")
         g.addWidget(self.avdd33,2,1)
 
         g.addWidget(QtWidgets.QLabel("DVDD 2.5 V:"),4,0)
         self.dvdd25 = QtWidgets.QLineEdit()
-        self.dvdd25.setEnabled(False)
+        self.dvdd25.setReadOnly(True)
+        self.dvdd25.setToolTip("DVDD 2.5 V")
         g.addWidget(self.dvdd25,4,1)
 
         g.addWidget(QtWidgets.QLabel("AVDD 1.8 V:"),3,0)
         self.avdd18 = QtWidgets.QLineEdit()
-        self.avdd18.setEnabled(False)
+        self.avdd18.setReadOnly(True)
+        self.avdd18.setToolTip("AVDD 1.8 V")
         g.addWidget(self.avdd18,3,1)
 
 
@@ -158,16 +193,19 @@ class Adc(QtWidgets.QWidget):
         self.pllLocked.setToolTip("Indicate whether the PLL of the ADC board is locked")
         g.addWidget(self.pllLocked)
         self.internalTriggerDisplay = QtWidgets.QCheckBox("Internal trigger")
+        self.internalTriggerDisplay.setToolTip("???")
         self.internalTriggerDisplay.setEnabled(False)
-        self.internalTriggerDisplay.setToolTip("Indicating whether the board is using an internal trigger")
         g.addWidget(self.internalTriggerDisplay)
         self.overload = QtWidgets.QCheckBox("Overload")
+        self.overload.setToolTip("Indicating whether any of the channels of this ADC have gone to overload since the last status update")
         self.overload.setEnabled(False)
         g.addWidget(self.overload)
-        self.led1 = QtWidgets.QCheckBox("LED 1")
+        self.led1 = QtWidgets.QCheckBox("SATA1 data out")
+        self.led1.setToolTip("Indicator for data output through SATA1")
         self.led1.setEnabled(False)
         g.addWidget(self.led1)
-        self.led2 = QtWidgets.QCheckBox("LED 2")
+        self.led2 = QtWidgets.QCheckBox("SATA2 data out")
+        self.led2.setToolTip("Indicator for data output through SATA2")
         self.led2.setEnabled(False)
         g.addWidget(self.led2)
 
@@ -204,6 +242,7 @@ class Adc(QtWidgets.QWidget):
                                                        name = "APDCAM10G_control.setAdcChannelEnable(" + str(self.number) + "," + str(channel) + ",state)"
                                                        ))
                 chk.setToolTip("Enable/disable a given channel")
+                chk.channelNumber = channel
                 self.channelOn[row*cols+col] = chk
                 l.addWidget(chk,row,col)
         l.setRowStretch(l.rowCount(),1)
@@ -227,11 +266,11 @@ class Adc(QtWidgets.QWidget):
         self.sataOn.guiMode = GuiMode.factory
         g.addWidget(self.sataOn,0,0)
 
-        self.dualSata = QtWidgets.QCheckBox("Dual SATA")
-        self.dualSata.setToolTip("Switch dual SATA mode on (must be done for ALL ADCs!)")
-        self.dualSata.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setDualSata(self.number,self.dualSata.isChecked())))
-        self.dualSata.guiMode = GuiMode.factory
-        g.addWidget(self.dualSata,1,0)
+        # self.dualSata = QtWidgets.QCheckBox("Dual SATA")
+        # self.dualSata.setToolTip("Switch dual SATA mode on (must be done for ALL ADCs!)")
+        # self.dualSata.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setAdcDualSata(self.number,self.dualSata.isChecked())))
+        # self.dualSata.guiMode = GuiMode.factory
+        # g.addWidget(self.dualSata,1,0)
         
         self.sataSync = QtWidgets.QCheckBox("SATA Sync")
         self.sataSync.setToolTip("Switch SATA sync for this ADC")
@@ -244,6 +283,8 @@ class Adc(QtWidgets.QWidget):
         g.addWidget(self.test,3,0)
 
         self.internalTrigger = QtWidgets.QCheckBox("Internal trigger")
+        self.internalTrigger.setToolTip("Enable internal trigger output from this ADC board")
+        self.internalTrigger.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setInternalTriggerADC(adcBoardNo=self.number,enabled=self.internalTrigger.isChecked())))
         g.addWidget(self.internalTrigger,4,0)
 
         self.reverseBitOrder = QtWidgets.QCheckBox("Rev. bitord.")
@@ -256,8 +297,14 @@ class Adc(QtWidgets.QWidget):
         g = QGridGroupBox(self)
         topRow.addWidget(g)
         g.addWidget(QtWidgets.QLabel("Bits:"),0,0)
-        self.bits = QtWidgets.QLineEdit()
+        self.bits = QtWidgets.QComboBox()
+        self.bits.setToolTip("Choose the resolution (number of bits) for the data")
+        self.bits.addItem("14")
+        self.bits.addItem("12")
+        self.bits.addItem("8")
+        self.bits.activated[str].connect(self.gui.call(lambda: self.gui.camera.setResolution(self.number,int(self.bits.currentText()))))
         g.addWidget(self.bits,0,1)
+
         g.addWidget(QtWidgets.QLabel("Ring buffer:"),1,0)
         self.ringBuffer = QtWidgets.QSpinBox()
         self.ringBuffer.setMinimum(0)
@@ -266,14 +313,15 @@ class Adc(QtWidgets.QWidget):
         self.ringBuffer.setToolTip("Ring buffer size. Ring buffer is disabled if zero. Takes effect when you press Enter")
         self.ringBuffer.lineEdit().returnPressed.connect(self.gui.call(lambda: self.gui.camera.setRingBufferSize(self.number,self.ringBuffer.value()),name="setRingBufferSize",where=__file__))
         g.addWidget(self.ringBuffer,1,1)
-        g.addWidget(QtWidgets.QLabel("SATA CLK Mult:"),2,0)
-        self.sataClkMult = QtWidgets.QSpinBox()
-        g.addWidget(self.sataClkMult,2,1)
-        g.addWidget(QtWidgets.QLabel("SATA CLK Div:"),3,0)
-        self.sataClkDiv = QtWidgets.QSpinBox()
-        g.addWidget(self.sataClkDiv,3,1)
-        g.addWidget(QtWidgets.QLabel("Test pattern:"),4,0)
 
+        # g.addWidget(QtWidgets.QLabel("SATA CLK Mult (REDUNDANT?):"),2,0)
+        # self.sataClkMult = QtWidgets.QSpinBox()
+        # g.addWidget(self.sataClkMult,2,1)
+        # g.addWidget(QtWidgets.QLabel("SATA CLK Div (REDUNDANT?):"),3,0)
+        # self.sataClkDiv = QtWidgets.QSpinBox()
+        # g.addWidget(self.sataClkDiv,3,1)
+
+        g.addWidget(QtWidgets.QLabel("Test pattern:"),4,0)
         self.testPattern = QtWidgets.QLineEdit()
         self.testPattern.returnPressed.connect(self.gui.call(self.setTestPattern))
         self.testPattern.setToolTip("Test pattern for this ADC. Either an integer (value for all four 8-channel blocks), or 4 integers (for the blocks separately)")
@@ -281,7 +329,6 @@ class Adc(QtWidgets.QWidget):
         g.setRowStretch(g.rowCount(),1)
 
         g = QGridGroupBox(self)
-        g.setTitle("Filter")
         topRow.addWidget(g)
         self.firCoeff = [0,0,0,0,0]
         for i in range(5):
@@ -313,6 +360,7 @@ class Adc(QtWidgets.QWidget):
         self.internalFilterDiv.setToolTip("Defines the factor to divide the filter output, as 2 to the power specified here. Must press Enter to take effect (but then all filter coeffs are sent to the camera)!")
         g.addWidget(self.internalFilterDiv,1,3)
 
+
         g.addWidget(QtWidgets.QLabel("FIR Freq. [MHz]:"),2,2)
         self.firFrequency = QDoubleEdit()
         g.addWidget(self.firFrequency,2,3)
@@ -327,10 +375,16 @@ class Adc(QtWidgets.QWidget):
         
         g.setRowStretch(g.rowCount(),1)
 
-        g = QVGroupBox("Internal trigger")
+        g = QVGroupBox("")
         layout.addWidget(g)
         h = QtWidgets.QHBoxLayout()
         g.addLayout(h)
+
+        title = QtWidgets.QLabel("Internal trigger")
+        title.setStyleSheet("font-weight:bold")
+        h.addWidget(title)
+        h.addStretch(1)
+
         triggerLevelAllButton = QtWidgets.QPushButton("Set all trigger levels")
         triggerLevelAllButton.clicked.connect(lambda: self.allTriggerLevels(self.triggerLevelAll.value()))
         triggerLevelAllButton.setToolTip("Set all trigger levels to the specified value (takes immediate effect)")
@@ -416,28 +470,16 @@ class Adc(QtWidgets.QWidget):
                 level.valueChanged.connect(func)
 
 
-        g = QVGroupBox("Channel offsets (DAC)")
+        g = QVGroupBox("")
         layout.addWidget(g)
+
         h = QtWidgets.QHBoxLayout()
         g.addLayout(h)
-        h.setSpacing(0)
-        self.dac = [None]*32
-        for i in range(32):
-            #self.dac[i] = QIntEdit(0,65535)
-            self.dac[i] = QtWidgets.QSpinBox()
-            self.dac[i].setMinimum(0)
-            self.dac[i].setMaximum(65535)
-            self.dac[i].setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
-            self.dac[i].setMaximumWidth(54)
-            f = partial(lambda ch: self.gui.camera.setOffset(self.number,ch,self.dac[ch-1].value()),i+1)
-            self.dac[i].lineEdit().returnPressed.connect(self.gui.call(f,name="APDCAM10G_control.setOffset(" + str(self.number) + "," + str(i+1) + ",value)",where=__file__))
-            self.dac[i].setToolTip("Specify the value (0..65535) for the DAC for the given channel, which defines the ADC offset. Changes take effect when you hit Enter")
-            h.addWidget(self.dac[i])
+
+        title = QtWidgets.QLabel("Channel offsets (DAC)")
+        title.setStyleSheet("font-weight:bold")
+        h.addWidget(title)
         h.addStretch(1)
-
-        h = QtWidgets.QHBoxLayout()
-        g.addLayout(h)
-
 
         self.allDacValues = QtWidgets.QSpinBox()
         self.allDacValues.setMinimum(0)
@@ -472,39 +514,72 @@ class Adc(QtWidgets.QWidget):
 
         h.addStretch(10)
 
+        h = QtWidgets.QHBoxLayout()
+        g.addLayout(h)
+        h.setSpacing(0)
+        self.dac = [None]*32
+        for i in range(32):
+            #self.dac[i] = QIntEdit(0,65535)
+            self.dac[i] = QtWidgets.QSpinBox()
+            self.dac[i].setMinimum(0)
+            self.dac[i].setMaximum(65535)
+            self.dac[i].setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+            self.dac[i].setMaximumWidth(54)
+            f = partial(lambda ch: self.gui.camera.setOffset(self.number,ch,self.dac[ch-1].value()),i+1)
+            self.dac[i].lineEdit().returnPressed.connect(self.gui.call(f,name="APDCAM10G_control.setOffset(" + str(self.number) + "," + str(i+1) + ",value)",where=__file__))
+            self.dac[i].setToolTip("Specify the value (0..65535) for the DAC for the given channel, which defines the ADC offset. Changes take effect when you hit Enter")
+            h.addWidget(self.dac[i])
+        h.addStretch(1)
+
+
 class AdcControl(QtWidgets.QWidget):
+    def updateGui(self):
+        for adc in self.adc:
+            adc.updateGui()
+
     def __init__(self,parent):
         self.gui = parent
         super(AdcControl,self).__init__(parent)
         self.layout = QtWidgets.QVBoxLayout()
         self.setLayout(self.layout)
 
-        self.readAllAdcStatusButton = QtWidgets.QPushButton("Read all ADC status")
-        self.layout.addWidget(self.readAllAdcStatusButton)
-
         self.adc = []
         self.adcTabs = QtWidgets.QTabWidget(self)
         self.layout.addWidget(self.adcTabs)
 
-        self.setAdcs(4)
+        #self.setAdcs(4)
+
+        h = QtWidgets.QHBoxLayout()
+        self.layout.addLayout(h)
+
 
         self.factoryResetButton = QtWidgets.QPushButton("Factory reset")
         self.factoryResetButton.guiMode = GuiMode.factory
-        self.layout.addWidget(self.factoryResetButton)
+        h.addWidget(self.factoryResetButton)
 
         self.readFromHwButton = QtWidgets.QPushButton("Read from HW")
-        self.layout.addWidget(self.readFromHwButton)
+        h.addWidget(self.readFromHwButton)
 
-    def addAdc(self):
-        adc = Adc(self,len(self.adc)+1)
+        self.readAllAdcStatusButton = QtWidgets.QPushButton("Read all ADC status")
+        h.addWidget(self.readAllAdcStatusButton)
+
+        
+    def addAdc(self,number,address):
+        adc = Adc(self,number,address)
         self.adc.append(adc)
         self.adcTabs.addTab(adc,adc.name())
 
-    def setAdcs(self,number):
-        if number > self.adcTabs.count():
-            while number > self.adcTabs.count():
-                self.addAdc()
-        if number < self.adcTabs.count():
-            while number < self.adcTabs.count():
-                self.adcTabs.removeTab(self.adcTabs.count()-1)
+    def clearAdcs(self):
+        self.adc = []
+        while self.adcTabs.count() > 0:
+            self.adcTabs.removeTab(0)
+
+    # def setAdcs(self,number):
+    #     self.adc = []
+    #     if number > self.adcTabs.count():
+    #         while number > self.adcTabs.count():
+    #             self.addAdc()
+    #     if number < self.adcTabs.count():
+    #         while number < self.adcTabs.count():
+    #             self.adcTabs.removeTab(self.adcTabs.count()-1)
                 

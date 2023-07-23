@@ -1189,27 +1189,38 @@ class APDCAM10G_GUI_class:
                     self.var_HV2_act.set("{:5.1f}".format(self.GUI_status.APDCAM_status.HV_act[1]))
                     self.var_HV3_act.set("{:5.1f}".format(self.GUI_status.APDCAM_status.HV_act[2]))
                     self.var_HV4_act.set("{:5.1f}".format(self.GUI_status.APDCAM_status.HV_act[3]))
+
                     if (self.GUI_status.APDCAM_status.temps[APDCAM10G_GUI_class.DETECTOR_TEMP_SENSOR-1] < 100):
                         self.var_detTemp_act.set("{:3.1f}".\
                             format(self.GUI_status.APDCAM_status.temps[APDCAM10G_GUI_class.DETECTOR_TEMP_SENSOR-1]))
                     else:
                         self.var_detTemp_act.set("---") 
+
+
                     if (self.GUI_status.APDCAM_status.temps[APDCAM10G_GUI_class.BASE_TEMP_SENSOR-1] < 100):    
                         self.var_baseTemp_act.set("{:3.1f}".\
                             format(self.GUI_status.APDCAM_status.temps[APDCAM10G_GUI_class.BASE_TEMP_SENSOR-1]))
                     else:
                         self.var_baseTemp_act.set("---") 
+
+
                     if (self.GUI_status.APDCAM_status.temps[APDCAM10G_GUI_class.AMP_TEMP_SENSOR-1]< 100):
                         self.var_ampTemp_act.set("{:3.1f}".\
                             format(self.GUI_status.APDCAM_status.temps[APDCAM10G_GUI_class.AMP_TEMP_SENSOR-1]))
                     else:
                         self.var_ampTemp_act.set("---") 
+
+
                     if (self.GUI_status.APDCAM_status.temps[APDCAM10G_GUI_class.POWER_TEMP_SENSOR-1] < 100):
                         self.var_powerTemp_act.set("{:3.1f}".\
                             format(self.GUI_status.APDCAM_status.temps[APDCAM10G_GUI_class.POWER_TEMP_SENSOR-1]))
                     else:
                         self.var_powerTemp_act.set("---") 
+
+
                     self.var_CCTemp_act.set("{:3d}".format(self.GUI_status.APDCAM_status.CCTemp))
+
+
                     if (self.var_clocksource.get() == 'External'):
                         if (self.GUI_status.APDCAM_status.extclock_valid) : 
                             clk = self.GUI_status.APDCAM_status.extclock_freq/1000

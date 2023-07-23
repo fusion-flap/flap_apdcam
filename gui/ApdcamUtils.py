@@ -7,6 +7,12 @@ QtGui     = importlib.import_module(QtVersion+".QtGui")
 #from PyQt6.QtCore import Qt
 #from PyQt6.QtGui import QDoubleValidator
 
+class QCheckBoxIndicator(QtWidgets.QCheckBox):
+    def __init__(self,title):
+        super(QCheckBoxIndicator,self).__init__(title)
+        
+
+
 class QHGroupBox(QtWidgets.QGroupBox):
     def __init__(self,title=""):
         super(QHGroupBox,self).__init__(title)

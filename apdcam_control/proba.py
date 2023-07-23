@@ -1,11 +1,11 @@
-def func(a):
-    print("func with 1 arg")
-    print(a)
+def f(a):
+    if a == False:
+        print("False")
+    if a:
+        print("Evaluates to true")
+    if a=="False":
+        print("String false")
+    if a is None:
+        print("None")
 
-def func(a,b):
-    print("func with 2 args")
-    print(a)
-    print(b)
-
-func(1)
-func(2,3)
+f(None)        

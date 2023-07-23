@@ -3,6 +3,7 @@ import datetime
 import time
 import inspect
 import types
+import threading
 
 import importlib
 from QtVersion import QtVersion
@@ -23,7 +24,7 @@ from Plot import Plot
 from SimpleMeasurementControl import SimpleMeasurementControl
 from GuiMode import *
 
-sys.path.append('/home/barna/fusion-instruments/sw/flap_apdcam/apdcam_control')
+sys.path.append('/home/barna/fusion-instruments/apdcam/sw/flap_apdcam/apdcam_control')
 from APDCAM10G_control import *
 
 """
@@ -51,6 +52,32 @@ def setTabEnabled(self,enabled):
         print("This widget is not within a QTabWidget")
 
 class ApdcamGui(QtWidgets.QMainWindow):
+
+    DETECTOR_TEMP_SENSOR = 5 # 1...
+    BASE_TEMP_SENSOR = 11
+    AMP_TEMP_SENSOR = 6
+    POWER_TEMP_SENSOR = 16
+
+    def updateGui(self):
+        """
+        This function is called periodically to update the GUI display from the camera state.
+        """
+
+        while not self.updateGuiThreadStop:
+            time.sleep(1)
+            if not self.status.connected:
+                continue
+
+            self.camera.readStatus()
+
+            self.infrastructure.updateGui()
+            self.adcControl.updateGui()
+            self.controlTiming.updateGui()
+            self.cameraTimer.updateGui()
+            self.cameraConfig.updateGui()
+
+        self.updateGuiThread = None
+
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -87,10 +114,9 @@ class ApdcamGui(QtWidgets.QMainWindow):
         # File menu --------------------
         fileMenu = menuBar.addMenu("&File")
         exitAction = QAction("&Exit",self)
-        exitAction.triggered.connect(sys.exit)
         fileMenu.addAction(exitAction)
         restartAction = QAction("&Restart",self)
-        restartAction.triggered.connect(lambda: sys.exit(1))
+        restartAction.triggered.connect(lambda: self.exit(123))
         fileMenu.addAction(restartAction)
 
         # Run mode menu ------------------
@@ -133,9 +159,12 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
         self.adcControl = AdcControl(self)
         self.expertTabs.addTab(self.adcControl,"ADC control")
-        self.expertTabs.addTab(ControlTiming(self),"Control timing")
-        self.expertTabs.addTab(CameraTimer(self),"Camera timer")
-        self.expertTabs.addTab(CameraConfig(self),"Camera configuration")
+        self.controlTiming = ControlTiming(self)
+        self.expertTabs.addTab(self.controlTiming,"Control timing")
+        self.cameraTimer = CameraTimer(self)
+        self.expertTabs.addTab(self.cameraTimer,"Camera timer")
+        self.cameraConfig = CameraConfig(self)
+        self.expertTabs.addTab(self.cameraConfig,"Camera configuration")
 
         fs = FactoryTest(self)
         fs.guiMode = GuiMode.factory
@@ -158,6 +187,24 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
         self.show()
         self.setGuiMode(GuiMode.expert)
+
+        self.updateGuiThreadStop = False
+        self.updateGuiThread = None 
+        exitAction.triggered.connect(self.exit)
+        #self.startGuiUpdate()
+
+    def exit(self,rc):
+        self.stopGuiUpdate()
+        sys.exit(rc)
+        
+    def startGuiUpdate(self):
+        self.updateGuiThreadStop = False
+        self.updateGuiThread = threading.Thread(target=self.updateGui)
+        self.updateGuiThread.start()
+
+    def stopGuiUpdate(self):
+        self.updateGuiThreadStop = True
+        self.updateGuiThread = None
 
     def beforeBackendCall(self,*,name="",where=""):
         if not self.status.connected:

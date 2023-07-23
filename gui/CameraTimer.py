@@ -13,6 +13,9 @@ from ApdcamUtils import *
 
 
 class CameraTimer(QtWidgets.QWidget):
+    def updateGui(self):
+        pass
+
     def __init__(self,parent):
         super(CameraTimer,self).__init__(parent)
         layout = QtWidgets.QVBoxLayout()

@@ -25,20 +25,19 @@ class Adc(QtWidgets.QWidget):
         self.pllLocked.setChecked(pllLocked)
 
         (error,T) = self.gui.camera.getAdcTemperature(self.number)
-        self.temperature.setText(str(T))
+        self.temperature.setText("{:.1f}".format(T))
 
         (error,overload) = self.gui.camera.getAdcOverload(self.number)
         self.overload.setChecked(overload)
 
         error,status2 = self.gui.camera.getAdcRegister(self.number,self.gui.camera.codes_ADC.ADC_REG_STATUS2)
-        status2 = status2[0]
         self.led1.setChecked((status2>>2)&1) 
         self.led2.setChecked((status2>>3)&1)
         self.internalTriggerDisplay.setChecked((status2>>0)&1)
             #itt vagyok most meg kell irni
         
     def name(self):
-        return "ADC " + str(self.number) + " (" + str(self.address) + ")"
+        return "ADC " + str(self.number) + " (@" + str(self.address) + ")"
 
     def channelOnOff(self,i,state):
         if i > 32 or i <= 0:
@@ -95,12 +94,13 @@ class Adc(QtWidgets.QWidget):
     def setTestPattern(self):
         values = self.testPattern.text().split()
         if len(values) == 1:
-            self.gui.camera.setTestPattern(adcBoardNo=self.number,value=values[0])
+            error = self.gui.camera.setTestPattern(adcBoardNo=self.number,value=values[0])
         else:
             if len(values) != 4:
                 self.gui.showError("Test pattern must be a single or four integers")
                 return
-            self.gui.camera.setTestPattern(adcBoadNo=self.number,value=values)
+            error = self.gui.camera.setTestPattern(adcBoardNo=self.number,value=values)
+        return error
 
     def calculateFilterCoeffs(self,f_fir,f_recurs):
         print("This function should be crosschecked")
@@ -153,32 +153,32 @@ class Adc(QtWidgets.QWidget):
         topRow.addWidget(g)
         g.addWidget(QtWidgets.QLabel("DVDD33:"),1,0)
         self.dvdd33 = QtWidgets.QLineEdit()
-        self.dvdd33.setReadOnly(True)
+        readOnly(self.dvdd33)
         self.dvdd33.setToolTip("DVDD 3.3 V")
         g.addWidget(self.dvdd33,1,1)
         
         g.addWidget(QtWidgets.QLabel("AVDD33:"),2,0)
         self.avdd33 = QtWidgets.QLineEdit()
-        self.avdd33.setReadOnly(True)
+        readOnly(self.avdd33)
         self.avdd33.setToolTip("AVDD 3.3 V")
         g.addWidget(self.avdd33,2,1)
 
         g.addWidget(QtWidgets.QLabel("DVDD 2.5 V:"),4,0)
         self.dvdd25 = QtWidgets.QLineEdit()
-        self.dvdd25.setReadOnly(True)
+        readOnly(self.dvdd25)
         self.dvdd25.setToolTip("DVDD 2.5 V")
         g.addWidget(self.dvdd25,4,1)
 
         g.addWidget(QtWidgets.QLabel("AVDD 1.8 V:"),3,0)
         self.avdd18 = QtWidgets.QLineEdit()
-        self.avdd18.setReadOnly(True)
+        readOnly(self.avdd18)
         self.avdd18.setToolTip("AVDD 1.8 V")
         g.addWidget(self.avdd18,3,1)
 
 
         g.addWidget(QtWidgets.QLabel("Temp:"),5,0)
         self.temperature = QtWidgets.QLineEdit()
-        self.temperature.setEnabled(False)
+        readOnly(self.temperature)
         self.temperature.setToolTip("ADC board temperature")
         g.addWidget(self.temperature,5,1)
 
@@ -189,24 +189,24 @@ class Adc(QtWidgets.QWidget):
         g = QVGroupBox(self)
         l.addWidget(g)
         self.pllLocked = QtWidgets.QCheckBox("PLL Locked")
-        self.pllLocked.setEnabled(False)
+        readOnly(self.pllLocked)
         self.pllLocked.setToolTip("Indicate whether the PLL of the ADC board is locked")
         g.addWidget(self.pllLocked)
         self.internalTriggerDisplay = QtWidgets.QCheckBox("Internal trigger")
         self.internalTriggerDisplay.setToolTip("???")
-        self.internalTriggerDisplay.setEnabled(False)
+        readOnly(self.internalTriggerDisplay)
         g.addWidget(self.internalTriggerDisplay)
         self.overload = QtWidgets.QCheckBox("Overload")
         self.overload.setToolTip("Indicating whether any of the channels of this ADC have gone to overload since the last status update")
-        self.overload.setEnabled(False)
+        readOnly(self.overload)
         g.addWidget(self.overload)
         self.led1 = QtWidgets.QCheckBox("SATA1 data out")
         self.led1.setToolTip("Indicator for data output through SATA1")
-        self.led1.setEnabled(False)
+        readOnly(self.led1)
         g.addWidget(self.led1)
         self.led2 = QtWidgets.QCheckBox("SATA2 data out")
         self.led2.setToolTip("Indicator for data output through SATA2")
-        self.led2.setEnabled(False)
+        readOnly(self.led2)
         g.addWidget(self.led2)
 
 
@@ -214,7 +214,7 @@ class Adc(QtWidgets.QWidget):
         l.addLayout(h)
         h.addWidget(QtWidgets.QLabel("Error:"))
         self.error = QtWidgets.QLineEdit()
-        self.error.setReadOnly(True)
+        readOnly(self.error)
         h.addWidget(self.error)
         l.addStretch(1)
 
@@ -284,7 +284,7 @@ class Adc(QtWidgets.QWidget):
 
         self.internalTrigger = QtWidgets.QCheckBox("Internal trigger")
         self.internalTrigger.setToolTip("Enable internal trigger output from this ADC board")
-        self.internalTrigger.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setInternalTriggerADC(adcBoardNo=self.number,enabled=self.internalTrigger.isChecked())))
+        self.internalTrigger.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setInternalTriggerADC(adcBoardNo=self.number,enable=self.internalTrigger.isChecked())))
         g.addWidget(self.internalTrigger,4,0)
 
         self.reverseBitOrder = QtWidgets.QCheckBox("Rev. bitord.")

@@ -80,7 +80,7 @@ class Infrastructure(QtWidgets.QWidget):
 
         self.hvEnabled = QtWidgets.QCheckBox("HV enabled")
         self.hvEnabled.setToolTip("Enable the high-voltage for all generators")
-        self.hvEnabled.stateChanged.connect(self.gui.call(lambda: self.gui.camera.hvEnable(self.hvEnabled.isChecked())))
+        self.hvEnabled.stateChanged.connect(self.gui.call(self.hvEnable))
 
         hv.addWidget(self.hvEnabled)
         
@@ -198,9 +198,20 @@ class Infrastructure(QtWidgets.QWidget):
 
         layout.addStretch(1)
 
+    def hvEnable(self):
+        self.gui.camera.hvEnable(self.hvEnabled.isChecked())
+
+        # if the user checked the individual "HV #i On" checkboxes while HV was disabled, these took
+        # no effect on the camera (it seems the camera does not allow setting the PC_REG_HVON register, if
+        # PC_REG_HVENABLE is not true.
+        # So propagate these settings to the camera in this case
+        if(self.hvEnabled.isChecked()):
+            for i in range(4):
+                self.gui.camera.hvOnOff(i+1,self.hvOn[i].isChecked())
+
     def updateGui(self):
         for i in range(4):
-            self.hvActual[i]="{:5.1f}".format(self.gui.camera.status.HV_act[i])
+            self.hvActual[i].setText("{:.1f}".format(self.gui.camera.status.HV_act[i]))
 
         # probably no need to call this, since readStatus() has been called from the topmost element, i.e. the gui's update function
         # and this reads the temperatures as well. 
@@ -209,8 +220,6 @@ class Infrastructure(QtWidgets.QWidget):
         for i in range(16):
             T = self.gui.camera.status.temps[i]
             self.temps[i].setText("{:3.1f}".format(T) if T<100 else "---")
-
-
 
 #    def readTemperatures(self):
 #        self.gui.showError("Infrastructure.readTemperatures is not yet implemented")

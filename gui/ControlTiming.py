@@ -71,7 +71,7 @@ class ControlTiming(QtWidgets.QWidget):
 
     def setAdcClockParameters(self):
         #self.adcFrequency.setText("{0:.3f}".format(20*adcmult/adcdiv))
-        self.gui.camera.setClock(APDCAM10G_regCom.CLK_EXTERNAL if self.adcClockExt.isChecked() else APDCAM10G_regCom.CLK_INTERNAL,
+        self.gui.camera.setClock(self.gui.camera.CLK_EXTERNAL if self.adcClockExt.isChecked() else self.gui.camera.CLK_INTERNAL,
                                  adcdiv=self.basePllDiv.value(),
                                  adcmult=self.basePllMult.value(),
                                  extdiv=self.extClockDiv.value(),
@@ -115,12 +115,12 @@ class ControlTiming(QtWidgets.QWidget):
         l.addWidget(g)
         g.addWidget(QtWidgets.QLabel("CC card temp.:"))
         self.ccCardTemp = QtWidgets.QLineEdit()
-        self.ccCardTemp.setReadOnly(True)
+        readOnly(self.ccCardTemp)
         self.ccCardTemp.setToolTip("The actual temperature of the Control Card (CC)")
         g.addWidget(self.ccCardTemp)
         g.addWidget(QtWidgets.QLabel("CC card max. temp.:"))
         self.ccCardMaxTemp = QtWidgets.QLineEdit()
-        self.ccCardMaxTemp.setReadOnly(True)
+        readOnly(self.ccCardMaxTemp)
         self.ccCardMaxTemp.setToolTip("Maximum temperature of the board since.... since what?")
         g.addWidget(self.ccCardMaxTemp)
 
@@ -128,25 +128,25 @@ class ControlTiming(QtWidgets.QWidget):
         l.addWidget(g)
         g.addWidget(QtWidgets.QLabel("3.3 V:"),0,0)
         self.ccCardVoltage33 = QtWidgets.QLineEdit()
-        self.ccCardVoltage33.setReadOnly(True)
+        readOnly(self.ccCardVoltage33)
         self.ccCardVoltage33.setToolTip("Display of the actual value of the VDD 3.3V (main) power supply in V")
         g.addWidget(self.ccCardVoltage33,0,1)
 
         g.addWidget(QtWidgets.QLabel("1.8 V XC:"),0,2)
         self.ccCardVoltage18XC = QtWidgets.QLineEdit()
-        self.ccCardVoltage18XC.setReadOnly(True)
+        readOnly(self.ccCardVoltage18XC)
         self.ccCardVoltage18XC.setToolTip("Display of the actual value of the 1.8 V XC power supply in V")
         g.addWidget(self.ccCardVoltage18XC,0,3)
 
         g.addWidget(QtWidgets.QLabel("2.5 V:"),1,0)
         self.ccCardVoltage25 = QtWidgets.QLineEdit()
-        self.ccCardVoltage25.setReadOnly(True)
+        readOnly(self.ccCardVoltage25)
         self.ccCardVoltage25.setToolTip("Display of the actual value of the VDD 2.5V power supply in V")
         g.addWidget(self.ccCardVoltage25,1,1)
 
         g.addWidget(QtWidgets.QLabel("1.2 V ST:"),1,2)
         self.ccCardVoltage12ST = QtWidgets.QLineEdit()
-        self.ccCardVoltage12ST.setReadOnly(True)
+        readOnly(self.ccCardVoltage12ST)
         self.ccCardVoltage12ST.setToolTip("Display of the actual value of the VDD 1.2 V ST power supply in V")
         g.addWidget(self.ccCardVoltage12ST,1,3)
 
@@ -241,7 +241,7 @@ class ControlTiming(QtWidgets.QWidget):
         g.addWidget(self.extClockDiv,3,2)
 
         self.extClockFreq = QtWidgets.QLineEdit()
-        self.extClockFreq.setReadOnly(True)
+        readOnly(self.extClockFreq)
         self.extClockFreq.setToolTip("The measured frequency [MHz] of the external clock, multiplied and divided by the multiplicator and divisor on the left")
         g.addWidget(self.extClockFreq,3,3)
         
@@ -266,16 +266,6 @@ class ControlTiming(QtWidgets.QWidget):
         l = QtWidgets.QVBoxLayout()
         layout.addLayout(l)
 
-        # g = QtWidgets.QGridLayout()
-        # l.addLayout(g)
-        # g.addWidget(QtWidgets.QLabel("ADC freq. [MHz]:"),0,0)
-        # self.adcFrequency = QtWidgets.QLineEdit()
-        # self.adcFrequency.setReadOnly(True)
-        # g.addWidget(self.adcFrequency,0,1)
-        # g.addWidget(QtWidgets.QLabel("SATA freq. [MHz]:"),1,0)
-        # self.sataFrequency = QtWidgets.QSpinBox()
-        # g.addWidget(self.sataFrequency,1,1)
-
         g = QVGroupBox()
         l.addWidget(g)
 
@@ -297,32 +287,25 @@ class ControlTiming(QtWidgets.QWidget):
         g = QVGroupBox()
         l.addWidget(g)
         self.basicPllLocked = QtWidgets.QCheckBox("Basic PLL Locked")
-        self.basicPllLocked.setAttribute(Qt.WA_TransparentForMouseEvents,True)
+        readOnly(self.basicPllLocked)
         self.basicPllLocked.setToolTip("Indicator for the basic (ADC) PLL being in lock")
         g.addWidget(self.basicPllLocked)
         
         self.sataPllLocked = QtWidgets.QCheckBox("SATA PLL Locked")
-        self.sataPllLocked.setAttribute(Qt.WA_TransparentForMouseEvents,True)
+        readOnly(self.sataPllLocked)
         self.sataPllLocked.setToolTip("Indicator for the serial (SATA) PLL being in lock")
         g.addWidget(self.sataPllLocked)
         
         self.extDcmLocked = QtWidgets.QCheckBox("Ext. DCM Locked")
-        self.extDcmLocked.setAttribute(Qt.WA_TransparentForMouseEvents,True)
+        readOnly(self.extDcmLocked)
         self.extDcmLocked.setToolTip("Indicator for the external clock module (DCM) being in lock")
         g.addWidget(self.extDcmLocked)
         
         self.extClockValid = QtWidgets.QCheckBox("Ext. Clock Valid")
-        self.extClockValid.setAttribute(Qt.WA_TransparentForMouseEvents,True)
+        readOnly(self.extClockValid)
         self.extClockValid.setToolTip("Indicator for the external clock giving a valid clock signal")
         g.addWidget(self.extClockValid)
 
-        # h = QtWidgets.QHBoxLayout()
-        # g.addLayout(h)
-        # h.addWidget(QtWidgets.QLabel("Ext. clock freq. [MHz]"))
-        # self.extClockFrequency = QtWidgets.QLineEdit()
-        # self.extClockFrequency.setReadOnly(True)
-        # self.extClockFrequency.setToolTip("Frequency of the external clock, measured by the control card of the camera, in MHz")
-        # h.addWidget(self.extClockFrequency)
 
         l.addStretch(1)
 
@@ -364,8 +347,6 @@ class ControlTiming(QtWidgets.QWidget):
         self.trigMinus.stateChanged.connect(triggerFunc)
         self.internalTrig.stateChanged.connect(triggerFunc)
         self.triggerDelay.lineEdit().returnPressed.connect(triggerFunc)
-
-        
 
         h = QtWidgets.QHBoxLayout()
         l.addLayout(h)

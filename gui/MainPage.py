@@ -128,7 +128,7 @@ class MainPage(QtWidgets.QWidget):
             return
 
         for i in range(4):
-            self.gui.infrastructure.hvSet[i].setValue(self.gui.camera.status.HV_set[0])
+            self.gui.infrastructure.hvSet[i].setValue(self.gui.camera.status.HV_set[i])
 
         for adcBoardNo in range(nAdcBoards):
             err,offsets = self.gui.camera.getOffsets(adcBoardNo+1)

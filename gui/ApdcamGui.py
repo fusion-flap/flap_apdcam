@@ -91,6 +91,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
         
 
         time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.logfile = None
         self.logfile = open("apdcam-gui-log_" + time,"w")
         
         # set this property to make it defined. However, this has no effect here
@@ -165,6 +166,8 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.expertTabs.addTab(self.cameraTimer,"Camera timer")
         self.cameraConfig = CameraConfig(self)
         self.expertTabs.addTab(self.cameraConfig,"Camera configuration")
+        self.plot = Plot(self)
+        self.expertTabs.addTab(self.plot,"Plot")
 
         fs = FactoryTest(self)
         fs.guiMode = GuiMode.factory
@@ -313,8 +316,9 @@ class ApdcamGui(QtWidgets.QMainWindow):
     def showMessageWithTime(self,msg):
         time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.messages.append(time + " - " + msg)
-        self.logfile.write(msg + "\n")
-        self.logfile.flush()
+        if self.logfile != None:
+            self.logfile.write(msg + "\n")
+            self.logfile.flush()
 
     def showMessage(self,msg):
         self.showMessageWithTime(msg)

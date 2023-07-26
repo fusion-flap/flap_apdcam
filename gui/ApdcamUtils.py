@@ -2,10 +2,24 @@ import importlib
 from QtVersion import QtVersion
 QtWidgets = importlib.import_module(QtVersion+".QtWidgets")
 QtGui     = importlib.import_module(QtVersion+".QtGui")
+QtCore = importlib.import_module(QtVersion+".QtCore")
+Qt = QtCore.Qt
 
 #from PyQt6.QtWidgets import QApplication, QWidget,  QFormLayout, QVBoxLayout, QHBoxLayout, QGridLayout, QTabWidget, QLineEdit, QDateEdit, QPushButton, QTextEdit, QGroupBox, QLabel
 #from PyQt6.QtCore import Qt
 #from PyQt6.QtGui import QDoubleValidator
+
+def readOnly(c):
+    style = "background-color: rgb(245,252,245)"
+    if isinstance(c,QtWidgets.QCheckBox):
+        c.setAttribute(Qt.WA_TransparentForMouseEvents,True)
+        c.setStyleSheet(style)
+        c.setFocusPolicy(Qt.NoFocus)
+    if isinstance(c,QtWidgets.QLineEdit):
+        c.setReadOnly(True)
+        c.setStyleSheet(style)
+        c.setFocusPolicy(Qt.NoFocus)
+        
 
 class QCheckBoxIndicator(QtWidgets.QCheckBox):
     def __init__(self,title):

@@ -913,7 +913,7 @@ class APDCAM10G_regCom:
         d = data[1]
         for i in range(4):
             #self.status.HV_act[i] = (d[0+i*2]+d[1+i*2]*255)*self.HV_conversion_in[i]     # Replaced by D. Barna
-            self.status.HV_act[i] = (d[0+i*2]+d[1+i*2]*255)*self.HV_conversion[i]   
+            self.status.HV_act[i]  = (d[0+i*2]+d[1+i*2]*255)*self.HV_conversion[i]   
         if (HV_repeat > 1):
             for i in range(HV_repeat-1):  
                 err, data = APDCAM10G_regCom.readPDI(self,self.codes_PC.PC_CARD,self.codes_PC.PC_REG_HV1MON,8,arrayData=True)
@@ -1036,7 +1036,7 @@ class APDCAM10G_regCom:
 
         Returns
         ^^^^^^^
-        Error text and data in list of bytarrays       
+        Error text and data in list of bytearrays       
         """ 
         
         #Ensuring that input values are not modified
@@ -2033,49 +2033,57 @@ class APDCAM10G_regCom:
               If a list with 4 elements, the 8-channel blocks are set to these values
             The values can be given as strings as well, in which case they are safely converted to integers,
             returning an error if the conversion fails
+
+        Returns
+        ^^^^^^^
+        Error message
+
         """   
 
-        adcAddresses = []
+        err,adcAddresses = self.adcAddresses(adcBoardNo)
+        if err!="":
+            return err
+
+        n_adc = len(adcAddresses)
 
         # First transform the values into a list with n_adc elements, each list member being a list of 4 numbers
         if adcBoardNo == 'all':
-            adcAddresses = self.status.ADC_address # take all ADC addresses
-            n_adc = len(self.status.ADC_address)
+
+            # if setting is for all ADC boards, and value is a list, just check if it has the same number of elements, as the number of ADC boards
             if type(value) is list:
                 if (len(value) != n_adc):
                     return "Bad input in setTestPattern. Should be scalar or list with number of elements equal to number of ADCs."
+            # otherwise if value is a single number, then make it a lis
             else:
-                try:
-                    value = [int(value)] * n_adc
-                except ValueError:
-                    return "Bad input in setTestPattern."
+                value = [value] * n_adc
 
+            # Now, 'value' is a list with number of elements = number of ADC boards. Make sure each element of this list
+            # is a list of 4 elements
             for i_adc in range(n_adc):
                 if type(value[i_adc]) is list:
                     if len(value[i_adc]) != 4:
                         return "Bad input in setTestPattern"
                 else:
-                    try:
-                        value[i_adc] = [int(value[i_adc])]*4
-                    except ValueError:
-                        return "Can not convert to integer: " + str(value[i_adc])
+                    value[i_adc] = [value[i_adc]]*4
         else:
-            if adcBoardNo < 1 or len(self.status.ADC_address) < adcBoardNo:
-                return "Bad ADC board number"
-            adcAddresses = [self.status.ADC_address[adcBoardNo]]
+            # if the setting is for a single ADC board, and 'value' is a list, it must be containing 4 elements, corresponding to the 4 blocks. 
             if type(value) is list:
+                # make sure first that it contains 4 elements
                 if len(value) != 4:
                     return "Bad input in setTestPattern. Should be scalar or list with 4 numbers"
+                # Then create a 1-element list of
+                value = [value]
+            # otherwise, if a single number, make a list of 1 element being a 4-element list
             else:
-                try:
-                    value = [int(value)]*4
-                except ValueError:
-                    return "Can not convert to integer: " + str(value)
+                value = [[value]*4]
 
         for i_adc in range(n_adc):  
             d = bytearray(4)
             for i in range(4):
-                d[i] = value[i_adc][i]
+                try:
+                    d[i] = int(value[i_adc][i])
+                except ValueError:
+                    return "Can not convert to integer: " + str(value[i_adc][i])
             err = self.writePDI(adcAddresses[i_adc],self.codes_ADC.ADC_REG_AD1TESTMODE,d,numberOfBytes=4,arrayData=True)
             if (err != ""):
                 return err
@@ -2211,13 +2219,14 @@ class APDCAM10G_regCom:
         err,adcAddresses = self.adcAddresses(adcBoardNo)
 
         if type(adcBoardNo) is int:
-            return self.readPDI(adcAddresses[0],register,numberOfBytes=numberOfBytes,arrayData=False)
+            (err,data) = self.readPDI(adcAddresses[0],register,numberOfBytes=numberOfBytes,arrayData=False)
+            return (err,data[0])
 
         values = []
         for adcAddress in adcAddresses:
             err,d = self.readPDI(adcAddress,register,numberOfBytes=numberOfBytes,arrayData=False)
+            values.append(d[0])
             time.sleep(0.005)
-            values.append(d)
         return values
         
     def gePCRegister(self,register,numberOfBytes=1):
@@ -2317,7 +2326,9 @@ class APDCAM10G_regCom:
 
         """
 
-        adcAddresses = self.adcAddresses(adcBoardNo)
+        (error,adcAddresses) = self.adcAddresses(adcBoardNo)
+        if error != "":
+            return error
 
         if len(adcAddresses) > 1:
             self.lock.acquire()
@@ -2617,16 +2628,18 @@ class APDCAM10G_regCom:
 
         reg = 0 # The register address. There are 4 registers, each handling 8 channels (8 bits)
         if ch_no//8 == 0:
-            reg = self.codes_ADC.ADC_CHENABLE1
+            reg = self.codes_ADC.ADC_REG_CHENABLE1
         if ch_no//8 == 1:
-            reg = self.codes_ADC.ADC_CHENABLE2
+            reg = self.codes_ADC.ADC_REG_CHENABLE2
         if ch_no//8 == 2:
-            reg = self.codes_ADC.ADC_CHENABLE3
+            reg = self.codes_ADC.ADC_REG_CHENABLE3
         if ch_no//8 == 3:
-            reg = self.codes_ADC.ADC_CHENABLE4
+            reg = self.codes_ADC.ADC_REG_CHENABLE4
 
         # Read 1 byte of data from the given register
-        d = self.readPDI(self.status.ADC_address[adc_no],reg,1,arrayData=False)
+        #d = self.readPDI(self.status.ADC_address[adc_no],reg,1,arrayData=False)
+        #d = d[0]
+        err,d = self.getAdcRegister(adc_no+1,reg)
 
         ch_no %= 8 # modulo 8, channel is in the range 0..7
         # Bit 0 in the data is the last channel. My interpretation: LSB (bit 0) is channel 7 (?), MSB is channel 0
@@ -2637,7 +2650,8 @@ class APDCAM10G_regCom:
         else:
             d &= ~(1<<ch_no)
 
-        return self.writePDI(self.status.ADC_address[adc_board-1],reg,d,1,arrayData=False)
+        return self.setAdcRegister(adc_no,reg,d)
+        #return self.writePDI(self.status.ADC_address[adc_board-1],reg,d,1,arrayData=False)
 
     def getCallight(self):
         """ Get the current calibration  light setting.
@@ -2771,10 +2785,12 @@ class APDCAM10G_regCom:
 
         if on:
             # Set the bit corresponding to this 'n' to 1, leave others unaltered
-            d = d | 2**(n-1)
+            # d = d | 2**(n-1)
+            d |= 1<<(n-1)
         else:
             # Set the bit corresponding to this 'n' to 0, leave others unaltered
-            d = d & (2**(n-1) ^ 0xff)
+            #d = d & (2**(n-1) ^ 0xff)
+            d &= ~(1<<(n-1))
 
         # Write back the bit-coded value to the camera
         err = self.writePDI(self.codes_PC.PC_CARD,
@@ -2783,6 +2799,7 @@ class APDCAM10G_regCom:
                             numberOfBytes=1,
                             arrayData=False
                             )
+
         return err
 
 
@@ -2832,7 +2849,7 @@ class APDCAM10G_regCom:
             return "Error setting internal trigger:"+err
         return ""
 
-    def setInternalTriggerADC(self, adcBoard='all', enable=True):
+    def setInternalTriggerADC(self, adcBoardNo='all', enable=True):
         """
         Enable/Disable trigger output in one or all ADC blocks.
 
@@ -2851,7 +2868,7 @@ class APDCAM10G_regCom:
 
         """
 
-        return self.setAdcRegisterBit(adcBoard,self.codes_ADC.ADC_REG_CONTROL,5,enable)
+        return self.setAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,5,enable)
 
     
     # def setTrigger(self,externalTriggerPolarity=None,internalTrigger=False,triggerDelay = 0):
@@ -3415,8 +3432,8 @@ class APDCAM10G_regCom:
         return (errors,dvdd33[0],dvdd25[0],avdd33[0],avdd18[0])  # Changed by D. Barna
 
     def getAdcTemperature(self,adcBoardNo):
-        (err,T) = self.readPDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_TEMP,1,arrayData=False)
-        return (err,T)
+        #(err,T) = self.readPDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_TEMP,1,arrayData=False)
+        return self.getAdcRegister(adcBoardNo,self.codes_ADC.ADC_REG_TEMP)
         
     def getAdcOverload(self,adcBoardNo):
         """

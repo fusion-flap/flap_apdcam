@@ -13,10 +13,71 @@ from tkinter.ttk import *
 import os
 import threading
 
-import flap
+#import flap
 
 import matplotlib.pyplot as plt
-from .apdcam_types_versions import *
+
+#from .apdcam_types_versions import *
+# included fro mapdcam_types_versions.py, remove it!
+def apdcam_types_versions(family=None):
+    """
+    Returns the possible camera types and versions. 
+    
+    Parameters
+    ----------
+    family: string or None
+        '10G' : Return only 10G cameras
+        '1G' : Return only 1G cameras
+        None: return all types
+
+    Returns
+    -------
+    camera_types: list of strings
+        The list of possible camera types
+    camera_version: list of lists
+        For each camera type lists the possible version numbers
+    """
+    
+    camera_types_10G = [#APDCAM-10G:
+                        'APDCAM-10G_4x32',   # 4x32 pixel
+                        'APDCAM-10G_8x8',    # 8x8 pixel
+                        'APDCAM-10G_4x16',   # 4x16 pixel, subarray of 4x32
+                        'APDCAM-10G_8x16',   # 8x16 pixel, 8 pixel in one S8550 array
+                        'APDCAM-10G_8x16A',  # 8x16 pixel, 8 pixxels in two S8550 arrays
+                        'APDCAM-10G_FC'      # 64 individual detectors
+                        ]
+    camera_types_1G = [#APDCAM-1G:
+                       'APDCAM-1G',         # Standard APDCAM-1G (Horizontal array)
+                       'APDCAM-1G_90',      #APDCAM-1G with sensor rotated 90 degree CCW
+                       'APDCAM-1G_180',     #APDCAM-1G with sensor rotated 180 degree CCW
+                       'APDCAM-1G_270'      # APDCAM-1G with sensor rotated 270 degree CCW
+                       ]
+    
+    camera_versions_10G = [#APDCAM-10G:
+                           [1,0,2],   # 4x32 pixel
+                           [1,0,2],   # 8x8 pixel
+                           [1,0,2],   # 4x16 pixel, subarray of 4x32
+                           [1,0,2],   # 8x16 pixel, 8 pixel in one S8550 array
+                           [1]    ,   # 8x16 pixel, 8 pixels in two S8550 arrays
+                           [1]    ,   # 64 individual detectors
+                           ]   
+    camera_versions_1G = [#APDCAM-1G:
+                           [],        # Standard APDCAM-1G (Horizontal array)
+                           [],        #APDCAM-1G with sensor rotated 90 degree CCW
+                           [],        #APDCAM-1G with sensor rotated 180 degree CCW
+                           []         # APDCAM-1G with sensor rotated 270 degree CCW
+                           ]
+         
+    if (family is None):
+        return camera_types_10G + camera_types_1G, camera_versions_10G + camera_versions_1G
+    elif (family == '10G'):
+        return camera_types_10G, camera_versions_10G
+    elif (family == '1G'):
+        return camera_types_1G, camera_versions_1G
+
+
+
+
 
 class APDCAM_Plot_class:
     """
@@ -205,6 +266,10 @@ class APDCAM_Plot_class:
         w = tk.Label(fres_widg,text='Frequency resolution [Hz]:',bg=plot_background).grid(row=0,column=0,sticky='e')
         self.spectrplot_fres_widg = tk.Entry(fres_widg,width=10,textvariable=self.var_spectrplot_options_fres,bg=plot_background)
         self.spectrplot_fres_widg.grid(row=0,column=1,sticky='e')
+
+        return
+
+
         try:
             self.var_spectrplot_options_fres.set("{:4.2e}".format(float(flap.config.get('PS','Resolution',default='1e3'))))
         except ValueError:
@@ -845,5 +910,11 @@ def plot_gui():
     pgui.create_widgets(parent=w)
     # GUI_frame_widg.after(0,plt_loop)
     # GUI_frame_widg.mainloop()
-#    root.after(150,plt_loop)
+
+
+    # These two lines were commented. Uncommented by D. Barna
+    root.after(150,plt_loop)
     root.mainloop()
+
+# Added by D. Barna to test
+plot_gui()

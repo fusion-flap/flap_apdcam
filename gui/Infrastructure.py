@@ -208,6 +208,7 @@ class Infrastructure(QtWidgets.QWidget):
         if(self.hvEnabled.isChecked()):
             for i in range(4):
                 self.gui.camera.hvOnOff(i+1,self.hvOn[i].isChecked())
+        return ""
 
     def updateGui(self):
         for i in range(4):

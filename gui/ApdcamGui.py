@@ -14,6 +14,7 @@ Qt = importlib.import_module(QtVersion+".QtCore")
 from ApdcamUtils import *
 
 from MainPage import MainPage
+from Measure import Measure
 from Infrastructure import Infrastructure
 from AdcControl import AdcControl
 from ControlTiming import ControlTiming
@@ -92,7 +93,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
         time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.logfile = None
-        self.logfile = open("apdcam-gui-log_" + time,"w")
+        #self.logfile = open("apdcam-gui-log_" + time,"w")
         
         # set this property to make it defined. However, this has no effect here
         self.guiMode = GuiMode.simple
@@ -166,6 +167,8 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.expertTabs.addTab(self.cameraTimer,"Camera timer")
         self.cameraConfig = CameraConfig(self)
         self.expertTabs.addTab(self.cameraConfig,"Camera configuration")
+        self.measure = Measure(self)
+        self.expertTabs.addTab(self.measure,"Measure")
         self.plot = Plot(self)
         self.expertTabs.addTab(self.plot,"Plot")
 

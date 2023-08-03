@@ -348,14 +348,14 @@ class ControlTiming(QtWidgets.QWidget):
         self.internalTrig.stateChanged.connect(triggerFunc)
         self.triggerDelay.lineEdit().returnPressed.connect(triggerFunc)
 
-        h = QtWidgets.QHBoxLayout()
-        l.addLayout(h)
-        h.addWidget(QtWidgets.QLabel("Sample number: "))
-        self.sampleNumber = QtWidgets.QSpinBox()
-        self.sampleNumber.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
-        self.sampleNumber.lineEdit().returnPressed.connect(lambda: self.gui.camera.setSampleNumber(self.sampleNumber.value()))
-        self.sampleNumber.setToolTip("Set the number of samples to acquire")
-        h.addWidget(self.sampleNumber)
+        # h = QtWidgets.QHBoxLayout()
+        # l.addLayout(h)
+        # h.addWidget(QtWidgets.QLabel("Sample number: "))
+        # self.sampleNumber = QtWidgets.QSpinBox()
+        # self.sampleNumber.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        # self.sampleNumber.lineEdit().returnPressed.connect(lambda: self.gui.camera.setSampleNumber(self.sampleNumber.value()))
+        # self.sampleNumber.setToolTip("Set the number of samples to acquire")
+        # h.addWidget(self.sampleNumber)
 
         l.addStretch(1)
 

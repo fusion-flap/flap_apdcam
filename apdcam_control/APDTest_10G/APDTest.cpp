@@ -29,7 +29,7 @@ int ReadLine(FILE * f, char * buffer, int size);
 char *GetToken(char *str, char *token);
 char *GetString(char *str, char *param);
 char *GetInt(char *str, int *param);
-
+char *GetUint32(char *str, uint32_t *param);
 
 
 int main(int argc, char* argv[])
@@ -119,6 +119,20 @@ char *GetInt(char *str, int *param)
 	}
 	return p;
 }
+char *GetUint32(char *str, uint32_t *param)
+{
+	char strParam[64];
+	char *p = GetString(str, strParam);
+
+	if (p != str)
+	{
+		if (strParam[0] == '0' && (strParam[1] == 'x' || strParam[1] == 'X'))
+                    *param = strtoul(strParam, NULL, 16);
+		else
+                    *param = strtoul(strParam, NULL, 10);
+	}
+	return p;
+}
 
 
 void SwOptions()
@@ -177,10 +191,17 @@ int Sampling(int sampleDiv, int sampleSrc)
 
 int Allocate(LONGLONG sampleCount, int bits, uint32_t channelMask_1, uint32_t channelMask_2, uint32_t channelMask_3, uint32_t channelMask_4, int primaryBufferSize)
 {
-//printf("Allocate %d %d %d %d %d %d\n",bits,channelMask_1,channelMask_2,channelMask_3,channelMask_4,primaryBufferSize);
-	ADT_RESULT res = APDCAM_Allocate(g_handle, sampleCount, bits, channelMask_1, channelMask_2, channelMask_3, channelMask_4, primaryBufferSize);
-	if (res != ADT_OK) return -1;
-	return 0;
+    //printf("Allocate %d %d %d %d %d %d\n",bits,channelMask_1,channelMask_2,channelMask_3,channelMask_4,primaryBufferSize); // Corrected by D. Barna
+    printf("Allocate %d %u %u %u %u %d\n",bits,channelMask_1,channelMask_2,channelMask_3,channelMask_4,primaryBufferSize);
+    fflush(stdout);
+    ADT_RESULT res = APDCAM_Allocate(g_handle, sampleCount, bits, channelMask_1, channelMask_2, channelMask_3, channelMask_4, primaryBufferSize);
+    if(res != ADT_OK)
+    {
+        fprintf(stderr,"APDCAM_Allocate returned: %i\n",res);
+        fflush(stderr);
+    }
+    if (res != ADT_OK) return -1;
+    return 0;
 }
 
 int ARM(int measurementMode, int sampleCount, int calibrationMode, int signalFrequency)
@@ -307,11 +328,11 @@ int Start()
 	return 0;
 }
 
-int Wait(int timeout)
+int Wait(int timeout)  // timeout is in [ms]
 {
-	ADT_RESULT res = APDCAM_Wait(g_handle, timeout);
-	if (res != ADT_OK) return -1;
-	return 0;
+    ADT_RESULT res = APDCAM_Wait(g_handle, timeout);
+    if (res != ADT_OK) return -1;
+    return 0;
 }
 
 int Stop()
@@ -631,699 +652,701 @@ int SetPLL(int mul, int div0, int div1)
 
 int ProcessLine(char *buffer)
 {
-	char token[64];
-	buffer = GetToken(buffer, token);
+    printf(">>>>>  %s\n",buffer);
+    fflush(stdout);
 
-	if (token[0] == '\r' || token[0] == '\n' || token[0] == '\0')
-	{
-		return 0;
-	}
+    char token[64];
+    buffer = GetToken(buffer, token);
 
-	for (int i = 0;  token[i] != '\0'; i++)
-		token[i] = toupper(token[i]);
+    if (token[0] == '\r' || token[0] == '\n' || token[0] == '\0')
+    {
+        return 0;
+    }
 
-	if (strcmp("PAUSE", token) == 0)
-	{
-		int pauseTime;
-		buffer = GetInt(buffer, &pauseTime);
-		if (pauseTime == 0) 
-		{
-		   printf("Press enter to continue...\n");
-		   fflush(stdout);
-		   getchar();
-		}
-		else
-		{
-			usleep(pauseTime*1000);
-		} 
-	}
-	else if (strcmp("REM", token) == 0 || token[0] == '#')
-	{
-	}
-	else if (strcmp("MESSAGE", token) == 0)
-	{
-		printf("%s\n", buffer);
-		fflush(stdout);
-	}
-	else if (strcmp("OPEN", token) == 0 || strcmp("FORCE-OPEN", token) == 0)
-	{
-		char param0[32];
-		buffer = GetString(buffer, param0);
-		if (strlen(param0) == 0) return -1;
+    for (int i = 0;  token[i] != '\0'; i++)
+        token[i] = toupper(token[i]);
 
-		int res = Open(param0, strcmp("OPEN", token));
-		if (res == 0)
-		{
-			printf("Open success\n");
-			fflush(stdout);
-		}
-		else
-		{
-			fprintf(stderr, "Error, open failed\n");
-			fflush(stderr);
-       }
-		return res;
-	}
-	else if (strcmp("CLOSE", token) == 0)
-	{
-		int res = Close();
-		if (res == 0)
-		{
-			printf("Close success\n");
-			fflush(stdout);
-		}
-		else
-		{
-			fprintf(stderr, "Error, close failed\n");
-			fflush(stderr);
-       		}
-		return res;
-	}
-	else if (strcmp("SYNC", token) == 0)
-	{
-		int res = SyncADC();
-		if (res == 0)
-		{
-			printf("Sync success\n");
-			fflush(stdout);
-		}
-		else
-		{
-			fprintf(stderr, "Error, sync failed\n");
-			fflush(stderr);
-        	}
-		return res;
-	}
-	else if (strcmp("SET_OFFSET", token) == 0)
-	{
+    if (strcmp("PAUSE", token) == 0)
+    {
+        int pauseTime;
+        buffer = GetInt(buffer, &pauseTime);
+        if (pauseTime == 0) 
+        {
+            printf("Press enter to continue...\n");
+            fflush(stdout);
+            getchar();
+        }
+        else
+        {
+            usleep(pauseTime*1000);
+        } 
+    }
+    else if (strcmp("REM", token) == 0 || token[0] == '#')
+    {
+    }
+    else if (strcmp("MESSAGE", token) == 0)
+    {
+        printf("%s\n", buffer);
+        fflush(stdout);
+    }
+    else if (strcmp("OPEN", token) == 0 || strcmp("FORCE-OPEN", token) == 0)
+    {
+        char param0[32];
+        buffer = GetString(buffer, param0);
+        if (strlen(param0) == 0) return -1;
 
-		if (g_handle == 0) 
-		{
-			fprintf(stderr, "Error, camera not open.\n");
-			fflush(stderr);
-			return -1;
-		}	
+        int res = Open(param0, strcmp("OPEN", token));
+        if (res == 0)
+        {
+            printf("Open success\n");
+            fflush(stdout);
+        }
+        else
+        {
+            fprintf(stderr, "Error, open failed\n");
+            fflush(stderr);
+        }
+        return res;
+    }
+    else if (strcmp("CLOSE", token) == 0)
+    {
+        int res = Close();
+        if (res == 0)
+        {
+            printf("Close success\n");
+            fflush(stdout);
+        }
+        else
+        {
+            fprintf(stderr, "Error, close failed\n");
+            fflush(stderr);
+        }
+        return res;
+    }
+    else if (strcmp("SYNC", token) == 0)
+    {
+        int res = SyncADC();
+        if (res == 0)
+        {
+            printf("Sync success\n");
+            fflush(stdout);
+        }
+        else
+        {
+            fprintf(stderr, "Error, sync failed\n");
+            fflush(stderr);
+        }
+        return res;
+    }
+    else if (strcmp("SET_OFFSET", token) == 0)
+    {
 
-                int offset;
-		if (buffer) buffer = GetInt(buffer, &offset);
+        if (g_handle == 0) 
+        {
+            fprintf(stderr, "Error, camera not open.\n");
+            fflush(stderr);
+            return -1;
+        }	
 
-		int res = SetOffset((unsigned int)offset);
-		if (res == 0)
-		{
-			printf("Set_offset success\n");
-			fflush(stdout);
-		}	
-	}
-	else if (strcmp("SETTIMING", token) == 0)
-	{
-		// SETTIMING ADC_MULT ADC_DIV CLK_SOURCE, EXT_MUL, EXT_DIV
-		//  CLK_SOURCE: 0: internal, 1: external
-		int basicPLLmul;
-		int basicPLLdiv_0;
-		int basicPLLdiv_1;
-		int clkSrc = 0;
-		int extDCMmul = -1;
-		int extDCMdiv = -1;
+        int offset;
+        if (buffer) buffer = GetInt(buffer, &offset);
 
-		if (g_handle == 0) 
-		{
-			fprintf(stderr, "Error, camera not open.\n");
-			fflush(stderr);
-			return -1;
-		}	
+        int res = SetOffset((unsigned int)offset);
+        if (res == 0)
+        {
+            printf("Set_offset success\n");
+            fflush(stdout);
+        }	
+    }
+    else if (strcmp("SETTIMING", token) == 0)
+    {
+        // SETTIMING ADC_MULT ADC_DIV CLK_SOURCE, EXT_MUL, EXT_DIV
+        //  CLK_SOURCE: 0: internal, 1: external
+        int basicPLLmul;
+        int basicPLLdiv_0;
+        int basicPLLdiv_1;
+        int clkSrc = 0;
+        int extDCMmul = -1;
+        int extDCMdiv = -1;
 
-		buffer = GetInt(buffer, &basicPLLmul);
-		basicPLLdiv_0 = 0;
-		buffer = GetInt(buffer, &basicPLLdiv_1);
-		if (strlen(buffer)) buffer = GetInt(buffer, &clkSrc);
-		if (strlen(buffer)) buffer = GetInt(buffer, &extDCMmul);
-		if (strlen(buffer)) buffer = GetInt(buffer, &extDCMdiv);
+        if (g_handle == 0) 
+        {
+            fprintf(stderr, "Error, camera not open.\n");
+            fflush(stderr);
+            return -1;
+        }	
 
-		int res = SetTiming(basicPLLmul, basicPLLdiv_0, basicPLLdiv_1, clkSrc, extDCMmul, extDCMdiv);
-		if (res == 0)
-		{
-			printf("SetTiming success\n");
-			fflush(stdout);
-		}
-		else
-		{
-			fprintf(stderr, "Error, SetTiming failed\n");
-			fflush(stderr);
-       }
+        buffer = GetInt(buffer, &basicPLLmul);
+        basicPLLdiv_0 = 0;
+        buffer = GetInt(buffer, &basicPLLdiv_1);
+        if (strlen(buffer)) buffer = GetInt(buffer, &clkSrc);
+        if (strlen(buffer)) buffer = GetInt(buffer, &extDCMmul);
+        if (strlen(buffer)) buffer = GetInt(buffer, &extDCMdiv);
 
-		return res;
-	}
-	else if (strcmp("SAMPLING", token) == 0)
-	{
-		// SAMPLING SAMPLEDIV
-		int sampleDiv;
-		int sampleSrc;
+        int res = SetTiming(basicPLLmul, basicPLLdiv_0, basicPLLdiv_1, clkSrc, extDCMmul, extDCMdiv);
+        if (res == 0)
+        {
+            printf("SetTiming success\n");
+            fflush(stdout);
+        }
+        else
+        {
+            fprintf(stderr, "Error, SetTiming failed\n");
+            fflush(stderr);
+        }
+
+        return res;
+    }
+    else if (strcmp("SAMPLING", token) == 0)
+    {
+        // SAMPLING SAMPLEDIV
+        int sampleDiv;
+        int sampleSrc;
 		
-		if (g_handle == 0) 
-		{
-			fprintf(stderr, "Error, camera not open.\n");
-			fflush(stderr);
-			return -1;
-		}	
+        if (g_handle == 0) 
+        {
+            fprintf(stderr, "Error, camera not open.\n");
+            fflush(stderr);
+            return -1;
+        }	
 
 		
-		buffer = GetInt(buffer, &sampleDiv);
-		buffer = GetInt(buffer, &sampleSrc);
-		int res = Sampling(sampleDiv, sampleSrc);
-		if (res == 0)
-		{
-			printf("Sampling success\n");
-			fflush(stdout);
-		}
-		else
-		{
-			fprintf(stderr, "Error, sampling failed\n");
-			fflush(stderr);
-		}
+        buffer = GetInt(buffer, &sampleDiv);
+        buffer = GetInt(buffer, &sampleSrc);
+        int res = Sampling(sampleDiv, sampleSrc);
+        if (res == 0)
+        {
+            printf("Sampling success\n");
+            fflush(stdout);
+        }
+        else
+        {
+            fprintf(stderr, "Error, sampling failed\n");
+            fflush(stderr);
+        }
 
-		return res;
-	}
-	else if (strcmp("ALLOCATE", token) == 0)
-	{
-		int sampleCount;
-		int bits;
-		int channelMask_1;
-		int channelMask_2;
-		int channelMask_3;
-		int channelMask_4;
-		int primaryBufferSize = 10;
+        return res;
+    }
+    else if (strcmp("ALLOCATE", token) == 0)
+    {
+        int sampleCount;
+        int bits;
+        uint32_t channelMask_1;  // types were int before, corrected by D. Barna
+        uint32_t channelMask_2;
+        uint32_t channelMask_3;
+        uint32_t channelMask_4;
+        int primaryBufferSize = 10;
 
-		if (g_handle == 0) 
-		{
-			fprintf(stderr, "Error, camera not open.\n");
-			fflush(stderr);
-			return -1;
-		}	
+        if (g_handle == 0) 
+        {
+            fprintf(stderr, "Error, camera not open.\n");
+            fflush(stderr);
+            return -1;
+        }	
 
-		buffer = GetInt(buffer, &sampleCount);
-		buffer = GetInt(buffer, &bits);
-		buffer = GetInt(buffer, &channelMask_1);
-		buffer = GetInt(buffer, &channelMask_2);
-		buffer = GetInt(buffer, &channelMask_3);
-		buffer = GetInt(buffer, &channelMask_4);
-		GetInt(buffer, &primaryBufferSize);
+        buffer = GetInt(buffer, &sampleCount);
+        buffer = GetInt(buffer, &bits);
+        buffer = GetUint32(buffer, &channelMask_1);
+        buffer = GetUint32(buffer, &channelMask_2);
+        buffer = GetUint32(buffer, &channelMask_3);
+        buffer = GetUint32(buffer, &channelMask_4);
+        GetInt(buffer, &primaryBufferSize);
 
-		int res = Allocate(sampleCount, bits, channelMask_1, channelMask_2, channelMask_3, channelMask_4, primaryBufferSize);
-		if (res == 0)
-		{
-			printf("Allocate success\n");
-			fflush(stdout);
-		}
-		else
-		{
-			fprintf(stderr, "Error, allocate failed\n");
-			fflush(stderr);
-       }
-	}
-	else if (strcmp("ARM", token) == 0)
-	{
-		int measurementMode;
-		int sampleCount;
-		int calibrationMode;
-		int signalFrequency = 100;
+        int res = Allocate(sampleCount, bits, channelMask_1, channelMask_2, channelMask_3, channelMask_4, primaryBufferSize);
+        if (res == 0)
+        {
+            printf("Allocate success\n");
+            fflush(stdout);
+        }
+        else
+        {
+            fprintf(stderr, "Error, allocate failed\n");
+            fflush(stderr);
+        }
+    }
+    else if (strcmp("ARM", token) == 0)
+    {
+        int measurementMode;
+        int sampleCount;
+        int calibrationMode;
+        int signalFrequency = 100;
 
-		if (g_handle == 0) 
-		{
-			fprintf(stderr, "Error, camera not open.\n");
-			fflush(stderr);
-			return -1;
-		}	
+        if (g_handle == 0) 
+        {
+            fprintf(stderr, "Error, camera not open.\n");
+            fflush(stderr);
+            return -1;
+        }	
 
-		buffer = GetInt(buffer, &measurementMode);
-		buffer = GetInt(buffer, &sampleCount);
-		buffer = GetInt(buffer, &calibrationMode);
-		GetInt(buffer, &signalFrequency);
+        buffer = GetInt(buffer, &measurementMode);
+        buffer = GetInt(buffer, &sampleCount);
+        buffer = GetInt(buffer, &calibrationMode);
+        GetInt(buffer, &signalFrequency);
 
-		int res = ARM(measurementMode, sampleCount, calibrationMode, signalFrequency);
-		if (res == 0)
-		{
-			printf("Arm succes\n");
-			fflush(stdout);
-		}	
-		else
-		{
-			fprintf(stderr, "Error, arm failed\n");
-			fflush(stderr);
-       }
-	}
-	else if (strcmp("TRIGGER", token) == 0)
-	{
-		int triggerSource;
-		int triggerMode;
-		int triggerEdge;
-		int delay;
+        int res = ARM(measurementMode, sampleCount, calibrationMode, signalFrequency);
+        if (res == 0)
+        {
+            printf("Arm success\n");
+            fflush(stdout);
+        }	
+        else
+        {
+            fprintf(stderr, "Error, arm failed\n");
+            fflush(stderr);
+        }
+    }
+    else if (strcmp("TRIGGER", token) == 0)
+    {
+        int triggerSource;
+        int triggerMode;
+        int triggerEdge;
+        int delay;
 
-		if (g_handle == 0) 
-		{
-			fprintf(stderr, "Error, camera not open.\n");
-			fflush(stderr);
-			return -1;
-		}	
+        if (g_handle == 0) 
+        {
+            fprintf(stderr, "Error, camera not open.\n");
+            fflush(stderr);
+            return -1;
+        }	
 		
-		buffer = GetInt(buffer, &triggerSource);
-		buffer = GetInt(buffer, &triggerMode);
-		buffer = GetInt(buffer, &triggerEdge);
-		buffer = GetInt(buffer, &delay);
-		// Internal trigger setting is not implemented  S. Zoletnik 8.9.2018
-		// buffer = GetString(buffer, triggerFileName);
+        buffer = GetInt(buffer, &triggerSource);
+        buffer = GetInt(buffer, &triggerMode);
+        buffer = GetInt(buffer, &triggerEdge);
+        buffer = GetInt(buffer, &delay);
+        // Internal trigger setting is not implemented  S. Zoletnik 8.9.2018
+        // buffer = GetString(buffer, triggerFileName);
 
-		int res = Trigger(triggerSource, triggerMode, triggerEdge, delay, NULL);
-		if (res == 0)
-		{
-			printf("Trigger success\n");
-			fflush(stdout);
-       }
-		else
-		{
-			fprintf(stderr, "Error, trigger setup failed\n");
-			fflush(stderr);
-		}		
-	}
-	else if (strcmp("STREAMDUMP", token) == 0)
-	{
-		int streamNo;
-		char streamFileName[512];
+        int res = Trigger(triggerSource, triggerMode, triggerEdge, delay, NULL);
+        if (res == 0)
+        {
+            printf("Trigger successs\n");
+            fflush(stdout);
+        }
+        else
+        {
+            fprintf(stderr, "Error, trigger setup failed\n");
+            fflush(stderr);
+        }		
+    }
+    else if (strcmp("STREAMDUMP", token) == 0)
+    {
+        int streamNo;
+        char streamFileName[512];
 
-		if (g_handle == 0) 
-		{
-			fprintf(stderr, "Error, camera not open.\n");
-			fflush(stderr);
-			return -1;
-		}	
+        if (g_handle == 0) 
+        {
+            fprintf(stderr, "Error, camera not open.\n");
+            fflush(stderr);
+            return -1;
+        }	
 
 
-		buffer = GetInt(buffer, &streamNo);
-		buffer = GetString(buffer, streamFileName);
+        buffer = GetInt(buffer, &streamNo);
+        buffer = GetString(buffer, streamFileName);
 
-		if (APDCAM_StreamDump(g_handle, streamNo, streamFileName) == ADT_OK)
-		{
-			printf("StreamDump success\n");
-			fflush(stdout);
-		}
-		else
-		{
-			fprintf(stderr, "Error, streamDump failed\n");
-			fflush(stderr);
-		}	
-	}
+        if (APDCAM_StreamDump(g_handle, streamNo, streamFileName) == ADT_OK)
+        {
+            printf("StreamDump success\n");
+            fflush(stdout);
+        }
+        else
+        {
+            fprintf(stderr, "Error, streamDump failed\n");
+            fflush(stderr);
+        }	
+    }
 			
-	else if (strcmp("START", token) == 0)
-	{
+    else if (strcmp("START", token) == 0)
+    {
 
-		if (g_handle == 0) 
-		{
-			fprintf(stderr, "Error, camera not open.\n");
-			fflush(stderr);
-			return -1;
-		}	
+        if (g_handle == 0) 
+        {
+            fprintf(stderr, "Error, camera not open.\n");
+            fflush(stderr);
+            return -1;
+        }	
 
-		int res = Start();
-		if (res == 0)
-		{
-			printf("Start succes\n");
-			fflush(stdout);
-		}
-		else
-		{
-			fprintf(stderr, "Error, start failed\n");
-			fflush(stderr);
-		}	
-	}
-	else if (strcmp("WAIT", token) == 0)
-	{
+        int res = Start();
+        if (res == 0)
+        {
+            printf("Start success\n");
+            fflush(stdout);
+        }
+        else
+        {
+            fprintf(stderr, "Error, start failed\n");
+            fflush(stderr);
+        }	
+    }
+    else if (strcmp("WAIT", token) == 0)
+    {
+        if (g_handle == 0) 
+        {
+            fprintf(stderr, "Error, camera not open.\n");
+            fflush(stderr);
+            return -1;
+        }	
 
-		if (g_handle == 0) 
-		{
-			fprintf(stderr, "Error, camera not open.\n");
-			fflush(stderr);
-			return -1;
-		}	
+        int timeout = -1;
+        if (buffer) buffer = GetInt(buffer, &timeout);
 
-		int timeout = -1;
-		if (buffer) buffer = GetInt(buffer, &timeout);
+        int res = Wait(timeout);
+        if (res == 0)
+        {
+            printf("Wait success\n");
+            fflush(stdout);
+        }	
+        else
+        {
+            fprintf(stderr, "Error, wait time out\n");
+            fflush(stderr);
+        }
+    }
+    else if (strcmp("STOP", token) == 0)
+    {
 
-		int res = Wait(timeout);
-		if (res == 0)
-		{
-			printf("Wait success\n");
-			fflush(stdout);
-		}	
-		else
-		{
-			fprintf(stderr, "Error, wait time out\n");
-			fflush(stderr);
-       }
-	}
-	else if (strcmp("STOP", token) == 0)
-	{
+        if (g_handle == 0) 
+        {
+            fprintf(stderr, "Error, camera not open.\n");
+            fflush(stderr);
+            return -1;
+        }	
 
-		if (g_handle == 0) 
-		{
-			fprintf(stderr, "Error, camera not open.\n");
-			fflush(stderr);
-			return -1;
-		}	
+        int res = Stop();
+        if (res == 0)
+        {
+            printf("Stop success\n");
+            fflush(stdout);
+        }
+        else
+        {
+            fprintf(stderr, "Error, stop failed\n");
+            fflush(stderr);
+        }
+    }
+    else if (strcmp("SAVE", token) == 0)
+    {
 
-		int res = Stop();
-		if (res == 0)
-		{
-			printf("Stop success\n");
-			fflush(stdout);
-		}
-		else
-		{
-			fprintf(stderr, "Error, stop failed\n");
-			fflush(stderr);
-       }
-	}
-	else if (strcmp("SAVE", token) == 0)
-	{
+        if (g_handle == 0) 
+        {
+            fprintf(stderr, "Error, camera not open.\n");
+            fflush(stderr);
+            return -1;
+        }	
 
-		if (g_handle == 0) 
-		{
-			fprintf(stderr, "Error, camera not open.\n");
-			fflush(stderr);
-			return -1;
-		}	
+        int ndata = -1;
+        GetInt(buffer,&ndata);
+        int res = APDTest_Save(ndata);
+        if (res == 0)
+        {
+            printf("Save success\n");
+            fflush(stdout);
+        }	
+        else
+        {
+            fprintf(stderr, "Error, save failed\n");
+            fflush(stderr);
+        }
+    }
+    else if (strcmp("DATAMODE", token) == 0)
+    {
+        int mode = 0;
+        if (strlen(buffer))
+            buffer = GetInt(buffer, &mode);
+        int res = DataMode(mode);
+        if (res == 0)
+        {
+            printf("DataMode success\n");
+            fflush(stdout);
+        }
+        else
+        {
+            fprintf(stderr, "DataMode failed\n");
+            fflush(stderr);
+        }	
+    }
+    else if (strcmp("FILTER", token) == 0)
+    {
+        int coeffs[6] = {0};
+        for (int i = 0; i < 6; i++)
+        {
+            if (strlen(buffer))
+                buffer = GetInt(buffer, &coeffs[i]);
+            else
+            {
+                break;
+            }
+        }
+        int res = Filter(coeffs);
+        if (res == 0)
+        {
+            printf("Filter setting success\n");
+            fflush(stdout);
+        }	
+        else
+        {
+            printf("Filter setting failed\n");
+            fflush(stderr);
+        }	
+    }
+    else if (strcmp("CALIBRATE", token) == 0)
+    {
+        int res = Calibrate();
+        if (res == 0)
+        {
+            printf("Calibration success\n");
+            fflush(stdout);
+        }	
+        else
+        {
+            printf("Calibration failed\n");
+            fflush(stderr);
+        }	
+    }
+    else if (strcmp("READ", token) == 0)
+    {
 
-		int ndata = -1;
-		GetInt(buffer,&ndata);
-		int res = APDTest_Save(ndata);
-		if (res == 0)
-		{
-			printf("Save success\n");
-			fflush(stdout);
-		}	
-		else
-		{
-			fprintf(stderr, "Error, save failed\n");
-			fflush(stderr);
-       }
-	}
-	else if (strcmp("DATAMODE", token) == 0)
-	{
-		int mode = 0;
-		if (strlen(buffer))
-			buffer = GetInt(buffer, &mode);
-		int res = DataMode(mode);
-		if (res == 0)
-		{
-			printf("DataMode success\n");
-			fflush(stdout);
-       }
-		else
-		{
-			fprintf(stderr, "DataMode failed\n");
-			fflush(stderr);
-		}	
-	}
-	else if (strcmp("FILTER", token) == 0)
-	{
-		int coeffs[6] = {0};
-		for (int i = 0; i < 6; i++)
-		{
-			if (strlen(buffer))
-				buffer = GetInt(buffer, &coeffs[i]);
-			else
-			{
-				break;
-			}
-		}
-		int res = Filter(coeffs);
-		if (res == 0)
-		{
-    		printf("Filter setting success\n");
-			fflush(stdout);
-		}	
-		else
-		{
-			printf("Filter setting failed\n");
-			fflush(stderr);
-		}	
-	}
-	else if (strcmp("CALIBRATE", token) == 0)
-	{
-		int res = Calibrate();
-		if (res == 0)
-		{
-			printf("Calibration success\n");
-			fflush(stdout);
-		}	
-		else
-		{
-			printf("Calibration failed\n");
-			fflush(stderr);
-		}	
-	}
-	else if (strcmp("READ", token) == 0)
-	{
+        if (g_handle == 0) 
+        {
+            fprintf(stderr, "Error, camera not open.\n");
+            fflush(stderr);
+            return -1;
+        }	
 
-		if (g_handle == 0) 
-		{
-			fprintf(stderr, "Error, camera not open.\n");
-			fflush(stderr);
-			return -1;
-		}	
+        int address;
+        int subaddress;
+        int numbytes;
+        buffer = GetInt(buffer, &address);
+        buffer = GetInt(buffer, &subaddress);
+        buffer = GetInt(buffer, &numbytes);
+        Read(address, subaddress, numbytes);
+    }
+    else if (strcmp("WRITE", token) == 0)
+    {
 
-		int address;
-		int subaddress;
-		int numbytes;
-		buffer = GetInt(buffer, &address);
-		buffer = GetInt(buffer, &subaddress);
-		buffer = GetInt(buffer, &numbytes);
-		Read(address, subaddress, numbytes);
-	}
-	else if (strcmp("WRITE", token) == 0)
-	{
+        if (g_handle == 0) 
+        {
+            fprintf(stderr, "Error, camera not open.\n");
+            fflush(stderr);
+            return -1;
+        }	
 
-		if (g_handle == 0) 
-		{
-			fprintf(stderr, "Error, camera not open.\n");
-			fflush(stderr);
-			return -1;
-		}	
+        int address;
+        int subaddress;
+        unsigned char data[MAX_RW_BYTES];
+        int numbytes;
 
-		int address;
-		int subaddress;
-		unsigned char data[MAX_RW_BYTES];
-		int numbytes;
+        buffer = GetInt(buffer, &address);
+        buffer = GetInt(buffer, &subaddress);
+        buffer = GetInt(buffer, &numbytes);
+        if (numbytes > MAX_RW_BYTES)
+        {
+            fprintf(stderr, "Cannot write more than %d bytes!\n", MAX_RW_BYTES);
+            fflush(stdout);
+        }
+        else
+        {
+            for (int iloc = 0;(iloc < numbytes) && (iloc < MAX_RW_BYTES); ++iloc)
+            {
+                int d;
+                buffer = GetInt(buffer, &d);
+                data[iloc] = d;
+            }
+            Write(address, subaddress, numbytes, data);
+        }
+    }
+    //10G C&C Read & Write
+    else if (strcmp("CCREAD", token) == 0 || strcmp("CCREAD-7", token) == 0)
+    {
+        /*
+         * Read 10G C&C card registers.
+         * acktype: type of acknowledgement, 1: writable registers, 3: read-only registers
+         * firstreg: first register to read from register table, see 10G C&C instruction manual 5.10
+         * length: number of bytes to read
+         */
+        int acktype = 0;
+        int firstreg = 0;
+        unsigned char *value = NULL;
 
-		buffer = GetInt(buffer, &address);
-		buffer = GetInt(buffer, &subaddress);
-		buffer = GetInt(buffer, &numbytes);
-		if (numbytes > MAX_RW_BYTES)
-		{
-			fprintf(stderr, "Cannot write more than %d bytes!\n", MAX_RW_BYTES);
-			fflush(stdout);
-		}
-		else
-		{
-			for (int iloc = 0;(iloc < numbytes) && (iloc < MAX_RW_BYTES); ++iloc)
-			{
-				int d;
-				buffer = GetInt(buffer, &d);
-				data[iloc] = d;
-			}
-			Write(address, subaddress, numbytes, data);
-		}
-	}
-	//10G C&C Read & Write
-	else if (strcmp("CCREAD", token) == 0 || strcmp("CCREAD-7", token) == 0)
-	{
-		/*
-		 * Read 10G C&C card registers.
-		 * acktype: type of acknowledgement, 1: writable registers, 3: read-only registers
-		 * firstreg: first register to read from register table, see 10G C&C instruction manual 5.10
-		 * length: number of bytes to read
-		 */
-		int acktype = 0;
-		int firstreg = 0;
-		unsigned char *value = NULL;
+        int length = 0;
 
-		int length = 0;
-
-		if (g_handle == 0) 
-		{
-			fprintf(stderr, "Error, camera not open.\n");
-			fflush(stderr);
-			return -1;
-		}	
-
-
-		buffer = GetInt(buffer, &acktype);
-		buffer = GetInt(buffer, &firstreg);
-		buffer = GetInt(buffer, &length);
-
-		value = (unsigned char*) malloc (length);
-
-		bool compat = (strcmp("CCREAD", token) == 0);
-		if (ReadCC(acktype, value, compat ? firstreg - 7 : firstreg, length) == 0)
-		{
-			if (length == 1)
-			{
-				if (compat)
-					printf("\nC&C REGISTER VALUES:\n  Acktype:      %d\n  Address:      %d\n  Value:        %d\n", acktype, firstreg, value[0]);
-				else
-					printf("\nC&C REGISTER VALUES:\n  Acktype:      %d\n  Address:      %d\n  Value:        0x%.2x(%c)\n", acktype, firstreg, value[0], value[0]);
-			}
-			else
-			{
-				printf("\nC&C REGISTER VALUES:\n  Acktype:        %d\n  Start address:  %d\n  Values:         ", acktype, firstreg);
-				for (int i = 0; i < length; i++)
-				{
-					if (compat)
-						printf("%d ", value[i]);
-					else
-					{
-						if (isalnum(value[i]))
-							printf("0x%.2x(%c) ", value[i], value[i]);
-						else
-							printf("0x%.2x(%d) ", value[i], value[i]);
-					}
-				}
-				printf("\n\n");
-				fflush(stdout);
-			}
-		}
-
-		free(value);
-	}
-	//10G C&C Flash memory read
-	else if (strcmp("FLREAD", token) == 0)
-	{
-		/*
-		 * Read 10G C&C card flash page.
-		 * PgAddress: Page address 0...8191
-		 */
-		int PgAddress = 0;
-		unsigned char *value = NULL;
-
-		int length = 1024;
-
-		if (g_handle == 0) 
-		{
-			fprintf(stderr, "Error, camera not open.\n");
-			fflush(stderr);
-			return -1;
-		}	
+        if (g_handle == 0) 
+        {
+            fprintf(stderr, "Error, camera not open.\n");
+            fflush(stderr);
+            return -1;
+        }	
 
 
-		buffer = GetInt(buffer, &PgAddress);
+        buffer = GetInt(buffer, &acktype);
+        buffer = GetInt(buffer, &firstreg);
+        buffer = GetInt(buffer, &length);
 
-		value = (unsigned char*) malloc (length);
+        value = (unsigned char*) malloc (length);
 
-		if (ReadFlashPage(PgAddress, value) == 0)
-		{
-			printf("\nC&C FLASH DATA:\n  PageAddress:        %d\n  Values: ", PgAddress);
-				for (int i = 0; i < length; i++)
-				{
-					printf("%d ", value[i]);
-				}
-				printf("\n\n");
-				fflush(stdout);
-		} 
-		else
-		{ 
-		  fprintf(stderr, "Error reading flash memory.");
-		  fflush(stdout);
-		}  
+        bool compat = (strcmp("CCREAD", token) == 0);
+        if (ReadCC(acktype, value, compat ? firstreg - 7 : firstreg, length) == 0)
+        {
+            if (length == 1)
+            {
+                if (compat)
+                    printf("\nC&C REGISTER VALUES:\n  Acktype:      %d\n  Address:      %d\n  Value:        %d\n", acktype, firstreg, value[0]);
+                else
+                    printf("\nC&C REGISTER VALUES:\n  Acktype:      %d\n  Address:      %d\n  Value:        0x%.2x(%c)\n", acktype, firstreg, value[0], value[0]);
+            }
+            else
+            {
+                printf("\nC&C REGISTER VALUES:\n  Acktype:        %d\n  Start address:  %d\n  Values:         ", acktype, firstreg);
+                for (int i = 0; i < length; i++)
+                {
+                    if (compat)
+                        printf("%d ", value[i]);
+                    else
+                    {
+                        if (isalnum(value[i]))
+                            printf("0x%.2x(%c) ", value[i], value[i]);
+                        else
+                            printf("0x%.2x(%d) ", value[i], value[i]);
+                    }
+                }
+                printf("\n\n");
+                fflush(stdout);
+            }
+        }
 
-		free(value);
-	}
-	//10G firmware update STARTFUP
-	else if (strcmp("STARTFUP", token) == 0)
-	{
-		/*
-		 * Start fimrware update with already downloaded data.
-		 */
+        free(value);
+    }
+    //10G C&C Flash memory read
+    else if (strcmp("FLREAD", token) == 0)
+    {
+        /*
+         * Read 10G C&C card flash page.
+         * PgAddress: Page address 0...8191
+         */
+        int PgAddress = 0;
+        unsigned char *value = NULL;
 
-		if (g_handle == 0) 
-		{
-			fprintf(stderr, "Error, camera not open.\n");
-			fflush(stderr);
-			return -1;
-		}	
+        int length = 1024;
 
-		if (StartFUP() == 0)
-		{
-			printf("\nC&C Card firmware succesfully updated.\n");
-			fflush(stdout);
-		} 
-	}
-	else if (strcmp("CCCONTROL", token) == 0)
-	{
-		/*
-		 * Control 10G C&C card.
-		 * opcode: 10G commands in decimal form(!)
-		 * length: instruction length, see 10G C&C instruction manual 5.1-5.10
-		 * data
-		 */
-
-		int opcode;
-		int length;
-		unsigned char data[MAX_RW_BYTES];
-
-		if (g_handle == 0) 
-		{
-			fprintf(stderr, "Error, camera not open.\n");
-			fflush(stderr);
-			return -1;
-		}	
-
-		buffer = GetInt(buffer, &opcode);
-		buffer = GetInt(buffer, &length);
-		if (length > MAX_RW_BYTES)
-		{
-			fprintf(stderr, "Error in CCCONTROL, cannot write more than %d bytes!\n", MAX_RW_BYTES);
-			fflush(stderr);
-		}
-		else
-		{
-			for (int iloc = 0; (iloc < length) && (iloc < MAX_RW_BYTES); ++iloc)
-			{
-				int d;
-				buffer = GetInt(buffer, &d);
-				data[iloc] = d;
-			}
-
-			CCControl(opcode, length, data);
-		}
-	}
-	else if (strcmp("STREAM-INTERFACE", token) == 0)
-	{
-		char ifname[512];
-		buffer = GetString(buffer, ifname);
-
-		if (g_handle == 0) 
-		{
-			fprintf(stderr, "Error, camera not open.\n");
-			fflush(stderr);
-			return -1;
-		}	
+        if (g_handle == 0) 
+        {
+            fprintf(stderr, "Error, camera not open.\n");
+            fflush(stderr);
+            return -1;
+        }	
 
 
-		if (APDCAM_SetStreamInterface(g_handle, ifname) == ADT_OK)
-		{
-			printf("Interface set.\n");
-			fflush(stdout);
-		}
-		else
-		{
-			fprintf(stderr, "Error, cannot set stream interface!\n");
-			fflush(stderr);
-		}	
-	}
-	else
-	{
-		fprintf(stderr, "WARNING: Unknown command:\n|%s|\n", token);
-		fflush(stderr);
-   }
-	return 0;
+        buffer = GetInt(buffer, &PgAddress);
+
+        value = (unsigned char*) malloc (length);
+
+        if (ReadFlashPage(PgAddress, value) == 0)
+        {
+            printf("\nC&C FLASH DATA:\n  PageAddress:        %d\n  Values: ", PgAddress);
+            for (int i = 0; i < length; i++)
+            {
+                printf("%d ", value[i]);
+            }
+            printf("\n\n");
+            fflush(stdout);
+        } 
+        else
+        { 
+            fprintf(stderr, "Error reading flash memory.");
+            fflush(stdout);
+        }  
+
+        free(value);
+    }
+    //10G firmware update STARTFUP
+    else if (strcmp("STARTFUP", token) == 0)
+    {
+        /*
+         * Start fimrware update with already downloaded data.
+         */
+
+        if (g_handle == 0) 
+        {
+            fprintf(stderr, "Error, camera not open.\n");
+            fflush(stderr);
+            return -1;
+        }	
+
+        if (StartFUP() == 0)
+        {
+            printf("\nC&C Card firmware succesfully updated.\n");
+            fflush(stdout);
+        } 
+    }
+    else if (strcmp("CCCONTROL", token) == 0)
+    {
+        /*
+         * Control 10G C&C card.
+         * opcode: 10G commands in decimal form(!)
+         * length: instruction length, see 10G C&C instruction manual 5.1-5.10
+         * data
+         */
+
+        int opcode;
+        int length;
+        unsigned char data[MAX_RW_BYTES];
+
+        if (g_handle == 0) 
+        {
+            fprintf(stderr, "Error, camera not open.\n");
+            fflush(stderr);
+            return -1;
+        }	
+
+        buffer = GetInt(buffer, &opcode);
+        buffer = GetInt(buffer, &length);
+        if (length > MAX_RW_BYTES)
+        {
+            fprintf(stderr, "Error in CCCONTROL, cannot write more than %d bytes!\n", MAX_RW_BYTES);
+            fflush(stderr);
+        }
+        else
+        {
+            for (int iloc = 0; (iloc < length) && (iloc < MAX_RW_BYTES); ++iloc)
+            {
+                int d;
+                buffer = GetInt(buffer, &d);
+                data[iloc] = d;
+            }
+
+            CCControl(opcode, length, data);
+        }
+    }
+    else if (strcmp("STREAM-INTERFACE", token) == 0)
+    {
+        char ifname[512];
+        buffer = GetString(buffer, ifname);
+
+        if (g_handle == 0) 
+        {
+            fprintf(stderr, "Error, camera not open.\n");
+            fflush(stderr);
+            return -1;
+        }	
+
+
+        if (APDCAM_SetStreamInterface(g_handle, ifname) == ADT_OK)
+        {
+            printf("Interface set.\n");
+            fflush(stdout);
+        }
+        else
+        {
+            fprintf(stderr, "Error, cannot set stream interface!\n");
+            fflush(stderr);
+        }	
+    }
+    else
+    {
+        fprintf(stderr, "WARNING: Unknown command:\n|%s|\n", token);
+        fflush(stderr);
+    }
+    return 0;
 }
 
 

@@ -653,119 +653,121 @@ ADT_RESULT APDCAM_ShutupAllTS(ADT_HANDLE handle)
 
 ADT_RESULT APDCAM_Allocate(ADT_HANDLE handle, uint64_t sampleCount, int bits, uint32_t channelMask_1, uint32_t channelMask_2, uint32_t channelMask_3, uint32_t channelMask_4, int primary_buffer_size)
 {
-	int index = GetIndex(handle);
-	if (index < 0)
-		return ADT_INVALID_HANDLE_ERROR;
+    int index = GetIndex(handle);
+    if (index < 0) return ADT_INVALID_HANDLE_ERROR;
 
-	WORKING_SET &WorkingSet = g_WorkingSets[index];
+    WORKING_SET &WorkingSet = g_WorkingSets[index];
 
-	if (bits != 8 && bits != 12 && bits != 14)
-	{
-		return ADT_PARAMETER_ERROR;
-	}
+    if (bits != 8 && bits != 12 && bits != 14)
+    {
+        fprintf(stderr,"ERROR: bits (%i) is wrong\n",bits);
+        return ADT_PARAMETER_ERROR;
+    }
 
-	primary_buffer_size = std::max(primary_buffer_size, 10);
-	primary_buffer_size = std::min(primary_buffer_size, 100);
+    primary_buffer_size = std::max(primary_buffer_size, 10);
+    primary_buffer_size = std::min(primary_buffer_size, 100);
 
-	if (sampleCount > MAX_SAMPLECOUNT)
-	{
-		return ADT_PARAMETER_ERROR;
-	}
+    if (sampleCount > MAX_SAMPLECOUNT)
+    {
+        fprintf(stderr,"ERROR: sampleCount (%lu) is larger than maximum (%lu)\n",sampleCount,MAX_SAMPLECOUNT);
+        return ADT_PARAMETER_ERROR;
+    }
 
-	// After switching on, the sampleCount read back from the ADC board is invalid.
-	if (sampleCount == 0 && WorkingSet.bufferSizeInSampleNo == 0)
-	{
-		return ADT_PARAMETER_ERROR;
-	}
+    // After switching on, the sampleCount read back from the ADC board is invalid.
+    if (sampleCount == 0 && WorkingSet.bufferSizeInSampleNo == 0)
+    {
+        fprintf(stderr,"ERROR: sample count and buffer size in sample no are zero\n");
+        return ADT_PARAMETER_ERROR;
+    }
 
-	// Delete old setup
-	WorkingSet.setupComplete = false;
+    // Delete old setup
+    WorkingSet.setupComplete = false;
 
 //#warning FIXME: increasing sampleCount by one to workaround possible firmware bug
-	// Save new parameters
-	if (sampleCount > 0)
-		WorkingSet.bufferSizeInSampleNo = ++sampleCount;
+    // Save new parameters
+    if (sampleCount > 0)
+        WorkingSet.bufferSizeInSampleNo = ++sampleCount;
 
-	WorkingSet.streams[0].channelMask = channelMask_1;
-	WorkingSet.streams[1].channelMask = channelMask_2;
-	WorkingSet.streams[2].channelMask = channelMask_3;
-	WorkingSet.streams[3].channelMask = channelMask_4;
+    WorkingSet.streams[0].channelMask = channelMask_1;
+    WorkingSet.streams[1].channelMask = channelMask_2;
+    WorkingSet.streams[2].channelMask = channelMask_3;
+    WorkingSet.streams[3].channelMask = channelMask_4;
 
-	for (int i = 0; i < WorkingSet.n_streams; ++i)
-	{
-		Stream *stream = &WorkingSet.streams[i];
+    for (int i = 0; i < WorkingSet.n_streams; ++i)
+    {
+        Stream *stream = &WorkingSet.streams[i];
 
-		if (stream->np_memory)
-			delete stream->np_memory;
-		stream->np_memory = NULL;
+        if (stream->np_memory)
+            delete stream->np_memory;
+        stream->np_memory = NULL;
 
-		stream->bits = bits;
+        stream->bits = bits;
 
-		/*
-		 * Number of enabled channels
-		 */
-		unsigned int channels = GetBitCount(stream->channelMask);
-		/*
-		 * Number of bytes in a sample (with possible _bit_ padding)
-		 */
-		unsigned int blockSize = GetBlockSize(channels, stream->bits);
-		/*
-		 * Size of the data portion of a stream packet
-		 */
-		unsigned int dataSize = WorkingSet.packetsize - sizeof(CC_STREAMHEADER);
-		/*
-		 * Total number of _data_ bytes requested (ie. just the samples but _with_ padding to CC_OCTET_SIZE)
-		 */
-		if (blockSize % CC_OCTET_SIZE)
-			blockSize += CC_OCTET_SIZE - (blockSize % CC_OCTET_SIZE);
-		uint64_t requestedDataSize = blockSize * WorkingSet.bufferSizeInSampleNo;
-		/*
-		 * Total number of byes requested (ie. including the stream header)
-		 */
-		uint64_t networkData = (double)requestedDataSize * (double)WorkingSet.packetsize / (double)dataSize;
-		/*
-		 * Scale to primary_buffer_size percent
-		 */
-		networkData *= primary_buffer_size / 100.0;
-		/*
-		 * Enlarge buffersize to packetsize boundary
-		 */
-		unsigned int buffersize = (networkData / WorkingSet.packetsize + 1) * WorkingSet.packetsize;
-		/*
-		 * Enlarge buffersize to pagesize boundary
-		 */
-		stream->primary_buffer_size = (buffersize / PAGESIZE + 1) * PAGESIZE;
-		/*
-		 * Need to hold a packet
-		 */
-		stream->temp_buffer_size = (WorkingSet.packetsize - sizeof(CC_STREAMHEADER) / PAGESIZE + 1) * PAGESIZE;
-		/*
-		 * Every sample is stored in its 16 bit word (ie. unpacked)
-		 * Enlarge it to PAGESIZE boundary so that it can be properly aligned
-		 */
-		stream->user_buffer_size = ((WorkingSet.bufferSizeInSampleNo * sizeof(UINT16)) / PAGESIZE + 1) * PAGESIZE;
-		/*
-		 * Every channel has its own buffer
-		 */
-		uint64_t size = stream->primary_buffer_size + stream->temp_buffer_size + CHANNEL_NUM * stream->user_buffer_size;
+        /*
+         * Number of enabled channels
+         */
+        unsigned int channels = GetBitCount(stream->channelMask);
+        /*
+         * Number of bytes in a sample (with possible _bit_ padding)
+         */
+        unsigned int blockSize = GetBlockSize(channels, stream->bits);
+        /*
+         * Size of the data portion of a stream packet
+         */
+        unsigned int dataSize = WorkingSet.packetsize - sizeof(CC_STREAMHEADER);
+        /*
+         * Total number of _data_ bytes requested (ie. just the samples but _with_ padding to CC_OCTET_SIZE)
+         */
+        if (blockSize % CC_OCTET_SIZE)
+            blockSize += CC_OCTET_SIZE - (blockSize % CC_OCTET_SIZE);
+        uint64_t requestedDataSize = blockSize * WorkingSet.bufferSizeInSampleNo;
+        /*
+         * Total number of byes requested (ie. including the stream header)
+         */
+        uint64_t networkData = (double)requestedDataSize * (double)WorkingSet.packetsize / (double)dataSize;
+        /*
+         * Scale to primary_buffer_size percent
+         */
+        networkData *= primary_buffer_size / 100.0;
+        /*
+         * Enlarge buffersize to packetsize boundary
+         */
+        unsigned int buffersize = (networkData / WorkingSet.packetsize + 1) * WorkingSet.packetsize;
+        /*
+         * Enlarge buffersize to pagesize boundary
+         */
+        stream->primary_buffer_size = (buffersize / PAGESIZE + 1) * PAGESIZE;
+        /*
+         * Need to hold a packet
+         */
+        stream->temp_buffer_size = (WorkingSet.packetsize - sizeof(CC_STREAMHEADER) / PAGESIZE + 1) * PAGESIZE;
+        /*
+         * Every sample is stored in its 16 bit word (ie. unpacked)
+         * Enlarge it to PAGESIZE boundary so that it can be properly aligned
+         */
+        stream->user_buffer_size = ((WorkingSet.bufferSizeInSampleNo * sizeof(UINT16)) / PAGESIZE + 1) * PAGESIZE;
+        /*
+         * Every channel has its own buffer
+         */
+        uint64_t size = stream->primary_buffer_size + stream->temp_buffer_size + CHANNEL_NUM * stream->user_buffer_size;
 
-		stream->np_memory = CAPDFactory::GetAPDFactory()->GetNPMemory(size);
-		stream->primary_buffer = stream->np_memory->GetBuffer();
-		stream->temp_buffer = stream->primary_buffer + stream->primary_buffer_size;
-		stream->user_buffer = stream->temp_buffer + stream->temp_buffer_size;
-		stream->requestedData = requestedDataSize;
-		stream->eval->SetBuffers(stream->primary_buffer, stream->temp_buffer, stream->user_buffer, stream->user_buffer_size);
-		stream->eval->SetParams(stream->bits, stream->channelMask, WorkingSet.packetsize - sizeof(CC_STREAMHEADER));
+        stream->np_memory = CAPDFactory::GetAPDFactory()->GetNPMemory(size);
+        stream->primary_buffer = stream->np_memory->GetBuffer();
+        stream->temp_buffer = stream->primary_buffer + stream->primary_buffer_size;
+        stream->user_buffer = stream->temp_buffer + stream->temp_buffer_size;
+        stream->requestedData = requestedDataSize;
+        stream->eval->SetBuffers(stream->primary_buffer, stream->temp_buffer, stream->user_buffer, stream->user_buffer_size);
+        stream->eval->SetParams(stream->bits, stream->channelMask, WorkingSet.packetsize - sizeof(CC_STREAMHEADER));
 
-		SetChannel_1(WorkingSet.client, stream->address, reverseBits(stream->channelMask & 0xFF));
-		SetChannel_2(WorkingSet.client, stream->address, reverseBits((stream->channelMask >> 8) & 0xFF));
-		SetChannel_3(WorkingSet.client, stream->address, reverseBits((stream->channelMask >> 16) & 0xFF));
-		SetChannel_4(WorkingSet.client, stream->address, reverseBits((stream->channelMask >> 24) & 0xFF));
-	}
+        SetChannel_1(WorkingSet.client, stream->address, reverseBits(stream->channelMask & 0xFF));
+        SetChannel_2(WorkingSet.client, stream->address, reverseBits((stream->channelMask >> 8) & 0xFF));
+        SetChannel_3(WorkingSet.client, stream->address, reverseBits((stream->channelMask >> 16) & 0xFF));
+        SetChannel_4(WorkingSet.client, stream->address, reverseBits((stream->channelMask >> 24) & 0xFF));
+    }
 
-	WorkingSet.setupComplete = true;
+    WorkingSet.setupComplete = true;
 
-	return ADT_OK;
+    return ADT_OK;
 }
 
 
@@ -1253,7 +1255,7 @@ ADT_RESULT APDCAM_SWTrigger(ADT_HANDLE handle)
 
 	if (WorkingSet.state != AS_MEASURE)
 	{
-		return ADT_ERROR;
+            return ADT_ERROR;
 	}
 
 	uint64_t sc = WorkingSet.eval_1->GetSampleCount();

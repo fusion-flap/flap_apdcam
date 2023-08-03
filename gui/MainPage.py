@@ -27,6 +27,7 @@ class MainPage(QtWidgets.QWidget):
         addressGroupBox.addWidget(QtWidgets.QLabel("Address:"),0,0)
         self.addressEntry = QtWidgets.QLineEdit()
         self.addressEntry.setText("10.123.13.101")
+        #self.addressEntry.setText("10.123.13.102")
         self.addressEntry.setToolTip("The IP address of the camera")
         addressGroupBox.addWidget(self.addressEntry,0,1)
         addressGroupBox.addWidget(QtWidgets.QLabel("Interface: "),1,0)

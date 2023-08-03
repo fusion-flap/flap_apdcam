@@ -302,7 +302,7 @@ class Adc(QtWidgets.QWidget):
         self.bits.addItem("14")
         self.bits.addItem("12")
         self.bits.addItem("8")
-        self.bits.activated[str].connect(self.gui.call(lambda: self.gui.camera.setResolution(self.number,int(self.bits.currentText()))))
+        self.bits.activated[str].connect(self.gui.call(lambda: self.gui.camera.setAdcResolution(self.number,int(self.bits.currentText()))))
         g.addWidget(self.bits,0,1)
 
         g.addWidget(QtWidgets.QLabel("Ring buffer:"),1,0)

@@ -451,7 +451,7 @@ class measurePara_class:
         self.channelMasks=0
         self.sampleDiv=0,
         self.bits=0
-        self.externalTriggerPolarity=None
+        self.externalTrigger=None
         self.internalTrigger=False
         self.triggerDelay = 0
 
@@ -580,8 +580,8 @@ class APDCAM10G_regCom:
         self.APDCAM_IP = ip
 
 #        print("########### Check this here  ##################")
-        err = APDCAM10G_regCom.startReceiveAnswer(self)
-        #err = self.startReceiveAnswer()  # Changed by D. Barna
+        #err = APDCAM10G_regCom.startReceiveAnswer(self)
+        err = self.startReceiveAnswer()  # Changed by D. Barna
 
         if (err != "") :
             self.close()
@@ -2773,6 +2773,13 @@ class APDCAM10G_regCom:
             Error message, or empty string if no error
         """
 
+        # First check if global "HV Enable" is on. If not, writing PC_REG_HVON will fail
+        err, hvEnabled = self.readPDI(self.codes_PC.PC_CARD,
+                              self.codes_PC.PC_REG_HVENABLE,
+                              1,
+                              arrayData=False)
+        hvEnabled = hvEnabled[0]
+
         # Read the actual status (bit-coded)
         err, d = self.readPDI(self.codes_PC.PC_CARD,
                               self.codes_PC.PC_REG_HVON,
@@ -2797,9 +2804,9 @@ class APDCAM10G_regCom:
                             self.codes_PC.PC_REG_HVON,
                             d,
                             numberOfBytes=1,
-                            arrayData=False
+                            arrayData=False,
+                            noReadBack=(hvEnabled!=0xAB)
                             )
-
         return err
 
 
@@ -2982,7 +2989,7 @@ class APDCAM10G_regCom:
     # def measure(self,numberOfSamples=100000, channelMasks=[0xffffffff,0xffffffff, 0xffffffff, 0xffffffff], \
     #             sampleDiv=10, datapath="data", bits=14, waitForResult=0, externalTriggerPolarity=None,\
     #             internalTrigger=False, internalTriggerADC=None,  triggerDelay=0, data_receiver='APDTest'):
-    def measure(self,numberOfSamples=100000, \
+    def measure(self,numberOfSamples=None, \
                 channelMasks=None, \
                 sampleDiv=None, \
                 datapath="data",
@@ -3000,7 +3007,7 @@ class APDCAM10G_regCom:
         ^^^^^^^^^^
         numberOfSamples : int, optional
             The number of samples to measure in one ADC channel. The default is 100000.
-        channelMasks : list of four integers, optional
+        channelMasks : list of integers, length must be the same as number of ADC boards, optional
             Channel masks to enable ADC channel. Each bit enables one channel. 
             If omitted, the status is obtained from the registers CHENABLEx (x=1..4)
             Each element of this list corresponds to one ADC board
@@ -3050,30 +3057,35 @@ class APDCAM10G_regCom:
 
         """
 
+        print("------------- Measure starts ------------------")
+
         self.readStatus(dataOnly=True)
 
         chmask = None
 
+        n_adc = len(self.status.ADC_address)
+
         # If no channel mask was given by the user, read the CHENABLEx (x=1..4) registers from the camera
         # and set the mask from these values
         if channelMasks is None:
-            chmask = [bytearray(4)]*4
-            for adc in range(len(self.status.ADC_address)):
+            chmask = [0]*4
+            for adc in range(n_adc):
+                tmp = bytearray(4)
                 for i in range(4):
                     err,r = self.getAdcRegister(adc+1,self.codes_ADC.ADC_REG_CHENABLE1+i)
                     if err != "":
                         return "Error reading the channel enabled status from the camera: " + err
-                    chmask[adc][i] = r
+                    tmp[i] = r
+                chmask[adc] = int.from_bytes(tmp,'big')
         else:
             chmask = copy.deepcopy(channelMasks)
-            if (len(chmask) < 4):
-                for i in range(4-len(chmask)):
+            if (len(chmask) < n_adc):
+                for i in range(n_adc-len(chmask)):
                     chmask.append(0)
                     #chmask = [chmask, 0]
                     #this (old code) is probably wrong, we want to append zeros??? this will create nested lists
         self.measurePara.channelMasks = copy.deepcopy(chmask)
                 
-
         if (sampleDiv != None):
             self.setSampleDivider(sampleDiv)
             self.measurePara.sampleDiv = sampleDiv
@@ -3091,36 +3103,40 @@ class APDCAM10G_regCom:
                 if resolutions[0] != resolutions[i+1]:
                     return "ADC blocks have different resolution setting.",""
             if resolutions[0] != 0 and resolutions[0] != 1 and resolutions[0] != 2:
-               return "Invalid bit resolution setting in ADCs." ,""
+                return "Invalid bit resolution setting in ADCs." ,""
+            bits = [14,12,8][resolutions[0]]
             self.measurePara.bits = [14,12,8][resolutions[0]]
-
-
-        print("read the trigger settings from the camera, and depending on which parameter was provided in the call to this measure(...) function, set the bits/value")
-        sys.exit(123)
 
         # Trigger settings
         if externalTrigger is None: # default value, i.e. parameter not specified, then take it from the camera
-            pos = self.status.CC_settings[self.CC_REGISTER_TRIGSTATE] & (1<<0)
-            neg = self.status.CC_settings[self.CC_REGISTER_TRIGSTATE] & (1<<1)
+            pos = self.status.CC_settings[self.codes_CC.CC_REGISTER_TRIGSTATE] & (1<<0)
+            neg = self.status.CC_settings[self.codes_CC.CC_REGISTER_TRIGSTATE] & (1<<1)
             if pos and neg:
                 externalTrigger = 'both'
             elif pos:
                 externalTrigger = 'positive'
             elif neg:
                 externalTrigger = 'negative'
+        # Make sure we do not have something undefined. Anything other than 'positive', 'negative' or 'both' should be False
+        if externalTrigger != "positive" and externalTrigger != "negative" and externalTrigger != "both":
+            externalTrigger = False
+
         if internalTrigger is None: # default value, i.e. parameter not specified, then take it from the camera
-            internalTrigger = bool(self.status.CC_settings[self.CC_REGISTER_TRIGSTATE] & (1<<2))
+            internalTrigger = bool(self.status.CC_settings[self.codes_CC.CC_REGISTER_TRIGSTATE] & (1<<2))
 
         if triggerDelay is None: # default value, i.e. parameter not specified, then take it from the camera
-            triggerDelay = int.from_bytes(self.status.CC_settings[self.CC_REGISTER_TRIGDELAY:self.CC_REGISTER_TRIGDELAY+4],'big')
+            triggerDelay = int.from_bytes(self.status.CC_settings[self.codes_CC.CC_REGISTER_TRIGDELAY:self.codes_CC.CC_REGISTER_TRIGDELAY+4],'big')
 
         err = self.setTrigger(externalTrigger=externalTrigger,
                               internalTrigger=internalTrigger,
                               triggerDelay=triggerDelay)
 
-        self.measurePara.externalTriggerPolarity = externalTriggerPolarity
+        self.measurePara.externalTrigger = externalTrigger
         self.measurePara.internalTrigger = internalTrigger
         self.measurePara.triggerDelay = triggerDelay
+
+        if numberOfSamples is None:
+            numberOfSamples = int.from_bytes(self.status.CC_settings[self.codes_CC.CC_REGISTER_SAMPLECOUNT:self.codes_CC.CC_REGISTER_SAMPLECOUNT+6],byteorder='big')
 
         self.measurePara.numberOfSamples = numberOfSamples
         
@@ -3138,6 +3154,7 @@ class APDCAM10G_regCom:
         
             cmdfile_name = "apd_python_meas.cmd"
             cmdfile = datapath+'/'+cmdfile_name
+            print("Command file: " + cmdfile)
             try:
                 f = open(cmdfile,"wt")
             except:
@@ -3148,7 +3165,7 @@ class APDCAM10G_regCom:
 
             # Calculate the number of active channels
             chnum = 0
-            for i in range(n_adc):
+            for i in range(len(self.status.ADC_address)):
                 chnum += bin(chmask[i]).count("1")
 
             # add some safety margin to the buffer
@@ -3190,8 +3207,9 @@ class APDCAM10G_regCom:
             time.sleep(1)
             thisdir = os.path.dirname(os.path.realpath(__file__))
             apdtest_prog = 'APDTest_10G'
-            apdtest = os.path.join(thisdir,'APDTest_10G','APDTest_10G')
+            apdtest = os.path.join(thisdir,'../apdcam_control/APDTest_10G','APDTest_10G')
             cmd = "killall -KILL "+apdtest_prog+" 2> /dev/null ; cd "+datapath+" ; rm Channel*.dat 2> /dev/null ; "+apdtest+" "+cmdfile_name+" >APDTest_10G.out 2>&1 &"
+
             d = subprocess.run([cmd],check=False,shell=True)
             sleeptime = 0.1
             maxcount = int(10/sleeptime)+1
@@ -3329,8 +3347,7 @@ class APDCAM10G_regCom:
                      value_type='long',\
                      comment="The bit resolution of the ADC")
 
-
-        if (self.measurePara.externalTriggerPolarity == None):
+        if (self.measurePara.externalTriggerPolarity == False):
             trig = -1
         else:
             trig = float(self.measurePara.triggerDelay)/1e6

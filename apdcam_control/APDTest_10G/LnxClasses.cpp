@@ -205,39 +205,38 @@ void CLnxWaitForEvents::createPollFd()
 
 CWaitForEvents::WAIT_RESULT CLnxWaitForEvents::WaitAll(int timeout) 
 {
-	struct timeval begin;
-	int n = m_nfds;
+    struct timeval begin;
+    int n = m_nfds;
 
+    if (timeout > 0)
+        gettimeofday(&begin, NULL);
 
-	if (timeout > 0)
-		gettimeofday(&begin, NULL);
+    if (n == 1)
+    {
+        return WaitAny(1, &begin, &timeout, false, NULL);
+    }
 
-	if (n == 1)
-	{
-		return WaitAny(1, &begin, &timeout, false, NULL);
-	}
+    WAIT_RESULT res = WR_OK;
+    while (n)
+    {
+        int index;
 
-	WAIT_RESULT res = WR_OK;
-	while (n)
-	{
-		int index;
+        res = WaitAny(n, &begin, &timeout, true, &index);
 
-		res = WaitAny(n, &begin, &timeout, true, &index);
+        if (res != WR_OK)
+            break;
 
-		if (res != WR_OK)
-			break;
+        --n;
+        m_pfds[index].fd = m_pfds[n].fd;
+        m_pfds[index].revents = 0;
+    }
 
-		--n;
-		m_pfds[index].fd = m_pfds[n].fd;
-		m_pfds[index].revents = 0;
-	}
+    /*
+     * Recreate m_pfds
+     */
+    createPollFd();
 
-	/*
-	 * Recreate m_pfds
-	 */
-	createPollFd();
-
-	return res;
+    return res;
 }
 
 

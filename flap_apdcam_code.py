@@ -106,6 +106,7 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
     
     Parameters
     ----------
+    exp_id: Not used, present as required by FLAP get_data funciton format.
     data_name: string
                ADCxxx: ADC number. Unix style regular expressions are allowed:
                        ADC*
@@ -472,7 +473,7 @@ def apdcam_get_data(exp_id=None, data_name=None, no_data=False, options=None, co
                                      unit='n.a.',
                                      mode=c_mode,
                                      shape=[1],
-                                     values=chname_proc[0],
+                                     values=chname_proc0,
                                      dimension_list=[]
                                      )
                      )

@@ -362,10 +362,20 @@ class Adc(QtWidgets.QWidget):
 
 
         g.addWidget(QtWidgets.QLabel("FIR Freq. [MHz]:"),2,2)
-        self.firFrequency = QDoubleEdit()
+        #self.firFrequency = QDoubleEdit()
+        self.firFrequency = QtWidgets.QDoubleSpinBox()
+        self.firFrequency.setMinimum(0)
+        self.firFrequency.setMaximum(100)
+        self.firFrequency.setSingleStep(0.1)
+        self.firFrequency.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         g.addWidget(self.firFrequency,2,3)
         g.addWidget(QtWidgets.QLabel("Rec. Freq. [MHz]:"),3,2)
-        self.recFrequency = QDoubleEdit()
+        #self.recFrequency = QDoubleEdit()
+        self.recFrequency = QtWidgets.QDoubleSpinBox()
+        self.recFrequency.setMinimum(0)
+        self.recFrequency.setMaximum(100)
+        self.recFrequency.setSingleStep(0.1)
+        self.recFrequency.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         g.addWidget(self.recFrequency,3,3)
 
         self.filter = QtWidgets.QCheckBox("Enable")
@@ -537,6 +547,12 @@ class AdcControl(QtWidgets.QWidget):
         for adc in self.adc:
             adc.updateGui()
 
+    def saveSettings(self,file):
+        for adc in self.adc:
+            file.write("  [ADC " + str(adc.number) + "]\n")
+            saveSettings(adc,file,1)
+        file.write("\n")
+
     def __init__(self,parent):
         self.gui = parent
         super(AdcControl,self).__init__(parent)
@@ -557,8 +573,8 @@ class AdcControl(QtWidgets.QWidget):
         self.factoryResetButton.guiMode = GuiMode.factory
         h.addWidget(self.factoryResetButton)
 
-        self.readFromHwButton = QtWidgets.QPushButton("Read from HW")
-        h.addWidget(self.readFromHwButton)
+#        self.readFromHwButton = QtWidgets.QPushButton("Read from HW")
+#        h.addWidget(self.readFromHwButton)
 
         self.readAllAdcStatusButton = QtWidgets.QPushButton("Read all ADC status")
         h.addWidget(self.readAllAdcStatusButton)

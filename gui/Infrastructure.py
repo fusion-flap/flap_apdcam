@@ -89,11 +89,13 @@ class Infrastructure(QtWidgets.QWidget):
         l1.addWidget(shutter)
 
         self.shutterOpen = QtWidgets.QCheckBox("Shutter open")
+        self.shutterOpen.saveName = "Shutter open"
         self.shutterOpen.stateChanged.connect(self.gui.call(lambda: self.gui.camera.shutterOpen(self.shutterOpen.isChecked())))
         self.shutterOpen.setToolTip("Open/close the shutter")
         shutter.addWidget(self.shutterOpen)
 
         self.shutterMode = QtWidgets.QCheckBox("External control")
+        self.shutterMode.saveName = "Shutter external control"
         self.shutterMode.stateChanged.connect(lambda: self.setShutterMode(self.shutterMode.isChecked()))
         self.shutterMode.setToolTip("If checked, shutter is driven by the state of 'shutter control input'. If unchecked (manual), the 'Open shutter' control to the left is driving the shutter")
         shutter.addWidget(self.shutterMode)

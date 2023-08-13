@@ -166,6 +166,7 @@ class ControlTiming(QtWidgets.QWidget):
         serialPllMultMin = 10
         serialPllMultMax = 10
         self.serialPllMult = QtWidgets.QSpinBox()
+        self.serialPllMult.saveName = "SATA frequency multiplier"
         self.serialPllMult.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.serialPllMult.setToolTip("Set the multiplier value for the serial PLL. Takes effect when you press Enter.")
         self.serialPllMult.setMinimum(serialPllMultMin)
@@ -176,6 +177,7 @@ class ControlTiming(QtWidgets.QWidget):
         serialPllDivMin = 10
         serialPllDivMax = 10
         self.serialPllDiv = QtWidgets.QSpinBox()
+        self.serialPllDiv.saveName = "SATA frequency divisor"
         self.serialPllDiv.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.serialPllDiv.setToolTip("Set the divider value for the serial PLL. Takes effect when you press Enter")
         self.serialPllDiv.setMinimum(serialPllDivMin)
@@ -199,6 +201,7 @@ class ControlTiming(QtWidgets.QWidget):
         g.addWidget(QtWidgets.QLabel("ADC:"),2,0)
 
         self.basePllMult = QtWidgets.QSpinBox()
+        self.basePllMult.saveName = "ADC frequency multiplier"
         self.basePllMult.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.basePllMult.setToolTip("Multiplier for the internal clock frequency (20 MHz). Takes effect when you press Enter.")
         self.basePllMult.setMinimum(20)
@@ -207,6 +210,7 @@ class ControlTiming(QtWidgets.QWidget):
         g.addWidget(self.basePllMult,2,1)
 
         self.basePllDiv = QtWidgets.QSpinBox()
+        self.basePllDiv.saveName = "ADC frequency divisor"
         self.basePllDiv.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.basePllDiv.setToolTip("Divider for the internal clock frequency (20 MHz). Takes effect when you press Enter.")
         self.basePllDiv.setMinimum(8)
@@ -227,6 +231,7 @@ class ControlTiming(QtWidgets.QWidget):
         g.addWidget(QtWidgets.QLabel("Ext. clock:"),3,0)
 
         self.extClockMult = QtWidgets.QSpinBox()
+        self.extClockMult.saveName = "External clock frequency multiplier"
         self.extClockMult.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.extClockMult.setToolTip("Multiplier for the external clock frequency. Takes effect when you press Enter.")
         self.extClockMult.setMinimum(2)
@@ -234,6 +239,7 @@ class ControlTiming(QtWidgets.QWidget):
         g.addWidget(self.extClockMult,3,1)
 
         self.extClockDiv = QtWidgets.QSpinBox()
+        self.extClockDiv.saveName = "External clock frequency divisor"
         self.extClockDiv.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.extClockDiv.setToolTip("Divider for the external clock frequency. Takes effect when you press Enter.")
         self.extClockDiv.setMinimum(1)
@@ -254,8 +260,10 @@ class ControlTiming(QtWidgets.QWidget):
 
         g.addWidget(QtWidgets.QLabel("Sample:"),4,0)
         self.sampleDiv = QtWidgets.QSpinBox()
+        self.sampleDiv.saveName = "Sampling frequency divisor"
         g.addWidget(self.sampleDiv,4,2)
         g.setRowStretch(g.rowCount(),1)
+        self.sampleDiv.setMinimum(1)
         self.sampleDiv.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.sampleDiv.lineEdit().returnPressed.connect(self.gui.call(lambda : self.gui.camera.setSampleDivider(self.sampleDiv.value())))
         self.sampleDiv.setToolTip("Sample clock divider (sampling frequency w.r.t. ADC clock frequency, APDCAM User Guide Fig. 6). Takes effect when you press Enter")

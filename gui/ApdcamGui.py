@@ -115,8 +115,18 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
         # File menu --------------------
         fileMenu = menuBar.addMenu("&File")
+
+        saveSettingsAction = QAction("&Save settings",self)
+        fileMenu.addAction(saveSettingsAction)
+        saveSettingsAction.triggered.connect(self.saveSettings)
+
+        loadSettingsAction = QAction("&Load settings",self)
+        fileMenu.addAction(loadSettingsAction)
+        loadSettingsAction.triggered.connect(self.loadSettings)
+
         exitAction = QAction("&Exit",self)
         fileMenu.addAction(exitAction)
+
         restartAction = QAction("&Restart",self)
         restartAction.triggered.connect(lambda: self.exit(123))
         fileMenu.addAction(restartAction)
@@ -158,11 +168,16 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
         self.infrastructure = Infrastructure(self)
         self.expertTabs.addTab(self.infrastructure,"Infrastructure")
+        self.infrastructure.saveName = "Infrastructure"
 
         self.adcControl = AdcControl(self)
         self.expertTabs.addTab(self.adcControl,"ADC control")
+        self.adcControl.saveName = "ADC control"
+
         self.controlTiming = ControlTiming(self)
-        self.expertTabs.addTab(self.controlTiming,"Control timing")
+        self.expertTabs.addTab(self.controlTiming,"Control & Timing")
+        self.controlTiming.saveName = "Control & Timing"
+
         self.cameraTimer = CameraTimer(self)
         self.expertTabs.addTab(self.cameraTimer,"Camera timer")
         self.cameraConfig = CameraConfig(self)
@@ -294,14 +309,64 @@ class ApdcamGui(QtWidgets.QMainWindow):
             self.afterBackendCall(success,errors,n=n,name=name,showall=showall)
 
         return wrapper
-    
+
+    def loadSettings(self):
+        options = QtWidgets.QFileDialog.Options()
+        options |= QtWidgets.QFileDialog.DontUseNativeDialog
+        fileName, _ = QtWidgets.QFileDialog.getOpenFileName(self,"Save settings","","Text Files (*.txt);;All Files (*)", options=options)
+        try:
+            open(fileName,"r")
+        except:
+            self.showError("Failed to open file '" + fileName + "'")
+            return
+        
+        for i in range(self.expertTabs.count()):
+            tab = self.expertTabs.widget(i)
+
+            # Process only this which have 'saveName' attribute set, and skip others
+            if not hasattr(tab,"saveName"):
+                continue
+
+            if hasattr(tab,"loadSettings"):
+                tab.loadSettings(fileName)
+            else:
+                loadSettings(tab,fileName,tab.saveName)
+
+    def saveSettings(self):
+        options = QtWidgets.QFileDialog.Options()
+        options |= QtWidgets.QFileDialog.DontUseNativeDialog
+        fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self,"Save settings","","Text Files (*.txt);;All Files (*)", options=options)
+        file = None
+        try:
+            file = open(fileName,"wt")
+        except:
+            self.showError("Failed to save settings to '" + fileName + "'")
+            return
+        
+        for i in range(self.expertTabs.count()):
+            tab = self.expertTabs.widget(i)
+
+            # Process only this which have 'saveName' attribute set, and skip others
+            if not hasattr(tab,"saveName"):
+                continue
+
+            # write a section header to the file [TabName]
+            file.write("[" + tab.saveName + "]\n")
+
+            # If the given tab implements its own settings method, call that 
+            if hasattr(tab,"saveSettings"):
+                tab.saveSettings(file)
+            # Otherwise the default is to just write all controls' values to the file
+            else:
+                saveSettings(tab,file)
+                file.write("\n")
+        file.close()
+
     def markFunctionlessControls(self):
         children = self.findChildren(QtWidgets.QWidget)
         for child in children:
             if isinstance(child,QtWidgets.QPushButton) or \
                isinstance(child,QtWidgets.QSpinBox) or \
-               isinstance(child,QDoubleEdit) or \
-               isinstance(child,QIntEdit) or \
                isinstance(child,QtWidgets.QCheckBox) or \
                isinstance(child,QtWidgets.QComboBox):
                 if child.toolTip() == "":

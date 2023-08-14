@@ -1,0 +1,4 @@
+- print the serial number of ADC boards and PC board upon connection
+- MainPage: show interface obtained automatically.
+- Connect-disconnect-connect kills the app
+- LED1, LED2 - what are these? Apparently not SATA1/SATA2 data out

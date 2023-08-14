@@ -191,9 +191,9 @@ class ControlTiming(QtWidgets.QWidget):
         populateFrequencyCombo(serialPllMultMin,serialPllMultMax,serialPllDivMin,serialPllDivMax,self.serialPllFreq)
         self.serialPllFreq.setCurrentText(frequencyFormat.format(20.0*self.serialPllMult.value()/self.serialPllDiv.value()))
 
-        self.serialPllFreq.activated               .connect(lambda: setFreqMultDiv(self.serialPllMult,self.serialPllDiv,self.serialPllFreq) and self.setSerialPll())
-        self.serialPllMult.lineEdit().returnPressed.connect(lambda: setFreqCombo  (self.serialPllMult,self.serialPllDiv,self.serialPllFreq) and self.setSerialPll())
-        self.serialPllDiv .lineEdit().returnPressed.connect(lambda: setFreqCombo  (self.serialPllMult,self.serialPllDiv,self.serialPllFreq) and self.setSerialPll())
+        self.serialPllFreq.activated               .connect(self.gui.call(lambda: setFreqMultDiv(self.serialPllMult,self.serialPllDiv,self.serialPllFreq) and self.setSerialPll()))
+        self.serialPllMult.lineEdit().returnPressed.connect(self.gui.call(lambda: setFreqCombo  (self.serialPllMult,self.serialPllDiv,self.serialPllFreq) and self.setSerialPll()))
+        self.serialPllDiv .lineEdit().returnPressed.connect(self.gui.call(lambda: setFreqCombo  (self.serialPllMult,self.serialPllDiv,self.serialPllFreq) and self.setSerialPll()))
                                                                                  
 
         # ----------------------- ADC PLL parameters/frequency -----------------------------------------

@@ -594,7 +594,7 @@ class APDCAM10G_regCom:
             return "Error connecting to camera: "+err
         #Extracting camera information
         d = self.status.CC_settings 
-        self.status.manufacturer_serial = d[APDCAM10G_codes_v1.CC_REGISTER_MAN_SERIAL:APDCAM10G_codes_v1.CC_REGISTER_MAN_SERIAL+4]
+        self.status.manufacturer_serial = int.from_bytes(d[APDCAM10G_codes_v1.CC_REGISTER_MAN_SERIAL:APDCAM10G_codes_v1.CC_REGISTER_MAN_SERIAL+4])
         self.status.firmware = d[APDCAM10G_codes_v1.CC_REGISTER_FIRMWARE:APDCAM10G_codes_v1.CC_REGISTER_FIRMWARE+14]
         self.log("Manufacturer serial number: " + str(self.status.manufacturer_serial))
         self.log("Firmware: " + str(self.status.firmware))

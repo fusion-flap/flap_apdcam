@@ -221,8 +221,10 @@ class ControlTiming(QtWidgets.QWidget):
         self.basePllDiv.setValue(8)
         g.addWidget(self.basePllDiv,2,2)
 
+        g.addWidget(QtWidgets.QLabel("20 MHz"),2,3)
+
         self.basePllFreq = QtWidgets.QComboBox()
-        g.addWidget(self.basePllFreq,2,3)
+        g.addWidget(self.basePllFreq,2,4)
         populateFrequencyCombo(20,50,8,100,self.basePllFreq)
         self.basePllFreq.setCurrentText(frequencyFormat.format(20.0*self.basePllMult.value()/self.basePllDiv.value()))
         self.basePllFreq.setToolTip("The frequency [MHz] for the ADC (20 MHz base clock frequency multiplied/divided by the values given on the left")
@@ -255,6 +257,11 @@ class ControlTiming(QtWidgets.QWidget):
         g.addWidget(self.extClockFreq,3,3)
         
 
+        self.extClockFreqScaled = QtWidgets.QLineEdit()
+        readOnly(self.extClockFreqScaled)
+        self.extClockFreqScaled.setToolTip("The multiplied/divided actual value derived from the external clock signal")
+        g.addWidget(self.extClockFreqScaled,3,4)
+
         self.basePllFreq.activated.connect               (lambda: setFreqMultDiv(self.basePllMult,self.basePllDiv,self.basePllFreq) and self.setAdcClockParameters())
         self.basePllMult.lineEdit().returnPressed.connect(lambda: setFreqCombo  (self.basePllMult,self.basePllDiv,self.basePllFreq) and self.setAdcClockParameters())
         self.basePllDiv.lineEdit() .returnPressed.connect(lambda: setFreqCombo  (self.basePllMult,self.basePllDiv,self.basePllFreq) and self.setAdcClockParameters())
@@ -271,9 +278,13 @@ class ControlTiming(QtWidgets.QWidget):
         self.sampleDiv.lineEdit().returnPressed.connect(self.gui.call(lambda : self.gui.camera.setSampleDivider(self.sampleDiv.value())))
         self.sampleDiv.setToolTip("Sample clock divider (sampling frequency w.r.t. ADC clock frequency, APDCAM User Guide Fig. 6). Takes effect when you press Enter")
 
+        
+
         self.sampleFreq = QtWidgets.QLineEdit()
         g.addWidget(self.sampleFreq,4,4)
 
+
+        
         l.addStretch(1)
 
 

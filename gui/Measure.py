@@ -39,7 +39,8 @@ class Measure(QtWidgets.QWidget):
         self.dataDirectory = QtWidgets.QLineEdit()
         self.dataDirectory.settingsName = "Data directory"
         self.dataDirectory.setToolTip("Directory for storing the recorded data from the camera")
-        self.dataDirectory.setText("/user-data/barna/tmp/apdcam-data")
+        #self.dataDirectory.setText("/user-data/barna/tmp/apdcam-data")
+        self.dataDirectory.setText("/user/apdcam/tmp")
         h.addWidget(self.dataDirectory)
         self.dataDirectoryDialogButton = QtWidgets.QPushButton("PICK")
         h.addWidget(self.dataDirectoryDialogButton)

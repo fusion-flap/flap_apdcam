@@ -186,8 +186,10 @@ class ControlTiming(QtWidgets.QWidget):
         self.serialPllDiv.setValue(serialPllDivMin)
         g.addWidget(self.serialPllDiv,1,2)
 
+        g.addWidget(QtWidgets.QLabel("20 MHz"),1,3)
+
         self.serialPllFreq = QtWidgets.QComboBox()
-        g.addWidget(self.serialPllFreq,1,3)
+        g.addWidget(self.serialPllFreq,1,4)
         self.serialPllFreq.setToolTip("The frequency [MHz] for the serial (SATA) line (20 MHz base clock frequency multiplied/divided by the values given on the left")
         populateFrequencyCombo(serialPllMultMin,serialPllMultMax,serialPllDivMin,serialPllDivMax,self.serialPllFreq)
         self.serialPllFreq.setCurrentText(frequencyFormat.format(20.0*self.serialPllMult.value()/self.serialPllDiv.value()))

@@ -342,7 +342,7 @@ class ControlTiming(QtWidgets.QWidget):
         self.trigMinus.setToolTip("Enable triggering on falling edge of external signal")
         g.addWidget(self.trigMinus)
         self.internalTrig = QtWidgets.QCheckBox("Internal trigger")
-        self.internalTrigger.settingsName = "Internal trigger"
+        self.internalTrig.settingsName = "Internal trigger"
         self.internalTrig.setToolTip("Enable triggering on ADC channels (individual channels need to be enabled, and their threshold set in the 'ADC Control' tab)")
         g.addWidget(self.internalTrig)
         self.disableWhenStreamOff = QtWidgets.QCheckBox("Disable when stream off")

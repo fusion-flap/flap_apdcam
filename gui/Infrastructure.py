@@ -42,6 +42,7 @@ class Infrastructure(QtWidgets.QWidget):
 
             self.hvGroup[i].addWidget(QtWidgets.QLabel("HV"+str(i+1)+" set"),0,0)
             self.hvSet[i] = QtWidgets.QDoubleSpinBox()
+            self.hvSet[i].settingsName = "HV" + str(i+1) + " set"
             self.hvSet[i].setMinimum(0)
             self.hvSet[i].setMaximum(4095*self.gui.camera.HV_conversion[i])
             self.hvSet[i].valueChanged.connect(self.gui.call(partial(lambda i:self.gui.camera.setHV(i+1,self.hvSet[i].value()),i)))
@@ -50,7 +51,7 @@ class Infrastructure(QtWidgets.QWidget):
 
             self.hvGroup[i].addWidget(QtWidgets.QLabel("HV"+str(i+1)+" act."),1,0)
             self.hvActual[i] = QtWidgets.QLineEdit()
-            self.hvActual[i].setReadOnly(True)
+            readOnly(self.hvActual[i])
             self.hvActual[i].setToolTip("Actual value of the high-voltage generator #" + str(i+1))
             self.hvGroup[i].addWidget(self.hvActual[i],1,1)
 
@@ -89,13 +90,13 @@ class Infrastructure(QtWidgets.QWidget):
         l1.addWidget(shutter)
 
         self.shutterOpen = QtWidgets.QCheckBox("Shutter open")
-        self.shutterOpen.saveName = "Shutter open"
+        self.shutterOpen.settingsName = "Shutter open"
         self.shutterOpen.stateChanged.connect(self.gui.call(lambda: self.gui.camera.shutterOpen(self.shutterOpen.isChecked())))
         self.shutterOpen.setToolTip("Open/close the shutter")
         shutter.addWidget(self.shutterOpen)
 
         self.shutterMode = QtWidgets.QCheckBox("External control")
-        self.shutterMode.saveName = "Shutter external control"
+        self.shutterMode.settingsName = "Shutter external control"
         self.shutterMode.stateChanged.connect(lambda: self.setShutterMode(self.shutterMode.isChecked()))
         self.shutterMode.setToolTip("If checked, shutter is driven by the state of 'shutter control input'. If unchecked (manual), the 'Open shutter' control to the left is driving the shutter")
         shutter.addWidget(self.shutterMode)
@@ -106,6 +107,7 @@ class Infrastructure(QtWidgets.QWidget):
         l1.addWidget(calib)
         calib.addWidget(QtWidgets.QLabel("Intensity:"))
         self.calibrationLightIntensity = QtWidgets.QSpinBox()
+        self.calibrationLightIntensity.settingsName = "Calibration light intensity"
         self.calibrationLightIntensity.setMinimum(0)
         self.calibrationLightIntensity.setMaximum(4095)
         self.calibrationLightIntensity.valueChanged.connect(self.gui.call(lambda: self.gui.camera.setCallight(self.calibrationLightIntensity.value()),\
@@ -119,7 +121,7 @@ class Infrastructure(QtWidgets.QWidget):
         l1.addLayout(l)
         l.addWidget(QtWidgets.QLabel("PC Error:"))
         self.pcError = QtWidgets.QLineEdit()
-        self.pcError.setReadOnly(True)
+        readOnly(self.pcError)
         l.addWidget(self.pcError)
 
         l1.addStretch(1)
@@ -166,7 +168,7 @@ class Infrastructure(QtWidgets.QWidget):
             #setattr(self,tmp[i][1],t)
             self.temps[i] = t
             self.temps[i].setToolTip(tmp[0][0] + " temperature")
-            t.setReadOnly(True)
+            readOnly(t)
             g.addWidget(t,row,col+1)
 
 #        self.readTempsButton = QtWidgets.QPushButton("Read temps")

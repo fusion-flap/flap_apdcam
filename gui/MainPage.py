@@ -106,7 +106,7 @@ class MainPage(QtWidgets.QWidget):
         self.cameraConnectedStatus.setText("Camera status: connected")
         self.gui.status.connected = True
 
-        self.cameraType.append("Serial number: XXXXXXXXXX (Write this!!!!!!!!)")
+        self.cameraType.append("Manufacturer serial number: " + self.gui.camera.status.manufacturer_serial)
 
         #self.cameraType.setText(" Firmware: {:s}".format(self.GUI_status.APDCAM_reg.status.firmware.decode('utf-8')))
         self.cameraType.append("Firmware: {:s}".format(self.gui.camera.status.firmware.decode('utf-8')))

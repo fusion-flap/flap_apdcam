@@ -234,6 +234,7 @@ class Adc(QtWidgets.QWidget):
                 l.setRowMinimumHeight(row,1)
                 channel = row*cols+col+1
                 chk = QtWidgets.QCheckBox(str(channel))
+                chk.settingsName = "Channel " + str(channel) + " on"
                 chk.setStyleSheet("padding: 0px; margin: 0px; margin-top:0px; margin-bottom:0px;")
                 chk.setContentsMargins(0,0,0,0)
                 chk.stateChanged.connect(self.gui.call(partial(lambda channel,checkbox: self.gui.camera.setAdcChannelEnable(channel,checkbox.isChecked()),\
@@ -273,16 +274,19 @@ class Adc(QtWidgets.QWidget):
         # g.addWidget(self.dualSata,1,0)
         
         self.sataSync = QtWidgets.QCheckBox("SATA Sync")
+        self.sataSync.settingsName = "SATA sync"
         self.sataSync.setToolTip("Switch SATA sync for this ADC")
         self.sataSync.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setSataSync(self.number,self.sataSync.isChecked())))
         g.addWidget(self.sataSync,2,0)
 
         self.test = QtWidgets.QCheckBox("Test")
+        self.test.settingsName = "Test"
         self.test.setToolTip("Switch Test mode on (?)")
         self.test.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setTestPatternMode(self.number,self.test.isChecked())))
         g.addWidget(self.test,3,0)
 
         self.internalTrigger = QtWidgets.QCheckBox("Internal trigger")
+        self.internalTrigger.settingsName = "Internal trigger"
         self.internalTrigger.setToolTip("Enable internal trigger output from this ADC board")
         self.internalTrigger.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setInternalTriggerADC(adcBoardNo=self.number,enable=self.internalTrigger.isChecked())))
         g.addWidget(self.internalTrigger,4,0)
@@ -298,6 +302,7 @@ class Adc(QtWidgets.QWidget):
         topRow.addWidget(g)
         g.addWidget(QtWidgets.QLabel("Bits:"),0,0)
         self.bits = QtWidgets.QComboBox()
+        self.bits.settingsName = "Bits"
         self.bits.setToolTip("Choose the resolution (number of bits) for the data")
         self.bits.addItem("14")
         self.bits.addItem("12")
@@ -307,6 +312,7 @@ class Adc(QtWidgets.QWidget):
 
         g.addWidget(QtWidgets.QLabel("Ring buffer:"),1,0)
         self.ringBuffer = QtWidgets.QSpinBox()
+        self.ringBuffer.settingsName = "Ring buffer"
         self.ringBuffer.setMinimum(0)
         self.ringBuffer.setMaximum(1023)
         self.ringBuffer.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
@@ -323,6 +329,7 @@ class Adc(QtWidgets.QWidget):
 
         g.addWidget(QtWidgets.QLabel("Test pattern:"),4,0)
         self.testPattern = QtWidgets.QLineEdit()
+        self.testPattern.settingsName = "Test pattern"
         self.testPattern.returnPressed.connect(self.gui.call(self.setTestPattern))
         self.testPattern.setToolTip("Test pattern for this ADC. Either an integer (value for all four 8-channel blocks), or 4 integers (for the blocks separately)")
         g.addWidget(self.testPattern,4,1)
@@ -334,6 +341,7 @@ class Adc(QtWidgets.QWidget):
         for i in range(5):
             g.addWidget(QtWidgets.QLabel("FIR" + str(i+1)),i,0)
             self.firCoeff[i] = QtWidgets.QSpinBox()
+            self.firCoeff[i].settingsName = "FIR" + str(i+1)
             self.firCoeff[i].setMinimum(0)
             self.firCoeff[i].setMaximum(65535)
             self.firCoeff[i].setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
@@ -344,6 +352,7 @@ class Adc(QtWidgets.QWidget):
 
         g.addWidget(QtWidgets.QLabel("IIR:"),0,2)
         self.iirCoeff = QtWidgets.QSpinBox()
+        self.iirCoeff.settingsName = "IIR"
         self.iirCoeff.setMinimum(0)
         self.iirCoeff.setMaximum(4095)
         self.iirCoeff.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
@@ -353,6 +362,7 @@ class Adc(QtWidgets.QWidget):
 
         g.addWidget(QtWidgets.QLabel("Div.:"),1,2)
         self.internalFilterDiv = QtWidgets.QSpinBox()
+        self.internalFilterDiv.settingsName = "Internal filter divisor"
         self.internalFilterDiv.setMinimum(0)
         self.internalFilterDiv.setMaximum(14)
         self.internalFilterDiv.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
@@ -364,6 +374,7 @@ class Adc(QtWidgets.QWidget):
         g.addWidget(QtWidgets.QLabel("FIR Freq. [MHz]:"),2,2)
         #self.firFrequency = QDoubleEdit()
         self.firFrequency = QtWidgets.QDoubleSpinBox()
+        self.firFrequency.settingsName = "FIR frequency"
         self.firFrequency.setMinimum(0)
         self.firFrequency.setMaximum(100)
         self.firFrequency.setSingleStep(0.1)
@@ -372,16 +383,18 @@ class Adc(QtWidgets.QWidget):
         g.addWidget(QtWidgets.QLabel("Rec. Freq. [MHz]:"),3,2)
         #self.recFrequency = QDoubleEdit()
         self.recFrequency = QtWidgets.QDoubleSpinBox()
+        self.recFrequency.settingsName = "Rec. frequency"
         self.recFrequency.setMinimum(0)
         self.recFrequency.setMaximum(100)
         self.recFrequency.setSingleStep(0.1)
         self.recFrequency.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         g.addWidget(self.recFrequency,3,3)
 
-        self.filter = QtWidgets.QCheckBox("Enable")
-        self.filter.setToolTip("Enable the filter (takes immediate effect)")
-        self.filter.stateChanged.connect(self.gui.call(lambda state: self.gui.camera.setFilterOn(self.number,state>0),name="APDCAM10G_control.filterOnOff",where=__file__))
-        g.addWidget(self.filter,4,2,1,2)
+        self.filterEnable = QtWidgets.QCheckBox("Enable")
+        self.filterEnable.settingsName = "Enable filter"
+        self.filterEnable.setToolTip("Enable the filter (takes immediate effect)")
+        self.filterEnable.stateChanged.connect(self.gui.call(lambda state: self.gui.camera.setFilterOn(self.number,state>0),name="APDCAM10G_control.filterOnOff",where=__file__))
+        g.addWidget(self.filterEnable,4,2,1,2)
         
         g.setRowStretch(g.rowCount(),1)
 
@@ -448,6 +461,7 @@ class Adc(QtWidgets.QWidget):
                 h1.addWidget(label)
                 c.addLayout(h1)
                 en = QtWidgets.QCheckBox("En.")
+                en.settingsName = "Internal trigger enabled " + str(channel)
                 en.setStyleSheet("padding: 0px; margin: 0px; margin-top:0px; margin-bottom:0px;")
                 en.setContentsMargins(0,0,0,0)
                 en.setToolTip("Enable channel " + str(channel) + " (takes immediate effect)")
@@ -455,6 +469,7 @@ class Adc(QtWidgets.QWidget):
                 h1.addWidget(en)
 
                 polarity = QtWidgets.QCheckBox("+")
+                polarity.settingsName = "Internal trigger positive edge " + str(channel)
                 polarity.setStyleSheet("padding: 0px; margin: 0px; margin-top:0px; margin-bottom:0px;")
                 polarity.setContentsMargins(0,0,0,0)
                 polarity.setToolTip("Set polarity to positive (takes immediate effect)")
@@ -462,6 +477,7 @@ class Adc(QtWidgets.QWidget):
                 self.internalTriggerPositive[row*cols+col] = polarity
 
                 level = QtWidgets.QSpinBox()
+                level.settingsName = "Internal trigger level " + str(channel)
                 level.setMinimum(0)
                 level.setMaximum(65535)
                 level.setStyleSheet("padding: 0px; margin: 0px; margin-top:0px; margin-bottom:0px;")
@@ -531,6 +547,7 @@ class Adc(QtWidgets.QWidget):
         for i in range(32):
             #self.dac[i] = QIntEdit(0,65535)
             self.dac[i] = QtWidgets.QSpinBox()
+            self.dac[i].settingsName = "DAC " + str(i+1)
             self.dac[i].setMinimum(0)
             self.dac[i].setMaximum(65535)
             self.dac[i].setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
@@ -546,12 +563,6 @@ class AdcControl(QtWidgets.QWidget):
     def updateGui(self):
         for adc in self.adc:
             adc.updateGui()
-
-    def saveSettings(self,file):
-        for adc in self.adc:
-            file.write("  [ADC " + str(adc.number) + "]\n")
-            saveSettings(adc,file,1)
-        file.write("\n")
 
     def __init__(self,parent):
         self.gui = parent
@@ -582,6 +593,7 @@ class AdcControl(QtWidgets.QWidget):
         
     def addAdc(self,number,address):
         adc = Adc(self,number,address)
+        adc.settingsSection = "ADC " + str(number)
         self.adc.append(adc)
         self.adcTabs.addTab(adc,adc.name())
 

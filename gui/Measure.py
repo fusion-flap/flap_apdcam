@@ -24,6 +24,7 @@ class Measure(QtWidgets.QWidget):
         layout.addLayout(h)
         h.addWidget(QtWidgets.QLabel("Sample number: "))
         self.sampleNumber = QtWidgets.QSpinBox()
+        self.sampleNumber.settingsName = "Sample number"
         self.sampleNumber.setMinimum(1)
         self.sampleNumber.setMaximum(1000000)
         self.sampleNumber.setValue(10)
@@ -36,6 +37,7 @@ class Measure(QtWidgets.QWidget):
         layout.addLayout(h)
         h.addWidget(QtWidgets.QLabel("Data directory: "))
         self.dataDirectory = QtWidgets.QLineEdit()
+        self.dataDirectory.settingsName = "Data directory"
         self.dataDirectory.setToolTip("Directory for storing the recorded data from the camera")
         self.dataDirectory.setText("/user-data/barna/tmp/apdcam-data")
         h.addWidget(self.dataDirectory)
@@ -58,4 +60,8 @@ class Measure(QtWidgets.QWidget):
 
     def measure(self):
         print("Measure.measure called")
+        if not self.gui.status.connected:
+            self.gui.showError("Camera is not connected")
+            return
+        self.gui.saveSettings("auto")
         self.gui.camera.measure(datapath=self.dataDirectory.text())

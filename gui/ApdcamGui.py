@@ -4,6 +4,7 @@ import time
 import inspect
 import types
 import threading
+import os
 
 import importlib
 from QtVersion import QtVersion
@@ -12,7 +13,7 @@ QtGui = importlib.import_module(QtVersion+".QtGui")
 Qt = importlib.import_module(QtVersion+".QtCore")
 
 from ApdcamUtils import *
-
+from ApdcamSettings import *
 from MainPage import MainPage
 from Measure import Measure
 from Infrastructure import Infrastructure
@@ -79,8 +80,15 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
         self.updateGuiThread = None
 
+    
+
     def __init__(self, parent=None):
         super().__init__(parent)
+
+        # Create settings directory if it does not exist
+        self.settingsDir = "~/.fusion-instruments/apdcam"
+        if not os.path.exists(self.settingsDir):
+            os.makedirs(self.settingsDir)
 
         self.camera = APDCAM10G_regCom()
 
@@ -168,24 +176,33 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
         self.infrastructure = Infrastructure(self)
         self.expertTabs.addTab(self.infrastructure,"Infrastructure")
-        self.infrastructure.saveName = "Infrastructure"
+        self.infrastructure.settingsSection = "Infrastructure"
 
         self.adcControl = AdcControl(self)
         self.expertTabs.addTab(self.adcControl,"ADC control")
-        self.adcControl.saveName = "ADC control"
+        self.adcControl.settingsSection = "ADC control"
+
+        self.adcControl.addAdc(1,10)
 
         self.controlTiming = ControlTiming(self)
         self.expertTabs.addTab(self.controlTiming,"Control & Timing")
-        self.controlTiming.saveName = "Control & Timing"
+        self.controlTiming.settingsSection = "Control & Timing"
 
         self.cameraTimer = CameraTimer(self)
         self.expertTabs.addTab(self.cameraTimer,"Camera timer")
+        self.cameraTimer.settingsSection = "Camera timer"
+
         self.cameraConfig = CameraConfig(self)
         self.expertTabs.addTab(self.cameraConfig,"Camera configuration")
+        self.cameraConfig.settingsSection = "Camera configuration"
+
         self.measure = Measure(self)
         self.expertTabs.addTab(self.measure,"Measure")
+        self.measure.settingsSection = "Measure"
+
         self.plot = Plot(self)
         self.expertTabs.addTab(self.plot,"Plot")
+        self.plot.settingsSection = "Plot"
 
         fs = FactoryTest(self)
         fs.guiMode = GuiMode.factory
@@ -314,53 +331,36 @@ class ApdcamGui(QtWidgets.QMainWindow):
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.DontUseNativeDialog
         fileName, _ = QtWidgets.QFileDialog.getOpenFileName(self,"Save settings","","Text Files (*.txt);;All Files (*)", options=options)
-        try:
-            open(fileName,"r")
-        except:
-            self.showError("Failed to open file '" + fileName + "'")
-            return
+        error = loadSettings(self,fileName)
+        if error != "":
+            self.showError(error)
         
-        for i in range(self.expertTabs.count()):
-            tab = self.expertTabs.widget(i)
 
-            # Process only this which have 'saveName' attribute set, and skip others
-            if not hasattr(tab,"saveName"):
-                continue
+    def saveSettings(self,fileName = None):
+        '''
+        Save the GUI settings into a file.
 
-            if hasattr(tab,"loadSettings"):
-                tab.loadSettings(fileName)
+        Parameters
+        ^^^^^^^^^^
+        fileName (string)
+        - if None, ask interactively for file name using a file dialog.
+        - If "auto", save as settingsDir/gui-settings-serialnumber.txt
+        - Otherwise the filename to save to
+        '''
+
+        if fileName is None:
+            options = QtWidgets.QFileDialog.Options()
+            options |= QtWidgets.QFileDialog.DontUseNativeDialog
+            fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self,"Save settings","","Text Files (*.txt);;All Files (*)", options=options)
+        elif fileName == "auto":
+            if not self.status.connected:
+                return "Can not save settings with automatic filename, camera is not connected"
             else:
-                loadSettings(tab,fileName,tab.saveName)
+                fileName = os.path.join(settingsDir,"gui-settings-" + self.camera.status.firmware + ".txt")
 
-    def saveSettings(self):
-        options = QtWidgets.QFileDialog.Options()
-        options |= QtWidgets.QFileDialog.DontUseNativeDialog
-        fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self,"Save settings","","Text Files (*.txt);;All Files (*)", options=options)
-        file = None
-        try:
-            file = open(fileName,"wt")
-        except:
-            self.showError("Failed to save settings to '" + fileName + "'")
-            return
-        
-        for i in range(self.expertTabs.count()):
-            tab = self.expertTabs.widget(i)
-
-            # Process only this which have 'saveName' attribute set, and skip others
-            if not hasattr(tab,"saveName"):
-                continue
-
-            # write a section header to the file [TabName]
-            file.write("[" + tab.saveName + "]\n")
-
-            # If the given tab implements its own settings method, call that 
-            if hasattr(tab,"saveSettings"):
-                tab.saveSettings(file)
-            # Otherwise the default is to just write all controls' values to the file
-            else:
-                saveSettings(tab,file)
-                file.write("\n")
-        file.close()
+        error = saveSettings(self,fileName)
+        if error != "":
+            self.showError(error)
 
     def markFunctionlessControls(self):
         children = self.findChildren(QtWidgets.QWidget)

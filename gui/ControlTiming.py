@@ -166,7 +166,7 @@ class ControlTiming(QtWidgets.QWidget):
         serialPllMultMin = 10
         serialPllMultMax = 10
         self.serialPllMult = QtWidgets.QSpinBox()
-        self.serialPllMult.saveName = "SATA frequency multiplier"
+        self.serialPllMult.settingsName = "SATA frequency multiplier"
         self.serialPllMult.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.serialPllMult.setToolTip("Set the multiplier value for the serial PLL. Takes effect when you press Enter.")
         self.serialPllMult.setMinimum(serialPllMultMin)
@@ -177,7 +177,7 @@ class ControlTiming(QtWidgets.QWidget):
         serialPllDivMin = 10
         serialPllDivMax = 10
         self.serialPllDiv = QtWidgets.QSpinBox()
-        self.serialPllDiv.saveName = "SATA frequency divisor"
+        self.serialPllDiv.settingsName = "SATA frequency divisor"
         self.serialPllDiv.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.serialPllDiv.setToolTip("Set the divider value for the serial PLL. Takes effect when you press Enter")
         self.serialPllDiv.setMinimum(serialPllDivMin)
@@ -201,7 +201,7 @@ class ControlTiming(QtWidgets.QWidget):
         g.addWidget(QtWidgets.QLabel("ADC:"),2,0)
 
         self.basePllMult = QtWidgets.QSpinBox()
-        self.basePllMult.saveName = "ADC frequency multiplier"
+        self.basePllMult.settingsName = "ADC frequency multiplier"
         self.basePllMult.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.basePllMult.setToolTip("Multiplier for the internal clock frequency (20 MHz). Takes effect when you press Enter.")
         self.basePllMult.setMinimum(20)
@@ -210,7 +210,7 @@ class ControlTiming(QtWidgets.QWidget):
         g.addWidget(self.basePllMult,2,1)
 
         self.basePllDiv = QtWidgets.QSpinBox()
-        self.basePllDiv.saveName = "ADC frequency divisor"
+        self.basePllDiv.settingsName = "ADC frequency divisor"
         self.basePllDiv.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.basePllDiv.setToolTip("Divider for the internal clock frequency (20 MHz). Takes effect when you press Enter.")
         self.basePllDiv.setMinimum(8)
@@ -231,7 +231,7 @@ class ControlTiming(QtWidgets.QWidget):
         g.addWidget(QtWidgets.QLabel("Ext. clock:"),3,0)
 
         self.extClockMult = QtWidgets.QSpinBox()
-        self.extClockMult.saveName = "External clock frequency multiplier"
+        self.extClockMult.settingsName = "External clock frequency multiplier"
         self.extClockMult.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.extClockMult.setToolTip("Multiplier for the external clock frequency. Takes effect when you press Enter.")
         self.extClockMult.setMinimum(2)
@@ -239,7 +239,7 @@ class ControlTiming(QtWidgets.QWidget):
         g.addWidget(self.extClockMult,3,1)
 
         self.extClockDiv = QtWidgets.QSpinBox()
-        self.extClockDiv.saveName = "External clock frequency divisor"
+        self.extClockDiv.settingsName = "External clock frequency divisor"
         self.extClockDiv.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.extClockDiv.setToolTip("Divider for the external clock frequency. Takes effect when you press Enter.")
         self.extClockDiv.setMinimum(1)
@@ -260,7 +260,7 @@ class ControlTiming(QtWidgets.QWidget):
 
         g.addWidget(QtWidgets.QLabel("Sample:"),4,0)
         self.sampleDiv = QtWidgets.QSpinBox()
-        self.sampleDiv.saveName = "Sampling frequency divisor"
+        self.sampleDiv.settingsName = "Sampling frequency divisor"
         g.addWidget(self.sampleDiv,4,2)
         g.setRowStretch(g.rowCount(),1)
         self.sampleDiv.setMinimum(1)
@@ -278,16 +278,19 @@ class ControlTiming(QtWidgets.QWidget):
         l.addWidget(g)
 
         self.adcClockExt = QtWidgets.QCheckBox("ADC Clock Ext.")
+        self.adcClockExt.settingsName = "External ADC clock"
         self.adcClockExt.setToolTip("Use external clock if checked, and internal clock if unchecked")
         self.adcClockExt.stateChanged.connect(self.setAdcClockParameters)
         g.addWidget(self.adcClockExt)
         
         self.autoExtClock = QtWidgets.QCheckBox("Auto Ext. Clock")
+        self.autoExtClock.settingsName = "Auto external clock"
         self.autoExtClock.setToolTip("Enable auto external clock mode: external clock is used if quality is good, will fall back to internal otherwise")
         self.autoExtClock.stateChanged.connect(self.setAdcClockParameters)
         g.addWidget(self.autoExtClock)
 
         self.extSample = QtWidgets.QCheckBox("Ext. Sample")
+        self.extSample.settingsName = "External sampling signal"
         self.extSample.setToolTip("Use external signal for sampling, rather than 20 MHz internal clock divided by SAMPLEDIVIDER")
         g.addWidget(self.extSample)
 
@@ -331,21 +334,26 @@ class ControlTiming(QtWidgets.QWidget):
         g = QVGroupBox("Trigger")
         l.addWidget(g)
         self.trigPlus = QtWidgets.QCheckBox("Ext. Trig. +")
+        self.trigPlus.settingsName = "External trigger positive edge"
         self.trigPlus.setToolTip("Enable triggering on rising edge of external signal")
         g.addWidget(self.trigPlus)
         self.trigMinus = QtWidgets.QCheckBox("Ext. Trig. -")
+        self.trigMinus.settingsName = "External trigger negative edge"
         self.trigMinus.setToolTip("Enable triggering on falling edge of external signal")
         g.addWidget(self.trigMinus)
         self.internalTrig = QtWidgets.QCheckBox("Internal trigger")
+        self.internalTrigger.settingsName = "Internal trigger"
         self.internalTrig.setToolTip("Enable triggering on ADC channels (individual channels need to be enabled, and their threshold set in the 'ADC Control' tab)")
         g.addWidget(self.internalTrig)
         self.disableWhenStreamOff = QtWidgets.QCheckBox("Disable when stream off")
+        self.disableWhenStreamOff.settingsName = "Disable when stream off"
         self.disableWhenStreamOff.setToolTip("If set, trigger events are disabled while streams are off. Otherwise triggers are registered even if streams are off, and data transmission starts immediately when streams are enabled again")
         g.addWidget(self.disableWhenStreamOff)
         h = QtWidgets.QHBoxLayout()
         g.addLayout(h)
         h.addWidget(QtWidgets.QLabel("Trigger delay [\u03bcs]:"))
         self.triggerDelay = QtWidgets.QSpinBox()
+        self.triggerDelay.settingsName = "Trigger delay [us]"
         self.triggerDelay.setToolTip("Data stream output will start with this delay after the trigger")
         h.addWidget(self.triggerDelay)
 

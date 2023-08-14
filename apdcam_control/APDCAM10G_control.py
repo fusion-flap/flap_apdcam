@@ -514,6 +514,7 @@ class APDCAM10G_status :
     """
     def __init__(self):
         self.firmware = ""
+        self.manufacturer_serial = ""
         # List of ADC addresses
         self.ADC_address = [] 
         self.ADC_serial = []
@@ -593,7 +594,9 @@ class APDCAM10G_regCom:
             return "Error connecting to camera: "+err
         #Extracting camera information
         d = self.status.CC_settings 
+        self.status.manufacturer_serial = d[APDCAM10G_codes_v1.CC_REGISTER_MAN_SERIAL:APDCAM10G_codes_v1.CC_REGISTER_MAN_SERIAL+4]
         self.status.firmware = d[APDCAM10G_codes_v1.CC_REGISTER_FIRMWARE:APDCAM10G_codes_v1.CC_REGISTER_FIRMWARE+14]
+        self.log("Manufacturer serial number: " + str(self.status.manufacturer_serial))
         self.log("Firmware: " + str(self.status.firmware))
         if (self.status.firmware[0:11] != b"BSF12-0001-"):
             err = "Unknown camera firmware."

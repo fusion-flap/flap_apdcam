@@ -53,6 +53,7 @@ class Plot(QtWidgets.QWidget):
         data.addLayout(row1)
         row1.addWidget(QtWidgets.QLabel("Data dir.:"))
         self.dataDir = QtWidgets.QLineEdit()
+        self.dataDir.settingsName = "Data directory"
         row1.addWidget(self.dataDir)
 
         row2 = QtWidgets.QHBoxLayout()
@@ -60,6 +61,7 @@ class Plot(QtWidgets.QWidget):
 
         row2.addWidget(QtWidgets.QLabel("Signals"))
         self.signals = QtWidgets.QLineEdit()
+        self.signals.settingsName = "Signals"
         row2.addWidget(self.signals)
 
         row2.addStretch(1)
@@ -68,9 +70,11 @@ class Plot(QtWidgets.QWidget):
         #l.setStyleSheet("margin-left:20px")
         row2.addWidget(l)
         self.timeFrom = QtWidgets.QSpinBox()
+        self.timeFrom.settingsName = "Time from"
         row2.addWidget(self.timeFrom)
         row2.addWidget(QtWidgets.QLabel("-"))
         self.timeTo = QtWidgets.QSpinBox()
+        self.timeTo.settingsName = "Time to"
         row2.addWidget(self.timeTo)
 
         row2.addStretch(1)
@@ -89,6 +93,7 @@ class Plot(QtWidgets.QWidget):
         rawDataPlot.addWidget(self.rawDataPlotButton,0,0)
         rawDataPlot.addWidget(QtWidgets.QLabel("Plot type:"),1,0)
         self.rawDataPlotType = QtWidgets.QComboBox()
+        self.rawDataPlotType.settingsName = "Raw data plot type"
         self.rawDataPlotType.addItem("xy")
         self.rawDataPlotType.addItem("grid xy")
         self.rawDataPlotType.addItem("image")
@@ -97,17 +102,21 @@ class Plot(QtWidgets.QWidget):
         rawDataPlot.setRowStretch(rawDataPlot.rowCount(),1)
 
         self.plotAllPoints = QtWidgets.QCheckBox("Plot all points")
+        self.plotAllPoints.settingsName = "Plot all points"
         rawDataPlot.addWidget(self.plotAllPoints,0,1)
         self.autoscale = QtWidgets.QCheckBox("Autoscale")
+        self.autoscale.settingsName = "Autoscale"
         rawDataPlot.addWidget(self.autoscale,1,1)
 
         h = QtWidgets.QHBoxLayout()
         rawDataPlot.addLayout(h,2,1)
         h.addWidget(QtWidgets.QLabel("Range"))
         self.rawDataPlotFrom = QtWidgets.QSpinBox()
+        self.rawDataPlotFrom.settingsName = "Raw data plot from"
         h.addWidget(self.rawDataPlotFrom)
         h.addWidget(QtWidgets.QLabel("-"))
         self.rawDataPlotTo = QtWidgets.QSpinBox()
+        self.rawDataPlotTo.settingsName = "Raw data plot to"
         h.addWidget(self.rawDataPlotTo)
 
         spectrumPlot = QGridGroupBox("Spectrum plot")
@@ -117,6 +126,7 @@ class Plot(QtWidgets.QWidget):
         spectrumPlot.addWidget(self.spectrumPlotButton,0,0)
         spectrumPlot.addWidget(QtWidgets.QLabel("Plot type:"),1,0)
         self.spectrumPlotType = QtWidgets.QComboBox()
+        self.spectrumPlotType.settingsName = "Spectrum plot type"
         self.spectrumPlotType.addItem("xy")
         self.spectrumPlotType.addItem("grid xy")
         self.spectrumPlotType.addItem("image")
@@ -125,6 +135,7 @@ class Plot(QtWidgets.QWidget):
 
         spectrumPlot.addWidget(QtWidgets.QLabel("Frequency resolution [Hz]"),0,1)
         self.frequencyResolution = QtWidgets.QSpinBox()
+        self.frequencyResolution.settingsName = "Frequency resolution"
         self.frequencyResolution.setMinimum(0)
         self.frequencyResolution.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         spectrumPlot.addWidget(self.frequencyResolution,1,1)

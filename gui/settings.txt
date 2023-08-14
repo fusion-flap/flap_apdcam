@@ -1,0 +1,25 @@
+[Plot]
+
+[Measure]
+
+[Camera configuration]
+
+[Camera timer]
+
+[Infrastructure]
+shutter open = false
+shutter external control = false
+
+[Control & Timing]
+sata frequency multiplier = 10
+sata frequency divisor = 10
+adc frequency multiplier = 21
+adc frequency divisor = 9
+external clock frequency multiplier = 3
+external clock frequency divisor = 2
+sampling frequency divisor = 5
+
+[ADC control]
+
+[ADC control/ADC 1]
+

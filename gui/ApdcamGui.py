@@ -358,7 +358,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
             if not self.status.connected:
                 return "Can not save settings with automatic filename, camera is not connected"
             else:
-                fileName = os.path.join(settingsDir,"gui-settings-" + self.camera.status.firmware + ".txt")
+                fileName = os.path.join(self.settingsDir,"gui-settings-" + self.camera.status.firmware + ".txt")
 
         error = saveSettings(self,fileName)
         if error != "":

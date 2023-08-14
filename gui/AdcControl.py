@@ -292,6 +292,7 @@ class Adc(QtWidgets.QWidget):
         g.addWidget(self.internalTrigger,4,0)
 
         self.reverseBitOrder = QtWidgets.QCheckBox("Rev. bitord.")
+        self.reverseBitOrder.settingsName = "Reverse bit order"
         self.reverseBitOrder.setToolTip("Set reverse bit order in the stream. If checked, least significant bit comes first.")
         self.reverseBitOrder.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setReverseBitord(self.number,self.reverseBitOrder.isChecked())))
         self.reverseBitOrder.guiMode = GuiMode.factory

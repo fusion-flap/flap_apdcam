@@ -268,6 +268,9 @@ class ControlTiming(QtWidgets.QWidget):
         self.sampleDiv.lineEdit().returnPressed.connect(self.gui.call(lambda : self.gui.camera.setSampleDivider(self.sampleDiv.value())))
         self.sampleDiv.setToolTip("Sample clock divider (sampling frequency w.r.t. ADC clock frequency, APDCAM User Guide Fig. 6). Takes effect when you press Enter")
 
+        self.sampleFreq = QtWidgets.QLineEdit()
+        g.addWidget(self.sampleFreq,4,4)
+
         l.addStretch(1)
 
 
@@ -291,7 +294,7 @@ class ControlTiming(QtWidgets.QWidget):
 
         self.extSample = QtWidgets.QCheckBox("Ext. Sample")
         self.extSample.settingsName = "External sampling signal"
-        self.extSample.setToolTip("Use external signal for sampling, rather than 20 MHz internal clock divided by SAMPLEDIVIDER")
+        self.extSample.setToolTip("Use external signal for sampling, rather than ADC frequency divided by SAMPLEDIVIDER")
         g.addWidget(self.extSample)
 
 

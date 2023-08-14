@@ -26,6 +26,7 @@ from Plot import Plot
 from SimpleMeasurementControl import SimpleMeasurementControl
 from GuiMode import *
 
+#sys.path.append('/home/apdcam/Python/apdcam_devel/apdcam_control')
 sys.path.append('/home/barna/fusion-instruments/apdcam/sw/flap_apdcam/apdcam_control')
 from APDCAM10G_control import *
 

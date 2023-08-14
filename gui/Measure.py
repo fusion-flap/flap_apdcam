@@ -1,4 +1,5 @@
 import sys
+import time
 
 import importlib
 from QtVersion import QtVersion

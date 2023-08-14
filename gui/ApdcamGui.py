@@ -182,7 +182,8 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.expertTabs.addTab(self.adcControl,"ADC control")
         self.adcControl.settingsSection = "ADC control"
 
-        self.adcControl.addAdc(1,10)
+        # for testing without camera
+        #self.adcControl.addAdc(1,10)
 
         self.controlTiming = ControlTiming(self)
         self.expertTabs.addTab(self.controlTiming,"Control & Timing")

@@ -159,7 +159,8 @@ class ControlTiming(QtWidgets.QWidget):
 
         g.addWidget(QtWidgets.QLabel("Multiplier"),0,1)
         g.addWidget(QtWidgets.QLabel("Divisor"),0,2)
-        g.addWidget(QtWidgets.QLabel("Frequency"),0,3)
+        g.addWidget(QtWidgets.QLabel("Ref. freq."),0,3)
+        g.addWidget(QtWidgets.QLabel("Actual freq."),0,4)
 
         g.addWidget(QtWidgets.QLabel("Serial (SATA):"),1,0)
 

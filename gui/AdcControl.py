@@ -489,7 +489,7 @@ class Adc(QtWidgets.QWidget):
                 func = self.gui.call(partial(lambda channel,en,polarity,level : self.gui.camera.setInternalTrigger(channel,\
                                                                                                                    en.isChecked(),\
                                                                                                                    level.value(), \
-                                                                                                                   self.gui.camera.codes_ADC.INT_TRIG_POSITIVE if polarity.isChecked() else self.codes_ADC.INT_TRIG_NEGATIVE),
+                                                                                                                   self.gui.camera.codes_ADC.INT_TRIG_POSITIVE if polarity.isChecked() else self.gui.camera.codes_ADC.INT_TRIG_NEGATIVE),
                                              (self.number-1)*32+channel,en,polarity,level))
                 en.stateChanged.connect(func) # enabled changes
                 polarity.stateChanged.connect(func)  # polarity changes

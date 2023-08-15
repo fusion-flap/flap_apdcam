@@ -14,16 +14,31 @@ Qt = QtCore.Qt
 
 
 def readOnly(c):
-    style = "background-color: rgb(245,252,245)"
+    style = """
+    QCheckBox, QLineEdit, QDoubleSpinBox, QSpinBox {
+      background-color: rgb(245,252,245)
+    }
+    QToolTip {
+      background-color: black;
+    }
+    """
+#    style = "background-color: rgb(245,252,245)"
     if isinstance(c,QtWidgets.QCheckBox):
         c.setAttribute(Qt.WA_TransparentForMouseEvents,True)
         c.setStyleSheet(style)
         c.setFocusPolicy(Qt.NoFocus)
-    if isinstance(c,QtWidgets.QLineEdit):
+    elif isinstance(c,QtWidgets.QLineEdit):
         c.setReadOnly(True)
         c.setStyleSheet(style)
         c.setFocusPolicy(Qt.NoFocus)
-        
+    elif isinstance(c,QtWidgets.QDoubleSpinBox):
+        c.setReadOnly(True)
+        c.setStyleSheet(style)
+        c.setFocusPolicy(Qt.NoFocus)
+    elif isinstance(c,QtWidgets.QSpinBox):
+        c.setReadOnly(True)
+        c.setStyleSheet(style)
+        c.setFocusPolicy(Qt.NoFocus)
 
 class QCheckBoxIndicator(QtWidgets.QCheckBox):
     def __init__(self,title):

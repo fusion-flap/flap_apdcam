@@ -58,7 +58,8 @@ def saveSettings(widget,fileName):
 
 def loadSettings(widget, fileName):
     settings = configparser.ConfigParser()
-    settings.read(fileName)
+    if len(settings.read(fileName))==0:
+        return "Could not read the file '" + fileName + "'"
 
     error = ""
 

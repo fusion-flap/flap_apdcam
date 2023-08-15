@@ -75,6 +75,10 @@ class MainPage(QtWidgets.QWidget):
         """
         Connects to APDCAM
         """
+
+        self.gui.initSettingsOnConnect()
+        return
+
         #self.messages.setText("") # clear previous messages
         self.cameraType.setText("")
 
@@ -106,23 +110,24 @@ class MainPage(QtWidgets.QWidget):
         self.cameraConnectedStatus.setText("Camera status: connected")
         self.gui.status.connected = True
 
-        self.cameraType.append("Manufacturer serial number: " + str(self.gui.camera.status.manufacturer_serial))
-
-        #self.cameraType.setText(" Firmware: {:s}".format(self.GUI_status.APDCAM_reg.status.firmware.decode('utf-8')))
-        self.cameraType.append("Firmware: {:s}".format(self.gui.camera.status.firmware.decode('utf-8')))
+        self.cameraType.append("CC card serial number: " + str(self.gui.camera.status.CC_serial))
+        self.cameraType.append("CC card firmware:      " + self.gui.camera.status.firmware.decode('utf-8'))
         
+        self.cameraType.append("")
+        self.cameraType.append("PC card serial no.:    " + self.gui.camera.status.PC_serial)
+        self.cameraType.append("PC card firmware:      " + self.gui.camera.status.PC_FW_version)
+
         nAdcBoards = len(self.gui.camera.status.ADC_address) 
         self.gui.adcControl.clearAdcs()
-        self.cameraType.append("")
         for i in range(nAdcBoards):
+            self.cameraType.append("")
             self.cameraType.append("ADC " + str(i+1))
             self.cameraType.append("   Address:      " +  str(self.gui.camera.status.ADC_address[i]))
             self.cameraType.append("   FPGA Version: " +  self.gui.camera.status.ADC_FPGA_version[i])
             self.cameraType.append("   MC Version:   " +  self.gui.camera.status.ADC_MC_version[i])
+            self.cameraType.append("   Serial no.:   " +  self.gui.camera.status.ADC_serial[i])
             self.gui.adcControl.addAdc(i+1,self.gui.camera.status.ADC_address[i])
 
-        self.cameraType.append("")
-        self.cameraType.append("PC Firmware Version: " + self.gui.camera.status.PC_FW_version)
 
         err = self.gui.camera.readStatus()
         if (err != "") :
@@ -150,4 +155,4 @@ class MainPage(QtWidgets.QWidget):
             self.gui.infrastructure.calibrationLightIntensity.setValue(d)
 
         self.gui.startGuiUpdate()
-
+        self.gui.initSettingsOnConnect()

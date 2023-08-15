@@ -20,7 +20,6 @@ from Infrastructure import Infrastructure
 from AdcControl import AdcControl
 from ControlTiming import ControlTiming
 from CameraTimer import CameraTimer
-from CameraConfig import CameraConfig
 from FactoryTest import FactoryTest
 from Plot import Plot
 from SimpleMeasurementControl import SimpleMeasurementControl
@@ -127,11 +126,11 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
         saveSettingsAction = QAction("&Save settings",self)
         fileMenu.addAction(saveSettingsAction)
-        saveSettingsAction.triggered.connect(self.saveSettings)
+        saveSettingsAction.triggered.connect(lambda: self.saveSettings())
 
         loadSettingsAction = QAction("&Load settings",self)
         fileMenu.addAction(loadSettingsAction)
-        loadSettingsAction.triggered.connect(self.loadSettings)
+        loadSettingsAction.triggered.connect(lambda: self.loadSettings())
 
         exitAction = QAction("&Exit",self)
         fileMenu.addAction(exitAction)
@@ -193,10 +192,6 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.cameraTimer = CameraTimer(self)
         self.expertTabs.addTab(self.cameraTimer,"Camera timer")
         self.cameraTimer.settingsSection = "Camera timer"
-
-        self.cameraConfig = CameraConfig(self)
-        self.expertTabs.addTab(self.cameraConfig,"Camera configuration")
-        self.cameraConfig.settingsSection = "Camera configuration"
 
         self.measure = Measure(self)
         self.expertTabs.addTab(self.measure,"Measure")
@@ -329,10 +324,24 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
         return wrapper
 
-    def loadSettings(self):
-        options = QtWidgets.QFileDialog.Options()
-        options |= QtWidgets.QFileDialog.DontUseNativeDialog
-        fileName, _ = QtWidgets.QFileDialog.getOpenFileName(self,"Save settings","","Text Files (*.txt);;All Files (*)", options=options)
+    def settingsFileName(self):
+        if not self.status.connected:
+            return ""
+        return os.path.join(self.settingsDir,"gui-settings-" + str(self.camera.status.firmware) + ".txt")
+        
+    def loadSettings(self,fileName = None):
+        if fileName is None:
+            options = QtWidgets.QFileDialog.Options()
+            options |= QtWidgets.QFileDialog.DontUseNativeDialog
+            fileName, _ = QtWidgets.QFileDialog.getOpenFileName(self,"Save settings","","Text Files (*.txt);;All Files (*)", options=options)
+            if fileName == "":
+                return
+        elif fileName == "auto":
+            if not self.status.connected:
+                return "Can not save settings with automatic filename, camera is not connected"
+            else:
+                fileName = self.settingsFileName()
+
         error = loadSettings(self,fileName)
         if error != "":
             self.showError(error)
@@ -354,15 +363,35 @@ class ApdcamGui(QtWidgets.QMainWindow):
             options = QtWidgets.QFileDialog.Options()
             options |= QtWidgets.QFileDialog.DontUseNativeDialog
             fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self,"Save settings","","Text Files (*.txt);;All Files (*)", options=options)
+            if fileName == "":
+                return
+
         elif fileName == "auto":
             if not self.status.connected:
                 return "Can not save settings with automatic filename, camera is not connected"
             else:
-                fileName = os.path.join(self.settingsDir,"gui-settings-" + str(self.camera.status.firmware) + ".txt")
+                fileName = self.settingsFileName()
 
         error = saveSettings(self,fileName)
         if error != "":
             self.showError(error)
+
+    def initSettingsOnConnect(self):
+        fileName = self.settingsFileName()
+        if os.path.exists(fileName):
+            reply = QtWidgets.QMessageBox.question(self, 'Yes', 'There exists a saved settings file for this camera. Do you want to use it? If you choose No, the actual values from the camera will be used.', QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
+            if reply == QtWidgets.QMessageBox.Yes:
+                self.loadSettings(fileName)
+                return
+        reply = QtWidgets.QMessageBox.question(self, 'Yes', 'Reading the values back from the camera is not implemented yet. Do you accept this situation?', QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
+        if reply == QtWidgets.QMessageBox.Yes:
+            self.showError("NO! You should not accept that something does not work! We need your insistence to make our world better!")
+        else:
+            self.showMessage("Good answer. We are working hard to implement this!")
+                
+
+
+            
 
     def markFunctionlessControls(self):
         children = self.findChildren(QtWidgets.QWidget)

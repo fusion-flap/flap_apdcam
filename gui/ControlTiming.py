@@ -29,14 +29,23 @@ def setFreqMultDiv(mult,div,combo):
     return True
 
 def setFreqCombo(mult,div,combo):
+    try:
+        mult.value()
+        div.value()
+    except:
+        return False
+
+    combo.setItemText(0,"")
     text = frequencyFormat.format(20.0*mult.value()/div.value())
     i = combo.findText(text)
+    #combo.blockSignals(True)
     if i<0:
-        print("This should not happen")
-        return False
-    combo.blockSignals(True)
-    combo.setCurrentIndex(i)
-    combo.blockSignals(False)
+        combo.setItemText(0,frequencyFormat.format(20.0*mult.value()/div.value()))
+        combo.setItemData(0,[mult.value(),div.value()])
+        combo.setCurrentIndex(0)
+    else:
+        combo.setCurrentIndex(i)
+    #combo.blockSignals(False)
     return True
     
 def populateFrequencyCombo(multFrom,multTo,divFrom,divTo,combo):
@@ -45,8 +54,10 @@ def populateFrequencyCombo(multFrom,multTo,divFrom,divTo,combo):
     freqs = []
     for mult in range(multFrom,multTo+1):
         for div in range(divFrom,divTo+1):
-            # first value is true frequency, for sorting, then mult and div
-            freqs.append([20.0*mult/div,mult,div])
+            val = 20.0*mult/div
+            if abs(round(val/2)-val/2) < 0.0001:
+                # first value is true frequency, for sorting, then mult and div
+                freqs.append([20.0*mult/div,mult,div])
     # sort by first element (frequency) of tuples
     freqs.sort()
 
@@ -61,6 +72,7 @@ def populateFrequencyCombo(multFrom,multTo,divFrom,divTo,combo):
         else:
             i=i+1
 
+    combo.addItem(frequencyFormat.format(freqs[0][0]),[freqs[0][1],freqs[0][2]])
     for f in freqs:
         combo.addItem(frequencyFormat.format(f[0]),[f[1],f[2]])
 
@@ -69,11 +81,28 @@ class ControlTiming(QtWidgets.QWidget):
     def setSerialPll(self):
         self.gui.camera.setSerialPll(self.serialPllMult.value(),self.serialPllDiv.value())
 
+    def setSampleDivider(self):
+        self.updateSamplingFrequency()
+        if self.gui.status.connected:
+            self.gui.camera.setSampleDivider(self.sampleDiv.value())
+
+    def updateSamplingFrequency(self):
+        try:
+            if self.adcClockExt.isChecked():
+                self.sampleFreqRef.setValue(self.extClockFreqScaled.value())
+            else:
+                self.sampleFreqRef.setValue(float(self.adcPllFreq.currentText()))
+            self.sampleFreq.setValue(self.sampleFreqRef.value()/self.sampleDiv.value())
+        except:
+            pass
+
     def setAdcClockParameters(self):
+        if not self.gui.status.connected:
+            return
         #self.adcFrequency.setText("{0:.3f}".format(20*adcmult/adcdiv))
         self.gui.camera.setClock(self.gui.camera.CLK_EXTERNAL if self.adcClockExt.isChecked() else self.gui.camera.CLK_INTERNAL,
-                                 adcdiv=self.basePllDiv.value(),
-                                 adcmult=self.basePllMult.value(),
+                                 adcdiv=self.adcPllDiv.value(),
+                                 adcmult=self.adcPllMult.value(),
                                  extdiv=self.extClockDiv.value(),
                                  extmult=self.extClockMult.value(),
                                  autoExternal=self.autoExtClock.isChecked(),
@@ -157,38 +186,42 @@ class ControlTiming(QtWidgets.QWidget):
         title.setStyleSheet("font-weight:bold")
         g.addWidget(title,0,0)
 
-        g.addWidget(QtWidgets.QLabel("Multiplier"),0,1)
-        g.addWidget(QtWidgets.QLabel("Divisor"),0,2)
-        g.addWidget(QtWidgets.QLabel("Ref. freq."),0,3)
-        g.addWidget(QtWidgets.QLabel("Actual freq."),0,4)
+        g.addWidget(QtWidgets.QLabel("Ref. freq. [MHz]"),0,1)
+        g.addWidget(QtWidgets.QLabel("Multiplier"),0,2)
+        g.addWidget(QtWidgets.QLabel("Divisor"),0,3)
+        g.addWidget(QtWidgets.QLabel("Actual frequency"),0,4)
 
         g.addWidget(QtWidgets.QLabel("Serial (SATA):"),1,0)
+
+        g.addWidget(QtWidgets.QLabel("20"),1,1)
 
         serialPllMultMin = 10
         serialPllMultMax = 10
         self.serialPllMult = QtWidgets.QSpinBox()
+        self.serialPllMult.guiMode = GuiMode.factory
         self.serialPllMult.settingsName = "SATA frequency multiplier"
         self.serialPllMult.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.serialPllMult.setToolTip("Set the multiplier value for the serial PLL. Takes effect when you press Enter.")
         self.serialPllMult.setMinimum(serialPllMultMin)
         self.serialPllMult.setMaximum(serialPllMultMax)
         self.serialPllMult.setValue(serialPllMultMin)
-        g.addWidget(self.serialPllMult,1,1)
+        g.addWidget(self.serialPllMult,1,2)
 
         serialPllDivMin = 10
         serialPllDivMax = 10
         self.serialPllDiv = QtWidgets.QSpinBox()
+        self.serialPllDiv.guiMode = GuiMode.factory
         self.serialPllDiv.settingsName = "SATA frequency divisor"
         self.serialPllDiv.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.serialPllDiv.setToolTip("Set the divider value for the serial PLL. Takes effect when you press Enter")
         self.serialPllDiv.setMinimum(serialPllDivMin)
         self.serialPllDiv.setMaximum(serialPllDivMax)
         self.serialPllDiv.setValue(serialPllDivMin)
-        g.addWidget(self.serialPllDiv,1,2)
+        g.addWidget(self.serialPllDiv,1,3)
 
-        g.addWidget(QtWidgets.QLabel("20 MHz"),1,3)
 
         self.serialPllFreq = QtWidgets.QComboBox()
+        self.serialPllFreq.guiMode = GuiMode.factory
         g.addWidget(self.serialPllFreq,1,4)
         self.serialPllFreq.setToolTip("The frequency [MHz] for the serial (SATA) line (20 MHz base clock frequency multiplied/divided by the values given on the left")
         populateFrequencyCombo(serialPllMultMin,serialPllMultMax,serialPllDivMin,serialPllDivMax,self.serialPllFreq)
@@ -203,37 +236,51 @@ class ControlTiming(QtWidgets.QWidget):
 
         g.addWidget(QtWidgets.QLabel("ADC:"),2,0)
 
-        self.basePllMult = QtWidgets.QSpinBox()
-        self.basePllMult.settingsName = "ADC frequency multiplier"
-        self.basePllMult.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
-        self.basePllMult.setToolTip("Multiplier for the internal clock frequency (20 MHz). Takes effect when you press Enter.")
-        self.basePllMult.setMinimum(20)
-        self.basePllMult.setMaximum(50)
-        self.basePllMult.setValue(20)
-        g.addWidget(self.basePllMult,2,1)
+        tmp = QtWidgets.QLabel("20")
+        tmp.setToolTip("The frequency of the built-in internal clock")
+        g.addWidget(tmp,2,1)
 
-        self.basePllDiv = QtWidgets.QSpinBox()
-        self.basePllDiv.settingsName = "ADC frequency divisor"
-        self.basePllDiv.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
-        self.basePllDiv.setToolTip("Divider for the internal clock frequency (20 MHz). Takes effect when you press Enter.")
-        self.basePllDiv.setMinimum(8)
-        self.basePllDiv.setMaximum(100)
-        self.basePllDiv.setValue(8)
-        g.addWidget(self.basePllDiv,2,2)
+        self.adcPllMult = QtWidgets.QSpinBox()
+        self.adcPllMult.settingsName = "ADC frequency multiplier"
+        self.adcPllMult.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        self.adcPllMult.setToolTip("Multiplier for the internal clock frequency (20 MHz). Takes effect when you press Enter.")
+        self.adcPllMult.setMinimum(20)
+        self.adcPllMult.setMaximum(50)
+        self.adcPllMult.setValue(20)
+        g.addWidget(self.adcPllMult,2,2)
 
-        g.addWidget(QtWidgets.QLabel("20 MHz"),2,3)
+        self.adcPllDiv = QtWidgets.QSpinBox()
+        self.adcPllDiv.settingsName = "ADC frequency divisor"
+        self.adcPllDiv.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        self.adcPllDiv.setToolTip("Divider for the internal clock frequency (20 MHz). Takes effect when you press Enter.")
+        self.adcPllDiv.setMinimum(8)
+        self.adcPllDiv.setMaximum(100)
+        self.adcPllDiv.setValue(20)
+        g.addWidget(self.adcPllDiv,2,3)
 
-        self.basePllFreq = QtWidgets.QComboBox()
-        g.addWidget(self.basePllFreq,2,4)
-        populateFrequencyCombo(20,50,8,100,self.basePllFreq)
-        self.basePllFreq.setCurrentText(frequencyFormat.format(20.0*self.basePllMult.value()/self.basePllDiv.value()))
-        self.basePllFreq.setToolTip("The frequency [MHz] for the ADC (20 MHz base clock frequency multiplied/divided by the values given on the left")
+        self.adcPllFreq = QtWidgets.QComboBox()
+        g.addWidget(self.adcPllFreq,2,4)
+        populateFrequencyCombo(20,50,8,100,self.adcPllFreq)
+        self.adcPllFreq.setCurrentText(frequencyFormat.format(20.0*self.adcPllMult.value()/self.adcPllDiv.value()))
+        self.adcPllFreq.setToolTip("The frequency [MHz] for the ADC (20 MHz base clock frequency multiplied/divided by the values given on the left")
 
+        self.adcPllFreq.currentTextChanged.connect(self.updateSamplingFrequency)
+
+        self.adcPllFreq.activated.connect               (lambda: setFreqMultDiv(self.adcPllMult,self.adcPllDiv,self.adcPllFreq) and self.setAdcClockParameters())
+        self.adcPllMult.lineEdit().returnPressed.connect(lambda: setFreqCombo  (self.adcPllMult,self.adcPllDiv,self.adcPllFreq) and self.setAdcClockParameters())
+        self.adcPllDiv.lineEdit() .returnPressed.connect(lambda: setFreqCombo  (self.adcPllMult,self.adcPllDiv,self.adcPllFreq) and self.setAdcClockParameters())
+        
         
 
         # ----------------------- External clock parameters/frequency -----------------------------------------
         
         g.addWidget(QtWidgets.QLabel("Ext. clock:"),3,0)
+
+        self.extClockFreq = QtWidgets.QDoubleSpinBox()
+        self.extClockFreq.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        readOnly(self.extClockFreq)
+        self.extClockFreq.setToolTip("The measured frequency [MHz] of the external clock, to be multiplied and divided by the multiplicator and divisor on the right")
+        g.addWidget(self.extClockFreq,3,1)
 
         self.extClockMult = QtWidgets.QSpinBox()
         self.extClockMult.settingsName = "External clock frequency multiplier"
@@ -241,7 +288,7 @@ class ControlTiming(QtWidgets.QWidget):
         self.extClockMult.setToolTip("Multiplier for the external clock frequency. Takes effect when you press Enter.")
         self.extClockMult.setMinimum(2)
         self.extClockMult.setMaximum(33)
-        g.addWidget(self.extClockMult,3,1)
+        g.addWidget(self.extClockMult,3,2)
 
         self.extClockDiv = QtWidgets.QSpinBox()
         self.extClockDiv.settingsName = "External clock frequency divisor"
@@ -249,44 +296,46 @@ class ControlTiming(QtWidgets.QWidget):
         self.extClockDiv.setToolTip("Divider for the external clock frequency. Takes effect when you press Enter.")
         self.extClockDiv.setMinimum(1)
         self.extClockDiv.setMaximum(32)
-        g.addWidget(self.extClockDiv,3,2)
+        g.addWidget(self.extClockDiv,3,3)
 
-        self.extClockFreq = QtWidgets.QLineEdit()
-        readOnly(self.extClockFreq)
-        self.extClockFreq.setToolTip("The measured frequency [MHz] of the external clock, multiplied and divided by the multiplicator and divisor on the left")
-        g.addWidget(self.extClockFreq,3,3)
-        
-
-        self.extClockFreqScaled = QtWidgets.QLineEdit()
+        self.extClockFreqScaled = QtWidgets.QDoubleSpinBox()
+        self.extClockFreqScaled.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         readOnly(self.extClockFreqScaled)
         self.extClockFreqScaled.setToolTip("The multiplied/divided actual value derived from the external clock signal")
         g.addWidget(self.extClockFreqScaled,3,4)
+        self.extClockFreqScaled.valueChanged.connect(self.updateSamplingFrequency)
 
-        self.basePllFreq.activated.connect               (lambda: setFreqMultDiv(self.basePllMult,self.basePllDiv,self.basePllFreq) and self.setAdcClockParameters())
-        self.basePllMult.lineEdit().returnPressed.connect(lambda: setFreqCombo  (self.basePllMult,self.basePllDiv,self.basePllFreq) and self.setAdcClockParameters())
-        self.basePllDiv.lineEdit() .returnPressed.connect(lambda: setFreqCombo  (self.basePllMult,self.basePllDiv,self.basePllFreq) and self.setAdcClockParameters())
         self.extClockMult.lineEdit().returnPressed.connect(self.setAdcClockParameters)
         self.extClockDiv.lineEdit() .returnPressed.connect(self.setAdcClockParameters)
 
-        g.addWidget(QtWidgets.QLabel("Sample:"),4,0)
+        # -----------------------------  Sampling frequency -------------------------------------------------
+        
+        g.addWidget(QtWidgets.QLabel("Sampling:"),4,0)
+
+        self.sampleFreqRef = QtWidgets.QDoubleSpinBox()
+        self.sampleFreqRef.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        self.sampleFreqRef.setToolTip("Reference frequency [MHz] of the sampling: either the ADC of the external clock's frequency (depending on the checkbox 'ADC Clock Ext.'), to be divided by the divisor on the right")
+        g.addWidget(self.sampleFreqRef,4,1)
+        readOnly(self.sampleFreqRef)
+        self.sampleFreqRef.setValue(float(self.adcPllFreq.currentText()))
+
         self.sampleDiv = QtWidgets.QSpinBox()
         self.sampleDiv.settingsName = "Sampling frequency divisor"
-        g.addWidget(self.sampleDiv,4,2)
+        g.addWidget(self.sampleDiv,4,3)
         g.setRowStretch(g.rowCount(),1)
         self.sampleDiv.setMinimum(1)
+        self.sampleDiv.setValue(10)
         self.sampleDiv.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
-        self.sampleDiv.lineEdit().returnPressed.connect(self.gui.call(lambda : self.gui.camera.setSampleDivider(self.sampleDiv.value())))
-        self.sampleDiv.setToolTip("Sample clock divider (sampling frequency w.r.t. ADC clock frequency, APDCAM User Guide Fig. 6). Takes effect when you press Enter")
+        self.sampleDiv.lineEdit().returnPressed.connect(self.setSampleDivider)
+        self.sampleDiv.setToolTip("Sample clock divisor (sampling frequency w.r.t. ADC clock frequency, APDCAM User Guide Fig. 6). Takes effect when you press Enter")
 
-        
-
-        self.sampleFreq = QtWidgets.QLineEdit()
+        self.sampleFreq = QtWidgets.QDoubleSpinBox()
+        self.sampleFreq.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        readOnly(self.sampleFreq)
+        self.sampleFreq.setValue(float(frequencyFormat.format(2)))
         g.addWidget(self.sampleFreq,4,4)
 
-
-        
         l.addStretch(1)
-
 
         l = QtWidgets.QVBoxLayout()
         layout.addLayout(l)
@@ -297,7 +346,7 @@ class ControlTiming(QtWidgets.QWidget):
         self.adcClockExt = QtWidgets.QCheckBox("ADC Clock Ext.")
         self.adcClockExt.settingsName = "External ADC clock"
         self.adcClockExt.setToolTip("Use external clock if checked, and internal clock if unchecked")
-        self.adcClockExt.stateChanged.connect(self.setAdcClockParameters)
+        self.adcClockExt.stateChanged.connect(lambda: self.updateSamplingFrequency() and self.setAdcClockParameters())
         g.addWidget(self.adcClockExt)
         
         self.autoExtClock = QtWidgets.QCheckBox("Auto Ext. Clock")
@@ -314,19 +363,21 @@ class ControlTiming(QtWidgets.QWidget):
 
         g = QVGroupBox()
         l.addWidget(g)
-        self.basicPllLocked = QtWidgets.QCheckBox("Basic PLL Locked")
+
+        self.sataPllLocked = QtWidgets.QCheckBox("SATA frequency valid")
+        readOnly(self.sataPllLocked)
+        self.sataPllLocked.setToolTip("Indicator for the serial (SATA) PLL being in lock")
+        g.addWidget(self.sataPllLocked)
+
+        self.basicPllLocked = QtWidgets.QCheckBox("Internal ADC frequency valid")
         readOnly(self.basicPllLocked)
         self.basicPllLocked.setToolTip("Indicator for the basic (ADC) PLL being in lock")
         g.addWidget(self.basicPllLocked)
         
-        self.sataPllLocked = QtWidgets.QCheckBox("SATA PLL Locked")
-        readOnly(self.sataPllLocked)
-        self.sataPllLocked.setToolTip("Indicator for the serial (SATA) PLL being in lock")
-        g.addWidget(self.sataPllLocked)
         
-        self.extDcmLocked = QtWidgets.QCheckBox("Ext. DCM Locked")
+        self.extDcmLocked = QtWidgets.QCheckBox("External ADC frequency valid")
         readOnly(self.extDcmLocked)
-        self.extDcmLocked.setToolTip("Indicator for the external clock module (DCM) being in lock")
+        self.extDcmLocked.setToolTip("Indicator for the external clock module (DCM) PLL being in lock")
         g.addWidget(self.extDcmLocked)
         
         self.extClockValid = QtWidgets.QCheckBox("Ext. Clock Valid")

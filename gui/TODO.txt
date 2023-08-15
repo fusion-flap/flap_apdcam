@@ -1,15 +1,10 @@
-- print the serial number of ADC boards and PC board upon connection
 - MainPage: show interface obtained automatically.
 - Connect-disconnect-connect kills the app
 - LED1, LED2 - what are these? Apparently not SATA1/SATA2 data out
 - read settings from last saved settings file upon connection,
 - ADC/Test pattern: combo box for pre-set values. Ask Sanyi.
 - FIR/Rec frequency --> coeffs. Ask Sanyi about the formula/code
-- ADC: "Read all ADC status" should be removed
 - ADC: Enable trigger/channel, crashes, o
-- ADC frequency: Mult/Div/Freq: frequency should not go above 30 MHz. Less values should be displayed.
-- Control timing/ Frequencies: Show reference frequency (20 MHz for first two rows, measured ext freq. for 3rd row, ADC freq for 4th row), and actual values in 5th column
-- Control timing / Locked panel: tooltips. "Basic PLL Locked" --> ADC clock (internal) valid. "Ext. DCM Locked" --> External ADC frequency valid. "SATA Pll Locked" --> SATA frequency valid
-- Camera configuration panel should be merged to Main
-
+- ADC frequency: Mult/Div/Freq: frequency should not go above 30 MHz. 
+- Save/Load settings: crash if cancelled file selector
 

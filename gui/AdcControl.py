@@ -585,11 +585,6 @@ class AdcControl(QtWidgets.QWidget):
         self.factoryResetButton.guiMode = GuiMode.factory
         h.addWidget(self.factoryResetButton)
 
-#        self.readFromHwButton = QtWidgets.QPushButton("Read from HW")
-#        h.addWidget(self.readFromHwButton)
-
-        self.readAllAdcStatusButton = QtWidgets.QPushButton("Read all ADC status")
-        h.addWidget(self.readAllAdcStatusButton)
 
         
     def addAdc(self,number,address):

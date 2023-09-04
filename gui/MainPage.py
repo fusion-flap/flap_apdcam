@@ -26,8 +26,8 @@ class MainPage(QtWidgets.QWidget):
         layout.addWidget(addressGroupBox) #,Qt.AlignmentFlag.AlignLeft)
         addressGroupBox.addWidget(QtWidgets.QLabel("Address:"),0,0)
         self.addressEntry = QtWidgets.QLineEdit()
+        self.addressEntry.setText("10.123.13.102")
         #self.addressEntry.setText("10.123.13.101")
-        self.addressEntry.setText("10.123.14.102")
         self.addressEntry.setToolTip("The IP address of the camera")
         addressGroupBox.addWidget(self.addressEntry,0,1)
         addressGroupBox.addWidget(QtWidgets.QLabel("Interface: "),1,0)
@@ -76,9 +76,6 @@ class MainPage(QtWidgets.QWidget):
         Connects to APDCAM
         """
 
-        self.gui.initSettingsOnConnect()
-        return
-
         #self.messages.setText("") # clear previous messages
         self.cameraType.setText("")
 
@@ -111,10 +108,10 @@ class MainPage(QtWidgets.QWidget):
         self.gui.status.connected = True
 
         self.cameraType.append("CC card serial number: " + str(self.gui.camera.status.CC_serial))
-        self.cameraType.append("CC card firmware:      " + self.gui.camera.status.firmware.decode('utf-8'))
+        self.cameraType.append("CC card firmware:      " + self.gui.camera.status.CC_firmware.decode('utf-8'))
         
         self.cameraType.append("")
-        self.cameraType.append("PC card serial no.:    " + self.gui.camera.status.PC_serial)
+        self.cameraType.append("PC card serial no.:    " + str(self.gui.camera.status.PC_serial))
         self.cameraType.append("PC card firmware:      " + self.gui.camera.status.PC_FW_version)
 
         nAdcBoards = len(self.gui.camera.status.ADC_address) 
@@ -125,7 +122,7 @@ class MainPage(QtWidgets.QWidget):
             self.cameraType.append("   Address:      " +  str(self.gui.camera.status.ADC_address[i]))
             self.cameraType.append("   FPGA Version: " +  self.gui.camera.status.ADC_FPGA_version[i])
             self.cameraType.append("   MC Version:   " +  self.gui.camera.status.ADC_MC_version[i])
-            self.cameraType.append("   Serial no.:   " +  self.gui.camera.status.ADC_serial[i])
+            self.cameraType.append("   Serial no.:   " +  str(self.gui.camera.status.ADC_serial[i]))
             self.gui.adcControl.addAdc(i+1,self.gui.camera.status.ADC_address[i])
 
 

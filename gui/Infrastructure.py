@@ -214,6 +214,11 @@ class Infrastructure(QtWidgets.QWidget):
                 self.gui.camera.hvOnOff(i+1,self.hvOn[i].isChecked())
         return ""
 
+    def loadSettingsFromCamera(self):
+        
+
+        self.gui.showError("Infrastructure.loadSettingsFromCamera is not implemented yet")
+
     def updateGui(self):
         for i in range(4):
             self.hvActual[i].setText("{:.1f}".format(self.gui.camera.status.HV_act[i]))

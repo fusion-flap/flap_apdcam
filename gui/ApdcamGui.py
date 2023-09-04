@@ -1,10 +1,11 @@
 import sys
-import datetime
+from datetime import datetime
 import time
 import inspect
 import types
 import threading
 import os
+import glob
 
 import importlib
 from QtVersion import QtVersion
@@ -25,8 +26,8 @@ from Plot import Plot
 from SimpleMeasurementControl import SimpleMeasurementControl
 from GuiMode import *
 
-sys.path.append('/home/apdcam/Python/apdcam_devel/apdcam_control')
-#sys.path.append('/home/barna/fusion-instruments/apdcam/sw/flap_apdcam/apdcam_control')
+#sys.path.append('/home/apdcam/Python/apdcam_devel/apdcam_control')
+sys.path.append('/home/barna/fusion-instruments/apdcam/sw/flap_apdcam/apdcam_control')
 from APDCAM10G_control import *
 
 """
@@ -76,7 +77,6 @@ class ApdcamGui(QtWidgets.QMainWindow):
             self.adcControl.updateGui()
             self.controlTiming.updateGui()
             self.cameraTimer.updateGui()
-            self.cameraConfig.updateGui()
 
         self.updateGuiThread = None
 
@@ -85,10 +85,6 @@ class ApdcamGui(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        # Create settings directory if it does not exist
-        self.settingsDir = "~/.fusion-instruments/apdcam"
-        if not os.path.exists(self.settingsDir):
-            os.makedirs(self.settingsDir)
 
         self.camera = APDCAM10G_regCom()
 
@@ -99,7 +95,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.status.connected = False
         
 
-        time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.logfile = None
         #self.logfile = open("apdcam-gui-log_" + time,"w")
         
@@ -324,74 +320,175 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
         return wrapper
 
-    def settingsFileName(self):
-        if not self.status.connected:
+    def settingsDirName(self):
+        """
+        Returns (and if it does not exist, creates) the global settings directory name
+        ~/.fusion-instruments/apdcam
+        It returns an empty string upon error
+        """
+
+        settingsDir = os.path.expanduser("~") + "/.fusion-instruments/apdcam"
+        if not os.path.exists(settingsDir):
+            try:
+                os.makedirs(settingsDir)
+            except:
+                return ""
+        return settingsDir
+
+    def cameraSettingsDirName(self):
+        """
+        If the camera is connected, it returns the name of the settings directory for this specific camera,
+        identified by its serial number (that of the CC card). If this directory does not exist yet,
+        it is automatically created
+        (by default ~/.fusion-instruments/apdcam/XXX, where XXX is the serial number of the camera)
+        If the camera is not connected, it returns the empty string
+        """
+        dir = self.settingsDirName() + "/UNKNOWN-DEVICE"
+        if self.status.connected:
+            dir = self.settingsDirName() + "/" + self.camera.status.CC_serial;
+        if not os.path.exists(dir):
+            try:
+                os.makedirs(dir)
+            except:
+                self.showError("Could not create camera-specific settings directory " + dir)
+                return ""
+        return dir
+
+    def cameraSettingsFileName(self):
+        """
+        Returns an absolute file name containing the actual time for the GUI settings to be saved into.
+        It returns an empty string if the camera is not connected.
+        """
+
+        dir = self.cameraSettingsDirName()
+        if dir=="":
+            return
+
+        fileName = dir + "/settings_" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S.txt")
+        return fileName
+
+    def cameraLastSettingsFileName(self):
+        """
+        Searches the camera-specific settings directory (identified by the camera CC card serial number)
+        for files named settings_YYYY-MM-DD_HH-MM-SS.txt
+        and returns the last one, or an empty string, if no such files exist, or the camera is not connected.
+        """
+
+        dir = self.cameraSettingsDirName()
+        if dir == "":
             return ""
-        return os.path.join(self.settingsDir,"gui-settings-" + str(self.camera.status.firmware) + ".txt")
-        
-    def loadSettings(self,fileName = None):
-        if fileName is None:
-            options = QtWidgets.QFileDialog.Options()
-            options |= QtWidgets.QFileDialog.DontUseNativeDialog
-            fileName, _ = QtWidgets.QFileDialog.getOpenFileName(self,"Save settings","","Text Files (*.txt);;All Files (*)", options=options)
-            if fileName == "":
-                return
-        elif fileName == "auto":
-            if not self.status.connected:
-                return "Can not save settings with automatic filename, camera is not connected"
-            else:
-                fileName = self.settingsFileName()
 
-        error = loadSettings(self,fileName)
-        if error != "":
-            self.showError(error)
-        
+        # Look for files settings_YYYY-MM-DD_HH-MM-SS.txt
+        files = glob.glob(dir + "/settings_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]_[0-9][0-9]-[0-9][0-9]-[0-9][0-9].txt")
+        if len(files) == 0:
+            return ""
+        files.sort()
+        return files[len(files)-1]
 
-    def saveSettings(self,fileName = None):
-        '''
-        Save the GUI settings into a file.
+    def loadSettings(self,fileName = "", ask=True):
+        """
+        Load the settings from a file
 
         Parameters
         ^^^^^^^^^^
         fileName (string)
-        - if None, ask interactively for file name using a file dialog.
-        - If "auto", save as settingsDir/gui-settings-serialnumber.txt
-        - Otherwise the filename to save to
-        '''
+        - if "", find the last previously saved settings file under ~/.fusion-instruments/apdcam/XXX/ where XXX is the CC card's serial number.
+        - Otherwise the filename to open
 
-        if fileName is None:
+        ask (bool)
+          Require to ask the user via a file dialog. If false, the user is asked via a file dialog to choose the file, using
+          the provided file name as the default (or the eventually automatically found last settings file, if it exists)
+
+        """
+
+        # if fileName is "auto", get the last saved file for this camera
+        if fileName == "":
+            fileName = self.cameraLastSettingsFileName()
+            # If no last settings is found, set fileName to None so that the next block asks
+            # for the filename interactively
+            if fileName == "":
+                ask = True
+                self.showMessage("No previous settings file is found in " + self.cameraSettingsDirName())
+                fileName = self.cameraSettingsDirName()
+
+        # If fileName is None, pop up a dialog and ask the user
+        if ask:
             options = QtWidgets.QFileDialog.Options()
             options |= QtWidgets.QFileDialog.DontUseNativeDialog
-            fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self,"Save settings","","Text Files (*.txt);;All Files (*)", options=options)
+            fileName, _ = QtWidgets.QFileDialog.getOpenFileName(self,"Save settings",fileName,"Text Files (*.txt);;All Files (*)", options=options)
             if fileName == "":
                 return
 
-        elif fileName == "auto":
-            if not self.status.connected:
-                return "Can not save settings with automatic filename, camera is not connected"
-            else:
-                fileName = self.settingsFileName()
+        error = loadSettings(self,fileName)
+        if error != "":
+            self.showError(error)
+        else:
+            self.showMessage("Settings have been loaded from " + fileName)
 
+    def saveSettings(self,fileName = "", ask=True):
+        '''
+        Save the GUI settings into a file.
+
+        Parameters 
+        ^^^^^^^^^^
+
+        fileName (string)
+        - If "", save as settingsDir/serialnumber/settings_YYYY-MM-DD_HH-MM_SS.txt
+        - Otherwise the filename to save to
+
+        ask (bool)
+          Require an interactive dialog so that the user can choose
+        '''
+
+        if fileName == "":
+            fileName = self.cameraSettingsFileName();
+
+        if  ask:
+            options = QtWidgets.QFileDialog.Options()
+            options |= QtWidgets.QFileDialog.DontUseNativeDialog
+            fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self,"Save settings",fileName,"Text Files (*.txt);;All Files (*)", options=options)
+            if fileName == "":
+                return
+
+        if fileName == "":
+            self.showError("No filename could be determined. Settings are not saved")
+            return
+
+        # call the global function which loads the settings for a given widget. Call it for the topmost widget (self)
         error = saveSettings(self,fileName)
         if error != "":
             self.showError(error)
+        else:
+            self.showMessage("Settings have been saved to " + fileName)
+
 
     def initSettingsOnConnect(self):
-        fileName = self.settingsFileName()
-        if os.path.exists(fileName):
-            reply = QtWidgets.QMessageBox.question(self, 'Yes', 'There exists a saved settings file for this camera. Do you want to use it? If you choose No, the actual values from the camera will be used.', QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
+        fileName = self.cameraLastSettingsFileName()
+        if fileName != "" and os.path.exists(fileName):
+            reply = QtWidgets.QMessageBox.question(self, 'Yes', 
+                                                   "There exists a saved settings file for this camera:\n" + fileName + ".\nDo you want to load it? If you choose No, the actual values from the camera will be used.",
+                                                   QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
             if reply == QtWidgets.QMessageBox.Yes:
-                self.loadSettings(fileName)
+                self.loadSettings(fileName,False)
                 return
-        reply = QtWidgets.QMessageBox.question(self, 'Yes', 'Reading the values back from the camera is not implemented yet. Do you accept this situation?', QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
+
+        reply = QtWidgets.QMessageBox.question(self, 'Yes', 'Reading the values back from the camera is not implemented yet. Do you accept this situation?',
+                                               QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
         if reply == QtWidgets.QMessageBox.Yes:
             self.showError("NO! You should not accept that something does not work! We need your insistence to make our world better!")
         else:
             self.showMessage("Good answer. We are working hard to implement this!")
                 
+    def loadSettingsFromCamera(self):
+        if not self.status.connected:
+            self.showError("Camera is not connected, can not read settings")
+            return
 
+        self.infrastructure.loadSettingsFromCamera()
+        self.adcControl.loadSettingsFromCamera()
+        self.controlTiming.loadSettingsFromCamera()
+        self.cameraTimer.loadSettingsFromCamera()
 
-            
 
     def markFunctionlessControls(self):
         children = self.findChildren(QtWidgets.QWidget)
@@ -413,7 +510,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
 
     def showMessageWithTime(self,msg):
-        time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.messages.append(time + " - " + msg)
         if self.logfile != None:
             self.logfile.write(msg + "\n")

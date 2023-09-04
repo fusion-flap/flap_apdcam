@@ -127,7 +127,7 @@ class ControlTiming(QtWidgets.QWidget):
 
         # external clock in MHz (register value is in kHz)
         extClockFreq = int.from_bytes(self.gui.camera.status.CC_variables[self.gui.camera.codes_CC.CC_REGISTER_EXTCLKFREQ:self.gui.camera.codes_CC.CC_REGISTER_EXTCLKFREQ:2],'big')/1000.0
-        self.extClockFreq.setText("{0:.3f}".format(extClockFreq*self.extClockMult.value()/self.extClockDiv.value()))
+        self.extClockFreq.setValue(extClockFreq*self.extClockMult.value()/self.extClockDiv.value())
 
     def __init__(self,parent):
         super(ControlTiming,self).__init__(parent)

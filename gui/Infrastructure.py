@@ -215,7 +215,39 @@ class Infrastructure(QtWidgets.QWidget):
         return ""
 
     def loadSettingsFromCamera(self):
-        
+
+        # load the HV values
+        for n in range(4):
+            err,hv = self.gui.camera.getHV(n)
+            if err=="":
+                self.hvSet[i].setValue(hv)
+            else:
+                self.gui.showError("Failed to read HV " + str(n) + " from camera: " + err)
+                
+        # shutter
+        err,sh = self.gui.camera.getPcRegister(self.gui.camera.codes_PC.PC_REG_SHSTATE)
+        if err=="":
+            self.shutterOpen.setChecked(sh)
+        else:
+            self.gui.showError("Failed to read shutter status from camera: " + err)
+
+        # shutter external control
+        err,ext = self.gui.camera.getPcRegister(self.gui.camera.codes_PC.PC_REG_SHMODE)
+        if err=="":
+            self.shutterMode.setChecked(ext)
+            if ext==0:
+                self.shutterOpen.setEnabled(True)
+            else:
+                self.shutterOpen.setEnabled(False)
+        else:
+            self.gui.showError("Failed to read shutter mode from camera: " + err)
+
+        # Calibration light
+        err,callight = self.gui.camera.getCallight()
+        if err=="":
+            self.calibrationLightIntensity.setValue(callight)
+        else:
+            self.gui.showError("Failed to read calibration light intensity from camera: " + err)
 
         self.gui.showError("Infrastructure.loadSettingsFromCamera is not implemented yet")
 
@@ -267,16 +299,16 @@ class Infrastructure(QtWidgets.QWidget):
         Parameters
         ^^^^^^^^^^
         mode: int
-            0 - Manual, the 'Open' manual control checkbox is enabled
-            1 - External, 'Open' manual control checkbox is disabled
+            0 - Manual, the 'Open' manual control checkbox is enabled, one can control the shutter from the GUI
+            1 - External, 'Open' manual control checkbox is disabled, an external electronic signal can control the shutter
 
         """
 
         # External mode
-        if mode:
-            self.shutterOpen.setEnabled(False)
-        else:
+        if mode==0:
             self.shutterOpen.setEnabled(True)
+        else:
+            self.shutterOpen.setEnabled(False)
         
         if not self.gui.beforeBackendCall(name="setShutterMode(" + str(mode) + ")",where=__file__):
             return

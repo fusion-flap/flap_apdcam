@@ -133,23 +133,5 @@ class MainPage(QtWidgets.QWidget):
             self.cameraOff()
             return
 
-        for i in range(4):
-            self.gui.infrastructure.hvSet[i].setValue(self.gui.camera.status.HV_set[i])
-
-        for adcBoardNo in range(nAdcBoards):
-            err,offsets = self.gui.camera.getOffsets(adcBoardNo+1)
-            if (err != ""):
-                self.gui.showError("Error reading offsets for board {:i}: {:s}".format(adcBoardNo+1,err))
-            else:
-                for channel in range(32):
-                    self.gui.adcControl.adc[adcBoardNo].dac[channel].setValue(offsets[channel])
-
-        err,d = self.gui.camera.getCallight()
-        if (err != ""):
-            self.gui.showError("Error reading calibration light: {:s}".format(err))
-        else:
-            self.gui.showMessage("Updated calibration light intensity value in the GUI from the camera")
-            self.gui.infrastructure.calibrationLightIntensity.setValue(d)
-
         self.gui.startGuiUpdate()
         self.gui.initSettingsOnConnect()

@@ -29,6 +29,13 @@ def setFreqMultDiv(mult,div,combo):
     return True
 
 def setFreqCombo(mult,div,combo):
+    """
+    Set the text of a combo-box (which contains a pre-selected list of possible (but not all) frequencies,
+    to the value 20*mult/div (where 20 [MHz] is the (hard-coded) frequency of the internal clock.
+    If this value is contained in the combo box list, choose that item. Otherwise choose the first item
+    of the combo box (which is reserved for this purpose) and change its text value
+    """
+
     try:
         mult.value()
         div.value()
@@ -445,3 +452,13 @@ class ControlTiming(QtWidgets.QWidget):
 
         layout.addStretch(1)
 
+    def loadSettingsFromCamera(self):
+
+        # Set the base (adc) pll mult/div values, and frequency
+        mult = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_BASE_PLL_MULT]
+        div = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_BASE_PLL_DIV]
+        self.adcPllMult.setValue(mult)
+        self.adcPllDiv.setValue(div)
+        self.setFreqCombo(self.adcPllMult,self.adcPllDiv,self.addPllFreq)
+
+        

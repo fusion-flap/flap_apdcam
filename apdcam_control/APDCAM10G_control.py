@@ -375,6 +375,8 @@ class APDCAM_PCcodes_v1 :
     PC_REG_HV4SET = 0x5C
     PC_REG_HV1MON = 0x04
     PC_REG_HV2MON = 0x06
+    PC_REG_HV1MON = 0x08 # Added by D. Barna
+    PC_REG_HV2MON = 0x0A # Added by D. Barna
     PC_REG_HV1MAX = 0x102
     PC_REG_HV2MAX = 0x104
     PC_REG_HV3MAX = 0x106
@@ -1026,20 +1028,32 @@ class APDCAM10G_regCom:
 
         Parameters
         ^^^^^^^^^^
-        cardAddress: Card addresses (one or more)
-        registerAddress: Register start address (list length should be equal to cardAddress length)
-        numberOfBytes:   Read length (list length should be equal to cardAddress length)
-        arrayData : For each read operation sets whether the data should be returned as one 
+        cardAddress:
+                    Card address(es) (a single number, or a list of addresses for multiple reads)
+        registerAddress:
+                    Register start address(es) (a single number, of a list of addresses for multiple reads)
+                    Its length must be equal to that of cardAddress
+        numberOfBytes:
+                    Read length (list length should be equal to cardAddress length)
+        arrayData :
+                    For each read operation sets whether the data should be returned as one 
                     integer or byte array. False: return integer, True: return byte array.
                     Default is that all reads are integer.
-        byteOrder:  defines the byte order for converting to integer. 
+        byteOrder:
+                    defines the byte order for converting to integer. 
                     List with 'MSB' or LSB' elements. LSB means LSB first.  Default is LSB.         
-        waitTime:   Wait time between register read commands in ms. Will insert a wait command
+        waitTime:
+                    Wait time between register read commands in ms. Will insert a wait command
                     between the read commands and also after the last one. If 0 no wait commands will be generated.
 
         Returns
         ^^^^^^^
-        Error text and data in list of bytearrays       
+        error (string):
+                    Error message, or empty string in case of no error
+        data:
+                    List of results. Each element is either an integer (if the corresponding element of
+                    the arrayData argument was False) or a byte array (if the corresponding element of
+                    the arrayDAta argument was True)
         """ 
         
         #Ensuring that input values are not modified
@@ -2201,14 +2215,16 @@ class APDCAM10G_regCom:
 
     def getAdcRegister(self,adcBoardNo,register,numberOfBytes=1):
         """
-        Get the value of a register
+        Get the value of a register of a single or multiple ADC board(s)
 
         Parameters
         ^^^^^^^^^^
         adcBoardNo: int(1..4) or string
             The ADC board number (1..4) or 'all' to indicate that it should be made for all ADCs
         register:
-            Address of the register
+            (Starting) address of the register
+        numberOfBytes (default 1):
+            Number of bytes to read from the given starting address
 
         Returns
         ^^^^^^^
@@ -2252,7 +2268,7 @@ class APDCAM10G_regCom:
         err,adcAddresses = self.adcAddresses(adcBoardNo)
 
         return self.readPDI(self.codes_PC.PC_CARD,register,numberOfBytes=numberOfBytes,arrayData=False)
-    
+
 
     def setAdcRegister(self,adcBoardNo,register,value,numberOfBytes=1):
         """
@@ -2287,7 +2303,7 @@ class APDCAM10G_regCom:
 
         return ""
 
-    def setPCRegister(self,register,value,numberOfBytes=1):
+    def setPcRegister(self,register,value,numberOfBytes=1):
         """
         Set a given register of the Power and Control unit to a given value
 
@@ -2306,6 +2322,28 @@ class APDCAM10G_regCom:
 
         return self.writePDI(self.codes_PC.PC_CARD,register,value,numberOfBytes=numberOfBytes,arrayData=False)
 
+    def getPcRegister(self,register,numberOfBytes=1):
+        """
+        Get the value of a register of the PC board
+
+        Parameters
+        ^^^^^^^^^^
+        register:
+            (Starting) address of the register
+        numberOfBytes (default 1):
+            The number of bytes to read from the given starting address
+
+        Returns
+        ^^^^^^^
+        err
+            Error message or empty string
+        value
+            The value of the register 
+        """
+
+        (err,data) = self.readPDI(self.codes_PC.PC_CARD,register,numberOfBytes=numberOfBytes,arrayData=False)
+        return (err,data[0])
+        
     
     def setAdcRegisterBit(self,adcBoardNo,register,bit,state):
         """
@@ -2660,8 +2698,8 @@ class APDCAM10G_regCom:
         """ Get the current calibration  light setting.
         Returns error text and number
         """
-        err, d = self.readPDI(self.codes_PC.PC_CARD,self.codes_PC.PC_REG_CALLIGHT,numberOfBytes=2,arrayData=False)
-        return err,d[0]
+        err, d = self.getPcRegister(self.codes_PC.PC_REG_CALLIGHT,numberOfBytes=2,arrayData=False)
+        return err,d
     
     def getHV(self,n): 
         """
@@ -2706,6 +2744,12 @@ class APDCAM10G_regCom:
                             numberOfBytes=2,
                             arrayData=False
                             )
+
+    def getHV(self,n):
+        if n<=0 or n>=4:
+            return ("Bad HV generator number",0)
+        (err,hv) = self.getPcRegister(self.codes_PC.PC_REG_HV1SET+(n-1)*2,2)
+        return (err,hv*self.HV_conversion[n-1])
 
     def setHVMax(self,n,value):
         """

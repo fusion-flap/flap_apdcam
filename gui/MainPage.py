@@ -47,14 +47,18 @@ class MainPage(QtWidgets.QWidget):
         self.connectCameraButton.setToolTip("Connect to the camera at the given IP address, and update the GUI control values from the actual camera settings, whereever possible")
         l.addWidget(self.connectCameraButton)
 
-        # aaa = QtWidgets.QPushButton("Start GUI Update")
-        # aaa.clicked.connect(lambda: self.gui.startGuiUpdate())
-        # l.addWidget(aaa)
-
         self.disconnectCameraButton = QtWidgets.QPushButton("Disconnect camera")
         self.disconnectCameraButton.clicked.connect(self.cameraOff)
         self.disconnectCameraButton.setToolTip("Disconnect from the camera")
         l.addWidget(self.disconnectCameraButton)
+
+        self.startGuiUpdateButton = QtWidgets.QPushButton("Start GUI update")
+        self.startGuiUpdateButton.clicked.connect(self.gui.startGuiUpdate)
+        l.addWidget(self.startGuiUpdateButton)
+
+        self.stopGuiUpdateButton = QtWidgets.QPushButton("Stop GUI update")
+        self.stopGuiUpdateButton.clicked.connect(self.gui.stopGuiUpdate)
+        l.addWidget(self.stopGuiUpdateButton)
 
         self.cameraConnectedStatus = QtWidgets.QLabel("Camera status: camera disconnected");
         l.addWidget(self.cameraConnectedStatus)

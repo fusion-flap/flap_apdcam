@@ -85,9 +85,11 @@ class Infrastructure(QtWidgets.QWidget):
 
         hv.addWidget(self.hvEnabled)
         
-
+        h = QtWidgets.QHBoxLayout()
+        l1.addLayout(h)
+        
         shutter = QHGroupBox("Shutter control")
-        l1.addWidget(shutter)
+        h.addWidget(shutter)
 
         self.shutterOpen = QtWidgets.QCheckBox("Shutter open")
         self.shutterOpen.settingsName = "Shutter open"
@@ -104,7 +106,7 @@ class Infrastructure(QtWidgets.QWidget):
         shutter.addStretch(1)
 
         calib = QHGroupBox("Calibration light control")
-        l1.addWidget(calib)
+        h.addWidget(calib)
         calib.addWidget(QtWidgets.QLabel("Intensity:"))
         self.calibrationLightIntensity = QtWidgets.QSpinBox()
         self.calibrationLightIntensity.settingsName = "Calibration light intensity"
@@ -217,12 +219,18 @@ class Infrastructure(QtWidgets.QWidget):
     def loadSettingsFromCamera(self):
 
         # load the HV values
+        err, hvon = self.gui.camera.getPcRegister(self.gui.camera.codes_PC.PC_REG_HVENABLE)
+        if err != "":
+            return err
+
         for n in range(4):
-            err,hv = self.gui.camera.getHV(n)
+            err,hv = self.gui.camera.getHV(n+1)
             if err=="":
-                self.hvSet[i].setValue(hv)
+                self.hvSet[n].setValue(hv)
+                self.hvOn[n].setChecked(hvon>>n)
             else:
-                self.gui.showError("Failed to read HV " + str(n) + " from camera: " + err)
+                self.gui.showError("Failed to read HV " + str(n+1) + " from camera: " + err)
+        
                 
         # shutter
         err,sh = self.gui.camera.getPcRegister(self.gui.camera.codes_PC.PC_REG_SHSTATE)
@@ -249,15 +257,9 @@ class Infrastructure(QtWidgets.QWidget):
         else:
             self.gui.showError("Failed to read calibration light intensity from camera: " + err)
 
-        self.gui.showError("Infrastructure.loadSettingsFromCamera is not implemented yet")
-
     def updateGui(self):
         for i in range(4):
             self.hvActual[i].setText("{:.1f}".format(self.gui.camera.status.HV_act[i]))
-
-        # probably no need to call this, since readStatus() has been called from the topmost element, i.e. the gui's update function
-        # and this reads the temperatures as well. 
-        # self.readTemperatures()
 
         for i in range(16):
             T = self.gui.camera.status.temps[i]

@@ -10,6 +10,8 @@
 #include <string.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <iostream>
+using namespace std;
 
 #include "helper.h"
 #include "APDLib.h"
@@ -34,8 +36,7 @@ char *GetUint32(char *str, uint32_t *param);
 
 int main(int argc, char* argv[])
 {
-	printf("APDTest Version 2.2\nFusion Instruments Kft.\nwww.fusioninstruments.com\n\n");
-	fflush(stdout);
+        cerr<<"APDTest Version 2.2\nFusion Instruments Kft.\nwww.fusioninstruments.com\n\n"<<endl;
 	APDCAM_Init();
 
 	char batchFileName[512];
@@ -50,8 +51,8 @@ int main(int argc, char* argv[])
 
 	if ((batchFile = fopen(batchFileName, "rt")) == NULL)
 	{
-		fprintf(stderr, "%s file not found\n", batchFileName);
-		return 1;
+            cerr<<batchFileName<<" file not found\n"<<endl;
+            return 1;
 	}
 
 	while (!feof(batchFile))
@@ -150,8 +151,7 @@ int Open(char *param0, int ignore_errors)
 	if (devices.numADCBoards == 0 && ignore_errors == 0)
 		return -1;
 
-	printf("%d ADCs found\n", devices.numADCBoards);
-	fflush(stdout);
+        cerr<<devices.numADCBoards<<" ADCs found"<<endl;
 	if (devices.numADCBoards || ignore_errors)
 		g_handle = APDCAM_OpenDevice(&devices);
 	else
@@ -175,30 +175,29 @@ int Close()
 
 int SetTiming(int basicPLLmul, int basicPLLdiv_0, int basicPLLdiv_1, int clkSrc, int extDCMmul, int extDCMdiv)
 {
-//printf("SetTiming  %d %d %d %d %d %d %d\n",adcMult, adcDiv,strMult, strDiv, clkSrc,clkMult, clkDiv);
-	ADT_RESULT res = APDCAM_SetTiming(g_handle, basicPLLmul, basicPLLdiv_0, basicPLLdiv_1, clkSrc, extDCMmul, extDCMdiv);
-	if (res != ADT_OK) return -1;
-	return 0;
+    cerr<<"SetTiming "<<basicPLLmul<<" "<<basicPLLdiv_0<<" "<<basicPLLdiv_1<<" "<<clkSrc<<" "<<extDCMmul<<" "<<extDCMdiv<<endl;
+    ADT_RESULT res = APDCAM_SetTiming(g_handle, basicPLLmul, basicPLLdiv_0, basicPLLdiv_1, clkSrc, extDCMmul, extDCMdiv);
+    if (res != ADT_OK) return -1;
+    return 0;
 }
 
 int Sampling(int sampleDiv, int sampleSrc)
 {
-//printf("Sampling %d %d\n",sampleDiv,sampleSrc);
-	ADT_RESULT res = APDCAM_Sampling(g_handle, sampleDiv, sampleSrc);
-	if (res != ADT_OK) return -1;
-	return 0;
+    cerr<<"Sampling "<<sampleDiv<<" "<<sampleSrc<<endl;
+    ADT_RESULT res = APDCAM_Sampling(g_handle, sampleDiv, sampleSrc);
+    if (res != ADT_OK) return -1;
+    return 0;
 }
 
 int Allocate(LONGLONG sampleCount, int bits, uint32_t channelMask_1, uint32_t channelMask_2, uint32_t channelMask_3, uint32_t channelMask_4, int primaryBufferSize)
 {
-    //printf("Allocate %d %d %d %d %d %d\n",bits,channelMask_1,channelMask_2,channelMask_3,channelMask_4,primaryBufferSize); // Corrected by D. Barna
-    printf("Allocate %d %u %u %u %u %d\n",bits,channelMask_1,channelMask_2,channelMask_3,channelMask_4,primaryBufferSize);
-    fflush(stdout);
+    cerr<<"Allocate sampleCount="<<sampleCount<<" bits="<<bits<<" channelMask1="<<channelMask_1<<" channelMask2="<<channelMask_2<<" channelMask3="<<channelMask_3<<" channelMask4="<<channelMask_4
+        <<" primaryBufferSize="<<primaryBufferSize<<endl;
+
     ADT_RESULT res = APDCAM_Allocate(g_handle, sampleCount, bits, channelMask_1, channelMask_2, channelMask_3, channelMask_4, primaryBufferSize);
     if(res != ADT_OK)
     {
-        fprintf(stderr,"APDCAM_Allocate returned: %i\n",res);
-        fflush(stderr);
+        cerr<<"APDCAM_Allocate returned: "<<res<<endl;
     }
     if (res != ADT_OK) return -1;
     return 0;
@@ -652,8 +651,7 @@ int SetPLL(int mul, int div0, int div1)
 
 int ProcessLine(char *buffer)
 {
-    printf(">>>>>  %s\n",buffer);
-    fflush(stdout);
+    cerr<<">>>>>  "<<buffer<<endl;
 
     char token[64];
     buffer = GetToken(buffer, token);
@@ -851,6 +849,7 @@ int ProcessLine(char *buffer)
         buffer = GetUint32(buffer, &channelMask_3);
         buffer = GetUint32(buffer, &channelMask_4);
         GetInt(buffer, &primaryBufferSize);
+
 
         int res = Allocate(sampleCount, bits, channelMask_1, channelMask_2, channelMask_3, channelMask_4, primaryBufferSize);
         if (res == 0)

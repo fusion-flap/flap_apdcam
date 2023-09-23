@@ -244,7 +244,7 @@ class Adc(QtWidgets.QWidget):
                                                        ))
                 chk.setToolTip("Enable/disable a given channel")
                 chk.channelNumber = channel
-                self.channelOn[row*cols+col] = chk
+                self.channelOn[channel-1] = chk
                 l.addWidget(chk,row,col)
         l.setRowStretch(l.rowCount(),1)
         h = QtWidgets.QHBoxLayout()
@@ -288,7 +288,7 @@ class Adc(QtWidgets.QWidget):
         self.internalTrigger = QtWidgets.QCheckBox("Internal trigger")
         self.internalTrigger.settingsName = "Internal trigger"
         self.internalTrigger.setToolTip("Enable internal trigger output from this ADC board")
-        self.internalTrigger.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setInternalTriggerADC(adcBoardNo=self.number,enable=self.internalTrigger.isChecked())))
+        self.internalTrigger.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setInternalTriggerAdc(adcBoardNo=self.number,enable=self.internalTrigger.isChecked())))
         g.addWidget(self.internalTrigger,4,0)
 
         self.reverseBitOrder = QtWidgets.QCheckBox("Rev. bitord.")
@@ -318,7 +318,7 @@ class Adc(QtWidgets.QWidget):
         self.ringBuffer.setMaximum(1023)
         self.ringBuffer.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.ringBuffer.setToolTip("Ring buffer size. Ring buffer is disabled if zero. Takes effect when you press Enter")
-        self.ringBuffer.lineEdit().returnPressed.connect(self.gui.call(lambda: self.gui.camera.setRingBufferSize(self.number,self.ringBuffer.value()),name="setRingBufferSize",where=__file__))
+        self.ringBuffer.editingFinished.connect(self.gui.call(lambda: self.gui.camera.setRingBufferSize(self.number,self.ringBuffer.value()),name="setRingBufferSize",where=__file__))
         g.addWidget(self.ringBuffer,1,1)
 
         # g.addWidget(QtWidgets.QLabel("SATA CLK Mult (REDUNDANT?):"),2,0)
@@ -331,7 +331,8 @@ class Adc(QtWidgets.QWidget):
         g.addWidget(QtWidgets.QLabel("Test pattern:"),4,0)
         self.testPattern = QtWidgets.QLineEdit()
         self.testPattern.settingsName = "Test pattern"
-        self.testPattern.returnPressed.connect(self.gui.call(self.setTestPattern))
+        #self.testPattern.returnPressed.connect(self.gui.call(self.setTestPattern))
+        self.testPattern.editingFinished.connect(self.gui.call(self.setTestPattern))
         self.testPattern.setToolTip("Test pattern for this ADC. Either an integer (value for all four 8-channel blocks), or 4 integers (for the blocks separately)")
         g.addWidget(self.testPattern,4,1)
         g.setRowStretch(g.rowCount(),1)
@@ -347,8 +348,7 @@ class Adc(QtWidgets.QWidget):
             self.firCoeff[i].setMaximum(65535)
             self.firCoeff[i].setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
             self.firCoeff[i].setToolTip("Coefficient " + str(i+1) + " of the FIR filter. Must press Enter to take effect (but then all filter coeffs are sent to the camera)!")
-            self.firCoeff[i].lineEdit().returnPressed.connect(self.gui.call(self.setFilterCoeffs))
-            #self.firCoeff[i].valueChanged.connect(self.gui.call(self.setFilterCoeffs))
+            self.firCoeff[i].editingFinished.connect(self.gui.call(self.setFilterCoeffs))
             g.addWidget(self.firCoeff[i],i,1)
 
         g.addWidget(QtWidgets.QLabel("IIR:"),0,2)
@@ -358,7 +358,7 @@ class Adc(QtWidgets.QWidget):
         self.iirCoeff.setMaximum(4095)
         self.iirCoeff.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.iirCoeff.setToolTip("Coefficient of the IIR (infinite impulse response/recursive) filter. Must press Enter to take effect (but then all filter coeffs are sent to the camera)!")
-        self.iirCoeff.lineEdit().returnPressed.connect(self.gui.call(self.setFilterCoeffs))
+        self.iirCoeff.editingFinished.connect(self.gui.call(self.setFilterCoeffs))
         g.addWidget(self.iirCoeff,0,3)
 
         g.addWidget(QtWidgets.QLabel("Div.:"),1,2)
@@ -367,7 +367,7 @@ class Adc(QtWidgets.QWidget):
         self.internalFilterDiv.setMinimum(0)
         self.internalFilterDiv.setMaximum(14)
         self.internalFilterDiv.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
-        self.internalFilterDiv.lineEdit().returnPressed.connect(self.gui.call(self.setFilterCoeffs))
+        self.internalFilterDiv.editingFinished.connect(self.gui.call(self.setFilterCoeffs))
         self.internalFilterDiv.setToolTip("Defines the factor to divide the filter output, as 2 to the power specified here. Must press Enter to take effect (but then all filter coeffs are sent to the camera)!")
         g.addWidget(self.internalFilterDiv,1,3)
 
@@ -394,7 +394,7 @@ class Adc(QtWidgets.QWidget):
         self.filterEnable = QtWidgets.QCheckBox("Enable")
         self.filterEnable.settingsName = "Enable filter"
         self.filterEnable.setToolTip("Enable the filter (takes immediate effect)")
-        self.filterEnable.stateChanged.connect(self.gui.call(lambda state: self.gui.camera.setFilterOn(self.number,state>0),name="APDCAM10G_control.filterOnOff",where=__file__))
+        self.filterEnable.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setFilterOn(self.number,self.filterEnable.isChecked()),name="APDCAM10G_control.filterOnOff",where=__file__))
         g.addWidget(self.filterEnable,4,2,1,2)
         
         g.setRowStretch(g.rowCount(),1)
@@ -487,14 +487,14 @@ class Adc(QtWidgets.QWidget):
                 h1.addWidget(level)
                 self.internalTriggerLevel[row*cols+col] = level
 
-                func = self.gui.call(partial(lambda channel,en,polarity,level : self.gui.camera.setInternalTrigger(channel,\
-                                                                                                                   en.isChecked(),\
-                                                                                                                   level.value(), \
-                                                                                                                   self.gui.camera.codes_ADC.INT_TRIG_POSITIVE if polarity.isChecked() else self.gui.camera.codes_ADC.INT_TRIG_NEGATIVE),
+                func = self.gui.call(partial(lambda channel_local,en_local,polarity_local,level_local : self.gui.camera.setInternalTrigger(channel_local,\
+                                                                                                                                           en_local.isChecked(),\
+                                                                                                                                           level_local.value(), \
+                                                                                                                                           self.gui.camera.codes_ADC.INT_TRIG_POSITIVE if polarity_local.isChecked() else self.gui.camera.codes_ADC.INT_TRIG_NEGATIVE),
                                              (self.number-1)*32+channel,en,polarity,level))
                 en.stateChanged.connect(func) # enabled changes
                 polarity.stateChanged.connect(func)  # polarity changes
-                level.valueChanged.connect(func)
+                level.editingFinished.connect(func)
 
 
         g = QVGroupBox("")
@@ -559,7 +559,131 @@ class Adc(QtWidgets.QWidget):
             h.addWidget(self.dac[i])
         h.addStretch(1)
 
+    def loadSettingsFromCamera(self):
 
+        # channelOn checkboxes
+        for i in range(4):
+            err,reg = self.gui.camera.getAdcRegister(self.number,self.gui.camera.codes_ADC.ADC_REG_CHENABLE1+i)
+            if err == "":
+                for c in range(8):
+                    self.channelOn[i*8+c].blockSignals(True)
+                    self.channelOn[i*8+c].setChecked(reg & (1<<(7-c)))
+                    self.channelOn[i*8+c].blockSignals(False)
+            else:
+                self.gui.showError(err)    
+
+        err,bit = self.gui.camera.getSataOn(self.number)
+        if err=="":
+            self.sataOn.blockSignals(True)
+            self.sataOn.setChecked(bit)
+            self.sataOn.blockSignals(False)
+        else:
+            self.showError("Failed to read 'Sata on' bit: " + err)
+        err,bit = self.gui.camera.getSataSync(self.number)
+        if err=="":
+            self.sataSync.blockSignals(True)
+            self.sataSync.setChecked(bit)
+            self.sataSync.blockSignals(False)
+        else:
+            self.showError("Failed to read 'Sata sync' bit: " + err)
+        err,bit = self.gui.camera.getTestPatternMode(self.number)
+        if err=="":
+            self.test.blockSignals(True)
+            self.test.setChecked(bit)
+            self.test.blockSignals(False)
+        else:
+            self.showError("Failed to read 'Test pattern mode' bit: " + err)
+
+        err,bit = self.gui.camera.getInternalTriggerAdc(self.number)
+        if err=="":
+            self.internalTrigger.blockSignals(True)
+            self.internalTrigger.setChecked(bit)
+            self.internalTrigger.blockSignals(False)
+        else:
+            self.showError("Failed to read 'ADC internal trigger' bit: " + err)
+        err,bit = self.gui.camera.getReverseBitord(self.number)
+        if err=="":
+            self.reverseBitOrder.blockSignals(True)
+            self.reverseBitOrder.setChecked(bit)
+            self.reverseBitOrder.blockSignals(False)
+        else:
+            self.showError("Failed to read 'reverse bit order' bit: " + err)
+
+        err,bits = self.gui.camera.getAdcResolution(self.number)
+        if err=="":
+            i = self.bits.findText(str(bits))
+            if i<0:
+                self.showError("Invalid resolution obtained from camera: " + str(bits))
+            else:
+                self.bits.blockSignals(True)
+                self.bits.setCurrentIndex(i)
+                self.bits.blockSignals(False)
+        else:
+            self.showError("Failed to read resolution: " + err)
+        
+        err,ringbufsize = self.gui.camera.getRingBufferSize(self.number)
+        if err=="":
+            self.ringBuffer.blockSignals(True)
+            self.ringBuffer.setValue(ringbufsize)
+            self.ringBuffer.blockSignals(False)
+        else:
+            self.showError("Failed to read ring buffer size: " + err)
+
+        err,testpattern = self.gui.camera.getTestPattern(self.number)
+        if err=="":
+            s = ""
+            for i in range(len(testpattern)):
+                if i>0:
+                    s += " ";
+                s += str(testpattern[i])
+            self.testPattern.blockSignals(True)
+            self.testPattern.setText(s)
+            self.testPattern.blockSignals(False)
+        else:
+            self.showError("Failed to read test pattern: " + err)
+
+        err,filtercoeffs = self.gui.camera.getFilterCoeffs(self.number)
+        if err=="":
+            for i in range(5):
+                self.firCoeff[i].blockSignals(True)
+                self.firCoeff[i].setValue(filtercoeffs[i])
+                self.firCoeff[i].blockSignals(False)
+            self.iirCoeff.blockSignals(True)
+            self.iirCoeff.setValue(filtercoeffs[5])
+            self.iirCoeff.blockSignals(False)
+            self.internalFilterDiv.blockSignals(True)
+            self.internalFilterDiv.setValue(filtercoeffs[7])
+            self.internalFilterDiv.blockSignals(False)
+
+        err,adcAddresses = self.gui.camera.adcAddresses(self.number)
+        if err=="":
+            adcAddress = adcAddresses[0]
+            err,regs = self.gui.camera.readPDI(adcAddress,self.gui.camera.codes_ADC.ADC_REG_MAXVAL11,32*2,arrayData=True)
+            if err=="":
+                regs = regs[0]
+                for i in range(32):
+                    reg = int.from_bytes(regs[i*2:(i+1)*2],'big')
+                    self.internalTriggerEnabled[i].blockSignals(True)
+                    self.internalTriggerEnabled[i].setChecked(True if ((reg>>15)&1) else False)
+                    self.internalTriggerEnabled[i].blockSignals(False)
+                    self.internalTriggerPositive[i].blockSignals(True)
+                    self.internalTriggerPositive[i].setChecked(False if ((reg>>14)&1) else True)  # yes, the 14th bit means 'negative' trigger
+                    self.internalTriggerPositive[i].blockSignals(False)
+                    self.internalTriggerLevel[i].blockSignals(True)
+                    self.internalTriggerLevel[i].setValue(reg&(2**14-1)) # mask the lowest 13 bits
+                    self.internalTriggerLevel[i].blockSignals(False)
+            else:
+                self.showError("Failed to read trigger settings for ADC board " + str(self.number))    
+        else:
+            self.showError("Failed to read trigger settings for ADC board " + str(self.number))
+            
+        err,offsets = self.gui.camera.getOffsets(self.number)
+        if err=="":
+            for i in range(32):
+                self.dac[i].setValue(offsets[i]);
+        else:
+            self.showError("Failed to get read offsets for ADC board " + str(self.number))
+            
 class AdcControl(QtWidgets.QWidget):
     def updateGui(self):
         for adc in self.adc:
@@ -580,6 +704,9 @@ class AdcControl(QtWidgets.QWidget):
         h = QtWidgets.QHBoxLayout()
         self.layout.addLayout(h)
 
+        self.loadSettingsFromCameraButton = QtWidgets.QPushButton("Load settings from camera")
+        self.loadSettingsFromCameraButton.clicked.connect(self.loadSettingsFromCamera)
+        h.addWidget(self.loadSettingsFromCameraButton)
 
         self.factoryResetButton = QtWidgets.QPushButton("Factory reset")
         self.factoryResetButton.guiMode = GuiMode.factory
@@ -607,3 +734,6 @@ class AdcControl(QtWidgets.QWidget):
     #         while number < self.adcTabs.count():
     #             self.adcTabs.removeTab(self.adcTabs.count()-1)
                 
+    def loadSettingsFromCamera(self):
+        for adc in self.adc:
+            adc.loadSettingsFromCamera()

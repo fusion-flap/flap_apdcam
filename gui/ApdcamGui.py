@@ -11,7 +11,8 @@ import importlib
 from QtVersion import QtVersion
 QtWidgets = importlib.import_module(QtVersion+".QtWidgets")
 QtGui = importlib.import_module(QtVersion+".QtGui")
-Qt = importlib.import_module(QtVersion+".QtCore")
+QtCore = importlib.import_module(QtVersion+".QtCore")
+
 
 from ApdcamUtils import *
 from ApdcamSettings import *
@@ -61,32 +62,53 @@ class ApdcamGui(QtWidgets.QMainWindow):
     AMP_TEMP_SENSOR = 6
     POWER_TEMP_SENSOR = 16
 
+    cameraStateRefreshed = QtCore.pyqtSignal()
+
+    def pollCameraStatus(self):
+        while True:
+
+            # if the camera is disconnected, we break the infinite loop of the update thread
+            # and return, terminating the thread
+            if not self.status.connected:
+                print("Camera is  disconnected, stopping the GUI update loop")
+                self.showMessage("Camera is disconnected, stopping the GUI update loop")
+                return
+
+            if self.updateGuiThreadStop:
+                print("Stopping GUI update loop")
+                self.showMessage("Stopping GUI update loop")
+                return
+            
+            time.sleep(1)
+
+            self.camera.readStatus()
+            self.camera.readAdcRegisters()
+
+            self.cameraStateRefreshed.emit()
+
+        
+
     def updateGui(self):
         """
         This function is called periodically to update the GUI display from the camera state.
         """
 
-        while not self.updateGuiThreadStop:
-            time.sleep(1)
-            if not self.status.connected:
-                continue
-
-            self.camera.readStatus()
-
-            self.infrastructure.updateGui()
-            self.adcControl.updateGui()
-            self.controlTiming.updateGui()
-            self.cameraTimer.updateGui()
-
-        self.updateGuiThread = None
+        self.infrastructure.updateGui()
+#            self.adcControl.updateGui()
+#            self.controlTiming.updateGui()
+#            self.cameraTimer.updateGui()
 
     
+    def onTabChange(self):
+        print("Tab changed")
 
     def __init__(self, parent=None):
         super().__init__(parent)
 
+        self.cameraStateRefreshed.connect(self.updateGui)
 
         self.camera = APDCAM10G_regCom()
+        self.camera.setErrorHandler(lambda msg: self.showError(msg))
 
         # Status info is collected into a sub-class 'status'
         class Status:
@@ -202,6 +224,8 @@ class ApdcamGui(QtWidgets.QMainWindow):
         fs.setEnabled = types.MethodType(setTabEnabled,fs)
         self.expertTabs.addTab(fs,"Factory test")
 
+        self.expertTabs.currentChanged.connect(self.onTabChange)
+
 #        self.expertTabs.addTab(Plot(self),"Plot")
 
         # ------------------ Simple tabs ----------------------------------
@@ -219,22 +243,36 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.show()
         self.setGuiMode(GuiMode.expert)
 
-        self.updateGuiThreadStop = False
+        self.updateGuiThreadStop = True
         self.updateGuiThread = None 
         exitAction.triggered.connect(self.exit)
         #self.startGuiUpdate()
+
+        self.adcControl.addAdc(1,1)
+
 
     def exit(self,rc):
         self.stopGuiUpdate()
         sys.exit(rc)
         
     def startGuiUpdate(self):
-        self.updateGuiThreadStop = False
-        self.updateGuiThread = threading.Thread(target=self.updateGui)
-        self.updateGuiThread.start()
+        if not self.status.connected:
+            self.showMessage("Camera is not connected")
+            return
+        if self.updateGuiThread == None:
+            self.showMessage("Starting GUI update")
+            self.updateGuiThreadStop = False
+            self.updateGuiThread = threading.Thread(target=self.pollCameraStatus)
+            self.updateGuiThread.start()
+        else:
+            self.showMessage("GUI update is already running")
 
     def stopGuiUpdate(self):
+        self.showMessage("Signaling the GUI update to stop")
         self.updateGuiThreadStop = True
+        while hasattr(self.updateGuiThread,"is_alive") and self.updateGuiThread.is_alive():
+            print("Still alive")
+            time.sleep(0.1)
         self.updateGuiThread = None
 
     def beforeBackendCall(self,*,name="",where=""):
@@ -345,7 +383,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
         """
         dir = self.settingsDirName() + "/UNKNOWN-DEVICE"
         if self.status.connected:
-            dir = self.settingsDirName() + "/" + self.camera.status.CC_serial;
+            dir = self.settingsDirName() + "/" + str(self.camera.status.CC_serial);
         if not os.path.exists(dir):
             try:
                 os.makedirs(dir)
@@ -472,13 +510,8 @@ class ApdcamGui(QtWidgets.QMainWindow):
                 self.loadSettings(fileName,False)
                 return
 
-        reply = QtWidgets.QMessageBox.question(self, 'Yes', 'Reading the values back from the camera is not implemented yet. Do you accept this situation?',
-                                               QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
-        if reply == QtWidgets.QMessageBox.Yes:
-            self.showError("NO! You should not accept that something does not work! We need your insistence to make our world better!")
-        else:
-            self.showMessage("Good answer. We are working hard to implement this!")
-                
+        self.loadSettingsFromCamera()
+        
     def loadSettingsFromCamera(self):
         if not self.status.connected:
             self.showError("Camera is not connected, can not read settings")

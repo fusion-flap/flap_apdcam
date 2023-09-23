@@ -432,11 +432,12 @@ class ControlTiming(QtWidgets.QWidget):
         self.triggerDelay.setToolTip("Data stream output will start with this delay after the trigger")
         h.addWidget(self.triggerDelay)
 
-        triggerFunc = self.gui.call(lambda: self.gui.camera.setTrigger(self.trigPlus.isChecked(),self.trigMinus.isChecked(),self.internalTrig.isChecked(),self.triggerDelay.value()))
+        triggerFunc = self.gui.call(lambda: self.gui.camera.setTrigger(self.trigPlus.isChecked(),self.trigMinus.isChecked(),self.internalTrig.isChecked(),self.triggerDelay.value(),self.disableWhenStreamOff.isChecked()))
 
         self.trigPlus.stateChanged.connect(triggerFunc)
         self.trigMinus.stateChanged.connect(triggerFunc)
         self.internalTrig.stateChanged.connect(triggerFunc)
+        self.disableWhenStreamOff.stateChanged.connect(triggerFunc)
         self.triggerDelay.lineEdit().returnPressed.connect(triggerFunc)
 
         # h = QtWidgets.QHBoxLayout()
@@ -456,9 +457,36 @@ class ControlTiming(QtWidgets.QWidget):
 
         # Set the base (adc) pll mult/div values, and frequency
         mult = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_BASE_PLL_MULT]
-        div = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_BASE_PLL_DIV]
+        div = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_BASE_PLL_DIV_ADC]
         self.adcPllMult.setValue(mult)
         self.adcPllDiv.setValue(div)
-        self.setFreqCombo(self.adcPllMult,self.adcPllDiv,self.addPllFreq)
+        setFreqCombo(self.adcPllMult,self.adcPllDiv,self.adcPllFreq)
 
+        # Set the external clock PLL mult/div values
+        mult = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_EXT_DCM_MULT]
+        div = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_EXT_DCM_DIV]
+        self.extClockMult.setValue(mult)
+        self.extClockDiv.setValue(div)
         
+        # sample dividier value
+        div = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_SAMPLEDIV]
+        self.sampleDiv.setValue(div)
+
+        # Clock source
+        clock_control = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_CLOCK_CONTROL]
+        sourceExternal = clock_control & (1<<2)
+        autoExternal = clock_control & (1<<3)
+        externalSample = clock_control & (1<<4)
+        self.adcClockExt.setChecked(sourceExternal)
+        self.autoExtClock.setChecked(autoExternal)
+        self.extSample.setChecked(externalSample)
+
+        # Trigger settings
+        reg = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_TRIGSTATE]
+        self.trigPlus.setChecked(reg & (1<<0))
+        self.trigMinus.setChecked(reg & (1<<1))
+        self.internalTrig.setChecked(reg & (1<<2))
+        self.disableWhenStreamOff.setChecked(reg & (1<<6))
+        td = int.from_bytes(self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_TRIGDELAY:self.gui.camera.codes_CC.CC_REGISTER_TRIGDELAY+4],'big',signed=False)
+        self.triggerDelay.setValue(td)
+

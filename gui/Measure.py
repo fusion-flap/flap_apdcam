@@ -41,7 +41,8 @@ class Measure(QtWidgets.QWidget):
         self.dataDirectory.settingsName = "Data directory"
         self.dataDirectory.setToolTip("Directory for storing the recorded data from the camera")
         #self.dataDirectory.setText("/user-data/barna/tmp/apdcam-data")
-        self.dataDirectory.setText("/home/apdcam/tmp")
+#        self.dataDirectory.setText("/home/apdcam/tmp")
+        self.dataDirectory.setText("/home/barna/tmp/apdcam")
         h.addWidget(self.dataDirectory)
         self.dataDirectoryDialogButton = QtWidgets.QPushButton("PICK")
         h.addWidget(self.dataDirectoryDialogButton)
@@ -61,11 +62,11 @@ class Measure(QtWidgets.QWidget):
         self.messages.append(msg)
 
     def measure(self):
-        print("Measure.measure called")
         if not self.gui.status.connected:
             self.gui.showError("Camera is not connected")
             return
-        self.gui.updateGuiThreadStop = True
+        self.gui.stopGuiUpdate()
         time.sleep(1)
-        self.gui.saveSettings("auto")
+        self.gui.saveSettings(ask=False)
         self.gui.camera.measure(datapath=self.dataDirectory.text())
+        print("Returned from APDCAM10G_control.measure(..)")

@@ -16,7 +16,12 @@ class CameraTimer(QtWidgets.QWidget):
     def updateGui(self):
         pass
 
+    def loadSettingsFromCamera(self):
+        self.gui.showMessage("Loading the settings from the camera is not yet implemented for Camera & Timer tab")
+
+
     def __init__(self,parent):
+        self.gui = parent
         super(CameraTimer,self).__init__(parent)
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
@@ -26,12 +31,12 @@ class CameraTimer(QtWidgets.QWidget):
 
         g = QVGroupBox()
         horiz.addWidget(g)
-        h = QtWidgets.QHBoxLayout()
-        self.readCameraTimerSettingsButton = QtWidgets.QPushButton("Read camera timer settings")
-        h.addWidget(self.readCameraTimerSettingsButton)
-        self.saveCameraTimerSettingsButton = QtWidgets.QPushButton("Save camera timer settings")
-        h.addWidget(self.saveCameraTimerSettingsButton)
-        g.addLayout(h)
+        # h = QtWidgets.QHBoxLayout()
+        # self.readCameraTimerSettingsButton = QtWidgets.QPushButton("Read camera timer settings")
+        # h.addWidget(self.readCameraTimerSettingsButton)
+        # self.saveCameraTimerSettingsButton = QtWidgets.QPushButton("Save camera timer settings")
+        # h.addWidget(self.saveCameraTimerSettingsButton)
+        # g.addLayout(h)
 
         r = QtWidgets.QGridLayout()
         g.addLayout(r)

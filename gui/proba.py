@@ -1,5 +1,7 @@
-import glob
 
-files = glob.glob("/home/barna/tmp/a-[0-9].txt")
-for f in files:
-    print(f)
+map = {}
+map[3] = "3"
+map[5] = "5"
+
+print(map)
+

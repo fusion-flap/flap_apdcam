@@ -66,6 +66,7 @@ class Measure(QtWidgets.QWidget):
             self.gui.showError("Camera is not connected")
             return
         self.gui.stopGuiUpdate()
+        self.gui.showWarning("After the measurement is completed, please re-start the GUI update manually by clicking on the corresponding button in the 'Main' tab")
         time.sleep(1)
         self.gui.saveSettings(ask=False)
         self.gui.camera.measure(datapath=self.dataDirectory.text())

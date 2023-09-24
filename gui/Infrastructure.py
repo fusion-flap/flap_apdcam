@@ -265,8 +265,11 @@ class Infrastructure(QtWidgets.QWidget):
             T = self.gui.camera.status.temps[i]
             self.temps[i].setText("{:3.1f}".format(T) if T<100 else "---")
 
-#    def readTemperatures(self):
-#        self.gui.showError("Infrastructure.readTemperatures is not yet implemented")
+        # r = self.gui.camera.status.PC_registers
+        # c = self.gui.camera.codes_PC
+        # hv1max = int.from_bytes(r[c.PC_REG_HV1MAX:c.PC_REG_HV1MAX+2],'little')
+        # print("hv1 max: " + str(hv1max*0.12))
+
 
     def setHvMax(self,n):
         """

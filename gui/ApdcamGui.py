@@ -82,21 +82,18 @@ class ApdcamGui(QtWidgets.QMainWindow):
             time.sleep(1)
 
             self.camera.readStatus()
-            self.camera.readAdcRegisters()
 
             self.cameraStateRefreshed.emit()
-
         
 
     def updateGui(self):
         """
-        This function is called periodically to update the GUI display from the camera state.
+        This function updates the GUI widgets from the camera status self.camera.status
         """
-
         self.infrastructure.updateGui()
-#            self.adcControl.updateGui()
-#            self.controlTiming.updateGui()
-#            self.cameraTimer.updateGui()
+        self.adcControl.updateGui()
+        self.controlTiming.updateGui()
+        self.cameraTimer.updateGui()
 
     
     def onTabChange(self):
@@ -204,7 +201,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
         #self.adcControl.addAdc(1,10)
 
         self.controlTiming = ControlTiming(self)
-        self.expertTabs.addTab(self.controlTiming,"Control & Timing")
+        self.expertTabs.addTab(self.controlTiming,"Control && Timing")
         self.controlTiming.settingsSection = "Control & Timing"
 
         self.cameraTimer = CameraTimer(self)
@@ -268,6 +265,11 @@ class ApdcamGui(QtWidgets.QMainWindow):
             self.showMessage("GUI update is already running")
 
     def stopGuiUpdate(self):
+        """
+        Sets the 'stop' flag for the thread making the periodic update of the widgets from the values
+        obtained from the camera, and waits for the thread to terminate
+        """
+        
         self.showMessage("Signaling the GUI update to stop")
         self.updateGuiThreadStop = True
         while hasattr(self.updateGuiThread,"is_alive") and self.updateGuiThread.is_alive():

@@ -377,8 +377,8 @@ class APDCAM_PCcodes_v1 :
     PC_REG_HV4SET = 0x5C
     PC_REG_HV1MON = 0x04
     PC_REG_HV2MON = 0x06
-    PC_REG_HV1MON = 0x08 # Added by D. Barna
-    PC_REG_HV2MON = 0x0A # Added by D. Barna
+    PC_REG_HV3MON = 0x08 # Added by D. Barna
+    PC_REG_HV4MON = 0x0A # Added by D. Barna
     PC_REG_HV1MAX = 0x102
     PC_REG_HV2MAX = 0x104
     PC_REG_HV3MAX = 0x106
@@ -525,8 +525,10 @@ class APDCAM10G_status :
         self.ADC_serial = []
         self.ADC_FPGA_version = []
         self.ADC_MC_version = []
+        self.ADC_registers = []
         self.PC_serial = None
         self.PC_FW_version = None
+        self.PC_registers = []
         self.HV_set = [0,0,0,0]
         self.HV_act = [0,0,0,0]
         self.temps = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]      
@@ -597,10 +599,11 @@ class APDCAM10G_regCom:
             self.close()
             return "Error connecting to camera: "+err
         #err = APDCAM10G_regCom.readStatus(self,dataOnly=True)
-        err = self.readStatus() # Changed by D. Barna
+        err = self.readStatus(dataOnly=True) # Changed by D. Barna
         if (err != ""):
             self.close()
             return "Error connecting to camera: "+err
+
         #Extracting camera information
         d = self.status.CC_settings 
         self.status.CC_serial = int.from_bytes(d[APDCAM10G_codes_v1.CC_REGISTER_MAN_SERIAL:APDCAM10G_codes_v1.CC_REGISTER_MAN_SERIAL+4],byteorder='little',signed=False)
@@ -887,10 +890,23 @@ class APDCAM10G_regCom:
             self.status.ADC_registers[i] = regs[0]
         return ""
 
-    def readStatus(self,HV_repeat=1):
+    def readPcRegisters(self):
         """
-        Reads the status of APDCAM (Settings and Variables tables and some Control
-        card and ADC data and stores in the status variable which is an APDCAM10G_status class.
+        Read the entire register table of all PC board into self.status.PC_registers
+        Returns an error message or the empty string if no error occurred. 
+        """
+        err,regs = self.readPDI(self.codes_PC.PC_CARD, 0, 264, arrayData=True)
+        if err != "":
+            return err
+        self.status.PC_registers = regs[0]
+        return ""
+
+    
+    def readStatus(self,dataOnly=False,HV_repeat=1):
+        """
+        Reads the status of APDCAM (Settings and Variables tables of the 10G communication card,
+        some Control card (PC) data, and the register table of teh ADC cards.
+        These data are stored in the 'status' property, which is an APDCAM10G_status class.
 
         Parameters
         ^^^^^^^^^^
@@ -901,15 +917,25 @@ class APDCAM10G_regCom:
         ^^^^^^^
         Error message or empty string
         """
+
+        self.lock.acquire()
+
         # Read DIT and Settings from the 10G card
         err = self.readCCdata(dataType=0)
         if (err != ""):
+            self.lock.release()
             return err
         
          # Read variables data from the 10G card
         err = self.readCCdata(dataType=1)
         if (err != ""):
+            self.lock.release()
             return err
+
+        if dataOnly:
+            self.lock.release()
+            return ""
+
 
         # Make some post-processing of the CC card's variables, calculate derived values directly into self.status
         # such as temperatures, frequencies, pll lock status, etc. 
@@ -928,11 +954,13 @@ class APDCAM10G_regCom:
                 
         err, data = APDCAM10G_regCom.readPDI(self,cards,regs,[8,8,32,2],arrayData=[True,True,True,False])
         if err != "" :
+            self.lock.release()
             return err
 
         d = data[0]
         for i in range(4):
             self.status.HV_set[i] = (d[0+i*2]+d[1+i*2]*256)*self.HV_conversion[i]  # here there was a multiplication by 255. Corrected to 256 by D. Barna
+            #print("HV set: " + str(self.status.HV_set[i]))
 
         d = data[2]
         for i in range(16):
@@ -942,10 +970,12 @@ class APDCAM10G_regCom:
         d = data[1]
         for i in range(4):
             self.status.HV_act[i]  = (d[0+i*2]+d[1+i*2]*256)*self.HV_conversion[i]   # here there was a multiplication by 255. Corrected to 256 by D. Barna
+            #print("HV act: " + str(self.status.HV_act[i]))
         if (HV_repeat > 1):
             for i in range(HV_repeat-1):  
                 err, data = APDCAM10G_regCom.readPDI(self,self.codes_PC.PC_CARD,self.codes_PC.PC_REG_HV1MON,8,arrayData=True)
                 if err != "" :
+                    self.lock.release()
                     return err
                 d = data[0]
                 for j in range(4):
@@ -956,6 +986,10 @@ class APDCAM10G_regCom:
         # Now copy the entire register array of all ADC boards into self.status.ADC_registers
         self.readAdcRegisters()
 
+        # Now copy the entire Power and Control unit register table into self.status.PC_registers
+        self.readPcRegisters()
+
+        self.lock.release()
         return ""
        
     def clearAnswerQueue(self):
@@ -2360,6 +2394,8 @@ class APDCAM10G_regCom:
         for adcAddress in adcAddresses:
             err = self.writePDI(adcAddress,register,value,numberOfBytes=numberOfBytes,arrayData=False)
             if err!="":
+                if len(adcAddresses) > 0:
+                    self.lock.release()
                 return err
 
         if len(adcAddresses) > 1:

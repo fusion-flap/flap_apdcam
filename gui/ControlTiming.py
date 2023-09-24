@@ -122,18 +122,20 @@ class ControlTiming(QtWidgets.QWidget):
         if self.ccCardMaxTemp.text()=="" or T>int(self.ccCardMaxTemp.text()):
             self.ccCardMaxTemp.setText("{:3d}".format(T))
 
-        self.ccCardVoltage33.setText("{0:.3f}".format(int.from_bytes(self.gui.camera.status.CC_variables[self.gui.camera.codes_CC.CC_REGISTER_33V:self.gui.camera.codes_CC.CC_REGISTER_33V+2],'little')/1000.0))
-        self.ccCardVoltage25.setText("{0:.3f}".format(int.from_bytes(self.gui.camera.status.CC_variables[self.gui.camera.codes_CC.CC_REGISTER_33V:self.gui.camera.codes_CC.CC_REGISTER_33V+2],'little')/1000.0))
-        self.ccCardVoltage18XC.setText("{0:.3f}".format(int.from_bytes(self.gui.camera.status.CC_variables[self.gui.camera.codes_CC.CC_REGISTER_18VXC:self.gui.camera.codes_CC.CC_REGISTER_18VXC+2],'little')/1000.0))
-        self.ccCardVoltage12ST.setText("{0:.3f}".format(int.from_bytes(self.gui.camera.status.CC_variables[self.gui.camera.codes_CC.CC_REGISTER_12VST:self.gui.camera.codes_CC.CC_REGISTER_12VST+2],'little')/1000.0))
+        v = self.gui.camera.status.CC_variables
+        c = self.gui.camera.codes_CC
+        self.ccCardVoltage33.setText("{0:.3f}".format(int.from_bytes(v[c.CC_REGISTER_33V:c.CC_REGISTER_33V+2],'little')/1000.0))
+        self.ccCardVoltage25.setText("{0:.3f}".format(int.from_bytes(v[c.CC_REGISTER_25V:c.CC_REGISTER_25V+2],'little')/1000.0))
+        self.ccCardVoltage18XC.setText("{0:.3f}".format(int.from_bytes(v[c.CC_REGISTER_18VXC:c.CC_REGISTER_18VXC+2],'little')/1000.0))
+        self.ccCardVoltage12ST.setText("{0:.3f}".format(int.from_bytes(v[c.CC_REGISTER_12VST:c.CC_REGISTER_12VST+2],'little')/1000.0))
         
-        self.basicPllLocked.setChecked((self.gui.camera.status.CC_variables[self.gui.camera.codes_CC.CC_REGISTER_PLLSTAT]>>0)&1)
-        self.sataPllLocked.setChecked((self.gui.camera.status.CC_variables[self.gui.camera.codes_CC.CC_REGISTER_PLLSTAT]>>1)&1)
-        self.extDcmLocked.setChecked((self.gui.camera.status.CC_variables[self.gui.camera.codes_CC.CC_REGISTER_PLLSTAT]>>2)&1)
-        self.extClockValid.setChecked((self.gui.camera.status.CC_variables[self.gui.camera.codes_CC.CC_REGISTER_PLLSTAT]>>3)&1)
+        self.basicPllLocked.setChecked((v[c.CC_REGISTER_PLLSTAT]>>0)&1)
+        self.sataPllLocked.setChecked((v[c.CC_REGISTER_PLLSTAT]>>1)&1)
+        self.extDcmLocked.setChecked((v[c.CC_REGISTER_PLLSTAT]>>2)&1)
+        self.extClockValid.setChecked((v[c.CC_REGISTER_PLLSTAT]>>3)&1)
 
         # external clock in MHz (register value is in kHz)
-        extClockFreq = int.from_bytes(self.gui.camera.status.CC_variables[self.gui.camera.codes_CC.CC_REGISTER_EXTCLKFREQ:self.gui.camera.codes_CC.CC_REGISTER_EXTCLKFREQ:2],'big')/1000.0
+        extClockFreq = int.from_bytes(v[c.CC_REGISTER_EXTCLKFREQ:c.CC_REGISTER_EXTCLKFREQ:2],'big')/1000.0
         self.extClockFreq.setValue(extClockFreq*self.extClockMult.value()/self.extClockDiv.value())
 
     def __init__(self,parent):

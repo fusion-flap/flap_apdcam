@@ -15,26 +15,38 @@ from GuiMode import *
 
 class Adc(QtWidgets.QWidget):
     def updateGui(self):
-        (error,dvdd33,dvdd25,avdd33,avdd18) = self.gui.camera.getAdcPowerVoltages(self.number)
-        self.dvdd33.setText("{:.3f}".format(dvdd33/1000.0))
-        self.dvdd25.setText("{:.3f}".format(dvdd25/1000.0))
-        self.avdd33.setText("{:.3f}".format(avdd33/1000.0))
-        self.avdd18.setText("{:.3f}".format(avdd18/1000.0))
+        a = self.gui.camera.codes_ADC
+        r = self.gui.camera.status.ADC_registers[self.number-1]
+        # (error,dvdd33,dvdd25,avdd33,avdd18) = self.gui.camera.getAdcPowerVoltages(self.number)
+        # self.dvdd33.setText("{:.3f}".format(dvdd33/1000.0))
+        # self.dvdd25.setText("{:.3f}".format(dvdd25/1000.0))
+        # self.avdd33.setText("{:.3f}".format(avdd33/1000.0))
+        # self.avdd18.setText("{:.3f}".format(avdd18/1000.0))
+        self.dvdd33.setText("{:.3f}".format(int.from_bytes(r[a.ADC_REG_DVDD33:a.ADC_REG_DVDD33+2],'little')/1000.0))
+        self.dvdd25.setText("{:.3f}".format(int.from_bytes(r[a.ADC_REG_DVDD25:a.ADC_REG_DVDD25+2],'little')/1000.0))
+        self.avdd33.setText("{:.3f}".format(int.from_bytes(r[a.ADC_REG_AVDD33:a.ADC_REG_AVDD33+2],'little')/1000.0))
+        self.avdd18.setText("{:.3f}".format(int.from_bytes(r[a.ADC_REG_AVDD18:a.ADC_REG_AVDD18+2],'little')/1000.0))
 
-        (error,pllLocked) = self.gui.camera.getAdcPllLocked(self.number)
-        self.pllLocked.setChecked(pllLocked)
+        # (error,T) = self.gui.camera.getAdcTemperature(self.number)
+        # self.temperature.setText("{:.1f}".format(T))
+        self.temperature.setText("{:.1f}".format(r[a.ADC_REG_TEMP]))
 
-        (error,T) = self.gui.camera.getAdcTemperature(self.number)
-        self.temperature.setText("{:.1f}".format(T))
+        # (error,pllLocked) = self.gui.camera.getAdcPllLocked(self.number)
+        # self.pllLocked.setChecked(pllLocked)
+        self.pllLocked.setChecked(r[a.ADC_REG_STATUS1]&1)
 
-        (error,overload) = self.gui.camera.getAdcOverload(self.number)
-        self.overload.setChecked(overload)
+        # (error,overload) = self.gui.camera.getAdcOverload(self.number)
+        # self.overload.setChecked(overload)
+        self.overload.setChecked(r[a.ADC_REG_OVDSTATUS]&1)
+#        print("we should clear the latched bit")
+#        self.gui.showWarning("We should clear the latched overload bit")
 
-        error,status2 = self.gui.camera.getAdcRegister(self.number,self.gui.camera.codes_ADC.ADC_REG_STATUS2)
+        #error,status2 = self.gui.camera.getAdcRegister(self.number,self.gui.camera.codes_ADC.ADC_REG_STATUS2)
+        status2 = r[a.ADC_REG_STATUS2]
         self.led1.setChecked((status2>>2)&1) 
         self.led2.setChecked((status2>>3)&1)
         self.internalTriggerDisplay.setChecked((status2>>0)&1)
-            #itt vagyok most meg kell irni
+
         
     def name(self):
         return "ADC " + str(self.number) + " (@" + str(self.address) + ")"
@@ -249,6 +261,7 @@ class Adc(QtWidgets.QWidget):
         l.setRowStretch(l.rowCount(),1)
         h = QtWidgets.QHBoxLayout()
         channelStatusGroup.addLayout(h)
+
         self.allChannelsOnButton = QtWidgets.QPushButton("All channels on")
         self.allChannelsOnButton.setToolTip("Enable all channels of this ADC board")
         self.allChannelsOnButton.clicked.connect(self.allChannelsOn)
@@ -562,7 +575,7 @@ class Adc(QtWidgets.QWidget):
     def loadSettingsFromCamera(self):
 
         # channelOn checkboxes
-        for i in range(4):
+        for i in range(4): # loop over the 4 ADCs on the board
             err,reg = self.gui.camera.getAdcRegister(self.number,self.gui.camera.codes_ADC.ADC_REG_CHENABLE1+i)
             if err == "":
                 for c in range(8):

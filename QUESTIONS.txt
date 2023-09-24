@@ -1,3 +1,5 @@
+ADC Internal Trigger indicator - where can this be read from?
+
 in measure(), channelMasks byte/bit order should be checked!
 
 Now ADC tab has "SATA CLK Mult" and "SATA CLK Div", and ControlTiming tab has "Serial PLL Mult" and "Serial PLL Div". They seem to be redundant, should they be merged?

@@ -70,4 +70,3 @@ class Measure(QtWidgets.QWidget):
         time.sleep(1)
         self.gui.saveSettings(ask=False)
         self.gui.camera.measure(datapath=self.dataDirectory.text())
-        print("Returned from APDCAM10G_control.measure(..)")

@@ -280,6 +280,8 @@ class Adc(QtWidgets.QWidget):
         self.sataOn.guiMode = GuiMode.factory
         g.addWidget(self.sataOn,0,0)
 
+        # this is removed here, one can not set it on a per-ADC basis (it would break the system). The tab "Control & Timing"
+        # has a global switch, which sets this flag in the CC board and all ADC boards as well.
         # self.dualSata = QtWidgets.QCheckBox("Dual SATA")
         # self.dualSata.setToolTip("Switch dual SATA mode on (must be done for ALL ADCs!)")
         # self.dualSata.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setAdcDualSata(self.number,self.dualSata.isChecked())))

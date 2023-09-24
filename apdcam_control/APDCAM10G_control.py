@@ -580,8 +580,9 @@ class APDCAM10G_regCom:
         self.errorHandler = func
         
     def connect(self,ip="10.123.13.102"):
-        """ Connect to the camera and start the answer reading socket
-        Returns an error message or ""
+        """
+        Connect to the camera and start the answer reading socket
+        Returns an error message or the empty string
         """
         if (type(ip) is str):
             _ip = bytearray(ip,encoding='ASCII')
@@ -1653,17 +1654,37 @@ class APDCAM10G_regCom:
         l = [1]*n_adc
 
         self.lock.acquire()
-        while(1):
+
+        # What is this while loop serving for??? There is no 'continue' statement, and at the end of the loop, there is a 'break' statement, so it
+        # only runs once
+        # Ok, it's a kind of 'goto' construct
+        while(1): 
             err,data = self.readPDI(copy.deepcopy(self.status.ADC_address),copy.deepcopy(reg),l,arrayData=[False]*n_adc)
             if (err != ""):
                 #print(err)
                 break
             # print("Control regs (syncADC in): {:b},{:b}".format(data[0],data[1]))
-    
+
+            # We read another time? Why?
             err,data = self.readPDI(copy.deepcopy(self.status.ADC_address),copy.deepcopy(reg),l,arrayData=[False]*n_adc)
             if (err != ""):
                 #print(err)
                 break
+
+            # This block (up to # ---- finish) was added by D. Barna
+            for i in range(n_adc):
+                data[i] &= 0xFB 
+            err = self.writePDI(copy.deepcopy(self.status.ADC_address),copy.deepcopy(reg),copy.deepcopy(data),\
+                                numberOfBytes=[1]*n_adc,arrayData=[False]*n_adc,noReadBack=False)
+            if (err != ""):
+                #print(err)
+                break
+
+            time.sleep(0.2)
+
+            # ---- finish
+
+
             for i in range(n_adc):
                 data[i] |= 0x04 
             err = self.writePDI(copy.deepcopy(self.status.ADC_address),copy.deepcopy(reg),copy.deepcopy(data),\
@@ -1671,11 +1692,14 @@ class APDCAM10G_regCom:
             if (err != ""):
                 #print(err)
                 break
+
             time.sleep(0.2)
+
             for i in range(n_adc):
                 data[i] &= 0xFB
             err = self.writePDI(self.status.ADC_address,reg,data,numberOfBytes=[1]*n_adc,arrayData=[False]*n_adc,noReadBack=False)
-            
+
+            # Make a final read attempt to check error (but value is not checked)
             err,data = self.readPDI(copy.deepcopy(self.status.ADC_address),copy.deepcopy(reg),l,arrayData=[False]*n_adc)
             if (err != ""):
                 #print(err)

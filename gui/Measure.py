@@ -34,6 +34,16 @@ class Measure(QtWidgets.QWidget):
         self.sampleNumber.setToolTip("Set the number of samples to acquire")
         h.addWidget(self.sampleNumber)
 
+        h.addStretch(1)
+
+        h.addWidget(QtWidgets.QLabel("Timeout [s]: "))
+        self.timeout = QtWidgets.QSpinBox()
+        self.timeout.settingsName = "Timeout"
+        self.timeout.setMinimum(0)
+        self.timeout.setToolTip("Specify the timeout of the data acquisition. It will terminate after this time is passed")
+        h.addWidget(self.timeout)
+        h.addStretch(10)
+
         h = QtWidgets.QHBoxLayout()
         layout.addLayout(h)
         h.addWidget(QtWidgets.QLabel("Data directory: "))
@@ -69,4 +79,4 @@ class Measure(QtWidgets.QWidget):
         self.gui.showWarning("After the measurement is completed, please re-start the GUI update manually by clicking on the corresponding button in the 'Main' tab")
         time.sleep(1)
         self.gui.saveSettings(ask=False)
-        self.gui.camera.measure(datapath=self.dataDirectory.text())
+        self.gui.camera.measure(datapath=self.dataDirectory.text(),timeout=self.timeout.value()*1000)

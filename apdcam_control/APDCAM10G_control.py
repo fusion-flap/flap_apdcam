@@ -3245,7 +3245,8 @@ class APDCAM10G_regCom:
                 internalTrigger=None, \
                 internalTriggerADC=None,  \
                 triggerDelay=0, \
-                data_receiver='APDTest'):
+                data_receiver='APDTest',
+                timeout=10000000):
         """
         Start measurement in APDCAM.
         
@@ -3293,6 +3294,8 @@ class APDCAM10G_regCom:
                 'APDTest': The scriptable APDTest_10G C++ program which is part of the module. This should be compiled
                            and will be called to collect data into files.
                 'Python': Python code inside this method. (Might still call some external C program.)
+        timeout: int (10000000)
+            Timeout in milliseconds for the external data acquisition program APDtest
 
         Returns
         ^^^^^^^
@@ -3428,7 +3431,7 @@ class APDCAM10G_regCom:
                 f.write(s+"\n")
                 f.write("Arm 0 "+str(round(numberOfSamples_plus))+" 0 1\n")
                 f.write("Start\n")
-                f.write("Wait 10000\n")
+                f.write("Wait " + str(timeout) + "\n")
                 f.write("Save\n")
                 # This clears the sample counter
                 f.write("CCCONTROL 276 6 0 0 0 0 0 0\n")

@@ -124,7 +124,6 @@ bool CLnxEvent::Wait(int timeout)
 
 	do
 	{
-            cerr<<"poll(fd="<<pfd.fd<<")"<<endl;
             int p = poll(&pfd, 1, timeout);
             if (p == 0)
                 return false;
@@ -249,8 +248,6 @@ CWaitForEvents::WAIT_RESULT CLnxWaitForEvents::WaitAny(int size, struct timeval 
 
 	do
 	{
-            cerr<<"poll multiple: "<<endl;
-            for(int i=0; i<size; ++i) cerr<<"  fd = "<<m_pfds[i].fd<<endl;
 		i = poll(m_pfds, size, *timeout);
 		if (i == 0)
 		{

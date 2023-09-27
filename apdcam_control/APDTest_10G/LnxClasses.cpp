@@ -6,6 +6,8 @@
 #include <sys/resource.h>
 #include <sys/mman.h>
 #include <sys/time.h>
+#include <iostream>
+using namespace std;
 
 #include "LnxClasses.h"
 #include "CamClient.h"
@@ -122,27 +124,28 @@ bool CLnxEvent::Wait(int timeout)
 
 	do
 	{
-		int p = poll(&pfd, 1, timeout);
-		if (p == 0)
-			return false;
-		else if (p == 1)
-			return true;
-
-		m_LastWaiterErrorCode = errno;
-		if (m_LastWaiterErrorCode != EINTR)
-			break;
-
-		if (timeout > 0)
-		{
-			struct timeval now;
-			gettimeofday(&now, NULL);
-			timeout -= timeval_to_millisec(&now) - timeval_to_millisec(&begin);
-			if (timeout <= 0)
-				return false;
-		}
+            cerr<<"poll(fd="<<pfd.fd<<")"<<endl;
+            int p = poll(&pfd, 1, timeout);
+            if (p == 0)
+                return false;
+            else if (p == 1)
+                return true;
+            
+            m_LastWaiterErrorCode = errno;
+            if (m_LastWaiterErrorCode != EINTR)
+                break;
+            
+            if (timeout > 0)
+            {
+                struct timeval now;
+                gettimeofday(&now, NULL);
+                timeout -= timeval_to_millisec(&now) - timeval_to_millisec(&begin);
+                if (timeout <= 0)
+                    return false;
+            }
 	} while (true);
 
-fprintf(stderr, "CLnxEvent::Wait() : %s\n", strerror(m_LastWaiterErrorCode));
+        fprintf(stderr, "CLnxEvent::Wait() : %s\n", strerror(m_LastWaiterErrorCode));
 	return false;
 }
 
@@ -246,6 +249,8 @@ CWaitForEvents::WAIT_RESULT CLnxWaitForEvents::WaitAny(int size, struct timeval 
 
 	do
 	{
+            cerr<<"poll multiple: "<<endl;
+            for(int i=0; i<size; ++i) cerr<<"  fd = "<<m_pfds[i].fd<<endl;
 		i = poll(m_pfds, size, *timeout);
 		if (i == 0)
 		{

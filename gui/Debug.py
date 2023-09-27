@@ -27,6 +27,9 @@ class Debug(QtWidgets.QWidget):
         # if you change these labels, update the function getRegister!
         self.cardSelector.addItem("Choose card")
         self.cardSelector.addItem("ADC1")
+        self.cardSelector.addItem("ADC2")
+        self.cardSelector.addItem("ADC3")
+        self.cardSelector.addItem("ADC4")
         self.cardSelector.addItem("Power and control card (PC)")
         self.cardSelector.addItem("Communication Card (CC) settings")
         self.cardSelector.addItem("Communication Card (CC) variables")

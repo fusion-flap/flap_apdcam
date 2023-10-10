@@ -1671,7 +1671,7 @@ class APDCAM10G_regCom:
                 #print(err)
                 break
 
-            # This block (up to # ---- finish) was added by D. Barna
+            # This block (down to # ---- finish) was added by D. Barna
             for i in range(n_adc):
                 data[i] &= 0xFB 
             err = self.writePDI(copy.deepcopy(self.status.ADC_address),copy.deepcopy(reg),copy.deepcopy(data),\
@@ -3782,8 +3782,8 @@ class APDCAM10G_data:
             if (self.bytes_per_sample[i] * self.sample_number % (self.octet * 8) == 0):
                 self.packets_per_adc[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8) 
             else:
-                # This line should contain +1 at the end, I guess - D. Barna
-                self.packets_per_adc[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8) 
+                # This line should contain +1 at the end, I guess. Now I corrected - D. Barna
+                self.packets_per_adc[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8) +1
         self.APDCAM.setSampleNumber(sampleNumber=sample_number)
         
 # 		map_locked = MAP_LOCKED;

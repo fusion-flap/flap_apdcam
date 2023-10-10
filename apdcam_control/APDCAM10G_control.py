@@ -3726,7 +3726,7 @@ class APDCAM10G_data:
         ----------
         APDCAM : APDCAM10G_regCom
             The communication class for the camera. 
-            The need not be connected at the time of construction of the
+            It does not need to be connected at the time of construction of the
             APDCAM10G_data class.
 
         Returns
@@ -3769,17 +3769,21 @@ class APDCAM10G_data:
             for ic in range(4):
                 chip_chmask = (channel_masks[i] >> ic * 8) % 256
                 chip_bits_per_sample = bits *  chip_chmask.bit_length()
+                # Each chip's data is rounded up to full bytes
                 if ((chip_bits_per_sample % 8) == 0):
                     chip_bytes_per_sample = chip_bits_per_sample // 8
                 else:
                     chip_bytes_per_sample = chip_bits_per_sample // 8 + 1        
+                # accumulate the number of bytes of this chip to the total
                 self.bytes_per_sample[i] += chip_bytes_per_sample
+            # An ADC board's data is rounded up to integer multiples of 32 bytes
             if ((self.bytes_per_sample[i] * 8) % 32 != 0):
                self.bytes_per_sample[i] = ((self.bytes_per_sample[i] * 8) // 32 + 1) * 32 / 8
             if (self.bytes_per_sample[i] * self.sample_number % (self.octet * 8) == 0):
                 self.packets_per_adc[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8) 
             else:
-                self.packets_per_adc[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8)
+                # This line should contain +1 at the end, I guess - D. Barna
+                self.packets_per_adc[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8) 
         self.APDCAM.setSampleNumber(sampleNumber=sample_number)
         
 # 		map_locked = MAP_LOCKED;
@@ -3793,7 +3797,7 @@ class APDCAM10G_data:
         
     def getNetParameters(self):
         """
-        Determine paraemters of the network and host. The network name is assumed to be
+        Determine parameters of the network and host. The network name is assumed to be
         known in self.APDCAM.interface. See self.APDCAM.getInterface(). Puts the results into
         self.MTU, self.hostMac, self.hostIP. 
 
@@ -3899,6 +3903,10 @@ class APDCAM10G_data:
                         break
         if ((mac is None) or (IP is None) or (mtu is None)):
             return "Cannot determine all host network parameters, neither with ip, nor with ifconfig."
+        print("MAC: " + str(self.hostMAC))
+        print("MTU: " + str(self.MTU))
+        print("IP : " + str(self.hostIP))
+
         self.setOctet()
         return ""    
        
@@ -3951,7 +3959,7 @@ class APDCAM10G_data:
     def startReceive(self):
         """
         Creates the data receive sockets and start to receive data on them.
-        Sets up addresses and other paramters in the camera.
+        Sets up addresses and other parameters in the camera.
         Does not start the data streams in the camera.
 
         Parameters
@@ -3973,17 +3981,27 @@ class APDCAM10G_data:
         self.packet_numbers = [None] * 4
         self.packet_times = [None] * 4
         if (self.APDCAM.dualSATA):
+            # Check added by D. Barna
+            if len(self.APDCAM.status.ADC_address)>2:
+                return "Dual SATA is set but more than 2 ADC boards are present"
+
             for i in range(len(self.APDCAM.status.ADC_address)):
-                self.stream_list[i * 2] =  True
-                self.stream_adc[i * 2] = i
-                self.packet_numbers[i * 2] = np.zeros(self.packets_per_adc[self.stream_adc[i*2]],dtype=np.uint32)
-                self.packet_times[i * 2] = np.zeros(self.packets_per_adc[self.stream_adc[i*2]],dtype=float)
+                # The following 4 commands cause potentially out-of-index exception, if there are more than 2 ADC boards? D.Barna
+                # With dualSATA config, can we have only 2 ADC boards (User guide section 5.4 intro, page 20 top states that for
+                # 64 channel systems (i.e. only 2 ADC boards?) dualSATA config is used for higher speed. Should one test here
+                # that dualSATA requires only 2 ADC boards?
+                # But even if this is so, why are only every 2nd strems used?
+                self.stream_list[i * 2] =  True   
+                self.stream_adc[i * 2] = i        
+                self.packet_numbers[i * 2] = np.zeros(self.packets_per_adc[self.stream_adc[i*2]],dtype=np.uint32) 
+                self.packet_times[i * 2] = np.zeros(self.packets_per_adc[self.stream_adc[i*2]],dtype=float) 
         else:
             for i in range(len(self.APDCAM.status.ADC_address)):
                 self.stream_list[i] =  True  
                 self.stream_adc[i] = i
                 self.packet_numbers[i] = np.zeros(self.packets_per_adc[self.stream_adc[i*2]],dtype=np.uint32)
                 self.packet_times[i] = np.zeros(self.packets_per_adc[self.stream_adc[i*2]],dtype=float)
+
         for i in range(4) :
             if (self.stream_list[i] == True) :
                 try:
@@ -3994,6 +4012,7 @@ class APDCAM10G_data:
                     self.receiveSockets[i].bind(('', APDCAM10G_data.RECEIVE_PORTS[i]))
                 except socket.error as se :
                     return str(se.args[1])
+                
 #                self.receiveSockets[i].setblocking(False) # Non-blocking mode
                 self.receiveSockets[i].settimeout(1)
                 UDP_data = bytearray(15)
@@ -4078,11 +4097,12 @@ class APDCAM10G_data:
                 
         packet_size = APDCAM10G_data.CC_STREAMHEADER + self.octet * 8
         stream_running = [True] * 4
+        # Loop until we get the expected number of packages, or the streams fail
         while (stream_running[0] or stream_running[1] or stream_running[2] or stream_running[3]):
             for i_stream in range(4):
-                if (self.stream_list[i_stream] and stream_running[i_stream] \
-                       and (self.packet_counter[i_stream] < self.packets_per_adc[self.stream_adc[i_stream]]) \
-                    ):
+                # Here we check the 'packet_counter' against the expected number of packages. However, there may be missing packages.
+                # Shouldn't we check the package number from the CC Header?
+                if self.stream_list[i_stream] and stream_running[i_stream] and (self.packet_counter[i_stream] < self.packets_per_adc[self.stream_adc[i_stream]]):
                     try:
                         data = self.receiveSockets[i_stream].recv(packet_size)
                         if (len(data) == 0):
@@ -4090,6 +4110,10 @@ class APDCAM10G_data:
                         if (len(data) != packet_size):
                             print("Data size is not equal to packet size.")
                         self.packet_times[i_stream][self.packet_counter[i_stream]] = time.time()
+                        # self.packet_numbers is a pre-allocated array with the same number of elements as the *expected* number of packages,
+                        # initialized to full zeros. We write this array with the packet numbers from the beginning, overwriting the initial
+                        # zeros. No conflict? Theh 'Packet Counter' of the CC Header of the package (page 28 of the User's manual) is 0-based
+                        # or 1-based?
                         self.packet_numbers[i_stream][self.packet_counter[i_stream]] = int.from_bytes(data[8:14],'big')
                         self.packet_counter[i_stream] += 1
                     except socket.error as se :

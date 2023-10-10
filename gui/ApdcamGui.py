@@ -244,6 +244,9 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.show()
         self.setGuiMode(GuiMode.expert)
 
+        if self.early_messages:
+            self.messages.setText(self.early_messages)
+
         self.updateGuiThreadStop = True
         self.updateGuiThread = None 
         exitAction.triggered.connect(self.exit)
@@ -550,7 +553,15 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
     def showMessageWithTime(self,msg):
         time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.messages.append(time + " - " + msg)
+        msg = time + " - " + msg
+        if hasattr(self,"messages"):
+            self.messages.append(msg)
+        else:
+            if hasattr(self,"early_messages"):
+                self.early_messages += "\n" + msg
+            else:
+                self.early_messages = msg
+            
         if self.logfile != None:
             self.logfile.write(msg + "\n")
             self.logfile.flush()

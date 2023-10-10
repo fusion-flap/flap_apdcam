@@ -85,6 +85,15 @@ def populateFrequencyCombo(multFrom,multTo,divFrom,divTo,combo):
 
     
 class ControlTiming(QtWidgets.QWidget):
+    def versionSpecificSetup(self,version):
+        self.gui.showWarning("ControlTiming.versionSpecificSetup is not yet implemented")
+        #if version > ???:
+        #    self.sampleDiv.setMinimum(1)
+        #    self.adcOutFreqDiv.setEnabled(True)
+        #else:
+        #    self.sampleDiv.setMinimum(2)
+        #    self.adcOutFreqDiv.setEnabled(False)
+
     def setSerialPll(self):
         self.gui.camera.setSerialPll(self.serialPllMult.value(),self.serialPllDiv.value())
 
@@ -332,7 +341,7 @@ class ControlTiming(QtWidgets.QWidget):
         self.sampleDiv.settingsName = "Sampling frequency divisor"
         g.addWidget(self.sampleDiv,4,3)
         g.setRowStretch(g.rowCount(),1)
-        self.sampleDiv.setMinimum(1)
+        self.sampleDiv.setMinimum(2)
         self.sampleDiv.setValue(10)
         self.sampleDiv.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.sampleDiv.lineEdit().returnPressed.connect(self.setSampleDivider)
@@ -369,6 +378,14 @@ class ControlTiming(QtWidgets.QWidget):
         self.extSample.setToolTip("Use external signal for sampling, rather than ADC frequency divided by SAMPLEDIVIDER")
         g.addWidget(self.extSample)
 
+        hh = QtWidgets.QHBoxLayout()
+        g.addLayout(hh)
+        hh.addWidget(QtWidgets.QLabel("ADC out freq. divisor:"))
+        self.adcOutFreqDiv = QtWidgets.QSpinBox()
+        hh.addWidget(self.adcOutFreqDiv)
+        self.adcOutFreqDiv.settingsName = "ADC output frequency divisor"
+        self.adcOutFreqDiv.setToolTip("Divisor for the ADC output frequency going to the panel")
+        self.gui.showError("Control & Timing / ADC output frequency divisor is not yet connected to an action")
 
         g = QVGroupBox()
         l.addWidget(g)

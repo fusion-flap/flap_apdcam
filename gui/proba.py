@@ -1,3 +1,4 @@
-a = 0b1111
+a = 13
+print(a//5)
+print(a%5)
 
-print(a)

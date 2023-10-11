@@ -18,6 +18,7 @@ from ApdcamUtils import *
 from ApdcamSettings import *
 from MainPage import MainPage
 from Measure import Measure
+from Diagnostics import Diagnostics
 from Infrastructure import Infrastructure
 from AdcControl import AdcControl
 from ControlTiming import ControlTiming
@@ -213,9 +214,14 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.expertTabs.addTab(self.measure,"Measure")
         self.measure.settingsSection = "Measure"
 
+
         self.plot = Plot(self)
         self.expertTabs.addTab(self.plot,"Plot")
         self.plot.settingsSection = "Plot"
+
+        self.diagnostics = Diagnostics(self)
+        self.expertTabs.addTab(self.diagnostics,"Diagnostics")
+        self.diagnostics.settingsSection = "Diagnostics"
 
         self.debug = Debug(self)
         self.expertTabs.addTab(self.debug,"Debug")
@@ -239,6 +245,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
         layout.addWidget(QtWidgets.QLabel("Messages/<font color='orange'>Warnings</font>/<font color='red'>Errors</font>:"))
         self.messages = QtWidgets.QTextEdit(self)
         self.messages.setReadOnly(True)
+        self.messages.setMinimumHeight(200)
         layout.addWidget(self.messages,3,0)
 
         self.show()
@@ -652,4 +659,6 @@ class ApdcamGuiApp(QtWidgets.QApplication):
         
 if __name__ == '__main__':
     app = ApdcamGuiApp()
+    #sys.stderr.write = app.showError
+    #sys.stdout.write = app.showMessage
     app.run()

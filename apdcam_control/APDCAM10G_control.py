@@ -537,6 +537,24 @@ class APDCAM10G_status :
         self.extclock_freq = 0.0  # kHz
         self.CC_settings = None
         self.CC_variables = None
+
+class Terminal:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+    def showMessage(self,s):
+        print(s)
+    def showWarning(self,s):
+        print(self.WARNING + s + self.ENDCs)
+    def showError(self,s):
+        print(self.FAIL + s + self.ENDCs)
         
 class APDCAM10G_regCom:
     """
@@ -3245,8 +3263,9 @@ class APDCAM10G_regCom:
                 internalTrigger=None, \
                 internalTriggerADC=None,  \
                 triggerDelay=0, \
-                data_receiver='APDTest',
-                timeout=10000000):
+                dataReceiver='APDTest',
+                timeout=10000000,
+                logger=Terminal()):
         """
         Start measurement in APDCAM.
         
@@ -3289,13 +3308,15 @@ class APDCAM10G_regCom:
             False: Internal trigger in all ADCs is disabled
         triggerDelay: int or float  
             Trigger with this delay [microsec]
-        data_receiver: str
+        dataReceiver: str
             The data receiver method:
                 'APDTest': The scriptable APDTest_10G C++ program which is part of the module. This should be compiled
                            and will be called to collect data into files.
                 'Python': Python code inside this method. (Might still call some external C program.)
         timeout: int (10000000)
             Timeout in milliseconds for the external data acquisition program APDtest
+        logger: object
+            An object that must have  showMessage(string), showWarning(string) and showError(string) functions to show eventual messages
 
         Returns
         ^^^^^^^
@@ -3303,10 +3324,13 @@ class APDCAM10G_regCom:
             "" or error message
         str
             Warning. "" if no warning.
+        datareceiver
+            An APDCAM10G_data object (if the argument dataReceiver=="python") which contains the data
+        
 
         """
 
-        print("------------- Measure starts ------------------")
+        logger.showMessage("[MEASUREMENT] Starts")
 
         self.readStatus()
 
@@ -3323,7 +3347,9 @@ class APDCAM10G_regCom:
                 for i in range(4):
                     err,r = self.getAdcRegister(adc+1,self.codes_ADC.ADC_REG_CHENABLE1+i)
                     if err != "":
-                        return "Error reading the channel enabled status from the camera: " + err
+                        error = "Error reading the channel enabled status from the camera: " + err 
+                        logger.showError(error)
+                        return error,"",None
                     tmp[i] = r
                 chmask[adc] = int.from_bytes(tmp,'big')
         else:
@@ -3344,15 +3370,20 @@ class APDCAM10G_regCom:
         if (bits != None):
             err = self.setAdcResolution('all',bits)
             if err!='':
-                return err
+                logger.showError(err)
+                return err,"",None
             self.measurePara.bits = bits
         else:
             err,resolutions = self.getAdcResolution('all')
             for i in range(len(resolutions)-1):
                 if resolutions[0] != resolutions[i+1]:
-                    return "ADC blocks have different resolution setting.",""
+                    error = "ADC blocks have different resolution setting." 
+                    logger.showError(error)
+                    return error,"",None
             if resolutions[0] != 8 and resolutions[0] != 12 and resolutions[0] != 14:
-                return "Invalid bit resolution setting in ADCs." ,""
+                error = "Invalid bit resolution setting in ADCs." 
+                logger.showError(error)
+                return error,"",None 
             bits = resolutions[0]
             self.measurePara.bits = resolutions[0]
 
@@ -3384,24 +3415,28 @@ class APDCAM10G_regCom:
         self.measurePara.numberOfSamples = numberOfSamples
         
         if (err != ""):
-            return err,""
+            logger.showError(err)
+            return err,"",None
         
         if (internalTriggerADC is not None):
             self.setInternalTriggerADC(adcBoard='all', enable=internalTriggerADC)
     
         err = self.syncADC()
         if (err != ""):
-            return err,""
+            logger.showError(err)
+            return err,"",None
 
-        if (data_receiver.lower() == 'apdtest'):
+        if (dataReceiver.lower() == 'apdtest'):
         
             cmdfile_name = "apd_python_meas.cmd"
             cmdfile = datapath+'/'+cmdfile_name
-            print("Command file: " + cmdfile)
+            logger.showMessage("[MEASUREMENT] Command file: " + cmdfile)
             try:
                 f = open(cmdfile,"wt")
             except:
-                return "Error opening file "+cmdfile,""
+                error = "Error opening file "+cmdfile
+                logger.showError(error)
+                return error,"",None 
             
             ip = self.getIP()
             interface = self.interface.decode('ascii')
@@ -3437,7 +3472,9 @@ class APDCAM10G_regCom:
                 f.write("CCCONTROL 276 6 0 0 0 0 0 0\n")
                 f.close()
             except :
-                return "Error writing command file " + cmdfile,""
+                error = "Error writing command file " + cmdfile
+                logger.showError(error)
+                return error,"",None 
                 f.close()
             
             time.sleep(1)
@@ -3445,7 +3482,7 @@ class APDCAM10G_regCom:
             apdtest_prog = 'APDTest_10G'
             apdtest = os.path.join(thisdir,'../apdcam_control/APDTest_10G','APDTest_10G')
             cmd = "killall -KILL "+apdtest_prog+" 2> /dev/null ; cd "+datapath+" ; rm APDTest_10G.out Channel*.dat 2> /dev/null ; "+apdtest+" "+cmdfile_name+" >APDTest_10G.out 2>&1 &"
-            print("Executing: " + cmd)
+            logger.showMessage("[MEASUREMENT] Executing: " + cmd)
 
             d = subprocess.run([cmd],check=False,shell=True)
             sleeptime = 0.1
@@ -3463,7 +3500,8 @@ class APDCAM10G_regCom:
                 for il in range(len(all_txt)):
                    if (all_txt[il].lower().find("error") >= 0):
                       err = "Error starting measurement: "+all_txt[il]
-                      return err,""
+                      logger.showError(err)
+                      return err,"",None
                    if (all_txt[il].lower().find("start succes") >= 0):
                       started = True
                       break
@@ -3472,32 +3510,46 @@ class APDCAM10G_regCom:
                 time.sleep(sleeptime)
     
             if (not started):
-                return "APDCAM did not start",""
+                err = "APDCAM did not start"
+                logger.showError(err)
+                return err,"",None
         else:
             # Native Python measurement
-            data_receiver = APDCAM10G_data(self)
+            data_receiver = APDCAM10G_data(self,logger)
             ret = data_receiver.getNetParameters()
             if (ret != ""):
-                return ret,""
-            ret = data_receiver.allocate(channel_masks=channelMasks,sample_number=numberOfSamples,bits=bits)
+                logger.showError(ret)
+                return ret,"",data_receiver
+            ret = data_receiver.allocate(channel_masks=chmask,sample_number=numberOfSamples,bits=bits)
             if (ret != ""):
-                return ret,""
+                logger.showError(ret)
+                return ret,"",data_receiver
             ret = data_receiver.startReceive()
             if (ret != ""):
-                return ret,""
+                logger.showError(ret)
+                return ret,"",data_receiver
             ret = data_receiver.startStream()
             if (ret != ""):
-                return ret,""            
+                logger.showError(ret)
+                return ret,"",data_receiver
             err, warn = data_receiver.getData()
+            logger.showMessage("[MEASUREMENT] Stop streams")
             data_receiver.stopStream()
+            logger.showMessage("[MEASUREMENT] Stop receive")
             data_receiver.stopReceive()
-            return err,warn
+            if err != "":
+                logger.showError(err)
+            if warn != "":
+                logger.showWarning(warn)
+            logger.showMessage("[MEASUREMENT] Finished")
+            return err,warn,data_receiver
             
         if (waitForResult <=0):
-            return "",""
+            return "","",None
         
         err,warning = self.waitForMeasurement(waitForResult)
-        return err,warning
+        logger.showMessage("[MEASUREMENT] Finished")
+        return err,warning,None
    
     def measurementStatus(self,datapath="data"):
         """ Check whether the APDTest_10G program is still running.
@@ -3706,6 +3758,100 @@ class APDCAM10G_regCom:
 
  # end of class APDCAM10G_regComm
 
+class APDCAM10G_packet:
+    """
+    A utility class to convert the bytes of the C&C header (22 bytes) to
+    variables
+
+    Parameters
+    ^^^^^^^^^^
+    h - bytearray(22), the 22 bytes of the C&C header in the UDP packets
+    
+    error - string, error message
+    
+    """
+
+    def __init__(self,data,error="",headerOnly=False):
+
+        # keep time when the class was initialized (approx. the time when the packet was received)
+        self.time_ = time.time()
+        self.error_ = error
+
+        if headerOnly:
+            # if we only want to keep the header, we take the first 22 bytes. This creates a copy of these 22 bytes
+            # and leaves the python reference count of the original data array unchanged, i.e. it may get
+            # deleted when its scope expires
+            self.data = data[0:22]
+            self.hasData_ = False
+        else:
+            # we store a reference, so the data will be kept in memory until this class is living,
+            # even if the original variable goes out of scope somewhere
+            self.data = data
+            self.hasData_ = True
+
+    def error(self):
+        return self.error_
+
+    def time(self):
+        return self.time_
+
+    def hasData(self):
+        return self.hasData_
+
+    def serial(self):
+        """
+        Returns the serial number from the CC packet header
+        """
+        return int.from_bytes(self.data[0:4],'big') # I assume big endian, not sure
+
+    def stream(self):
+        """
+        Returns the stream (ADC card) number: 1..4
+        """
+        S1 = int.from_bytes(self.data[4:6],'big')
+        return (S1>>14)&3 + 1
+
+    def udpTestMode(self):
+        S1 = int.from_bytes(self.data[4:6],'big')
+        return (((S1>>1)&1) > 0)
+
+    def firstSampleFull(self):
+        """
+        Returns the sample start condition. If True, the first data byte in the packet is the first data byte of a sample,
+        i.e. the packet boundary coincides with a sample data boundary. Otherwise a sample was split between two
+        packets, and this packet is the continuation of a previous sample
+        """
+        S1 = int.from_bytes(self.data[4:6],'big')
+        return ((S1&1) > 0)  
+
+    def lastSampleFull(self):
+        """
+        Returns True if the last sample in this packet is fully contained, i.e. not split between this and the
+        following packet
+        """
+        print("lastSampleFull is not yet implemented")
+        return False
+
+    def packetNumber(self):
+        """
+        Returns the packet number from the C&C header
+        """
+        return int.from_bytes(self.data[8:14],'big')
+
+    def firstSampleNumber(self):
+        """
+        Returns the sample number of the first sample in the packet
+        """
+        return int.from_bytes(self.data[16:22],'big')
+
+    def lastSampleNumber(self):
+        """
+        Returns the sample number of the first sample in the packet
+        """
+        print("lastSampleNumber is not yet implemented")
+        return 0
+
+
 class APDCAM10G_data:
     """ This class is for measuring APDCAM-10G data.
         Created and instance and keep and call the startReceiveAnswer() method
@@ -3718,7 +3864,7 @@ class APDCAM10G_data:
     UDP_HEADER = 8
     CC_STREAMHEADER = 22
                 
-    def __init__(self,APDCAM):
+    def __init__(self,APDCAM,logger=Terminal()):
         """
         Constructor for an APDCAM10G_data object. 
 
@@ -3734,6 +3880,7 @@ class APDCAM10G_data:
         None.
 
         """
+        self.logger = logger
         if (type(APDCAM) is not APDCAM10G_regCom):
             raise TypeError("An APDCAM10G_regCom class is expected as input to APDCAM10G_data.")
         self.APDCAM = APDCAM
@@ -3776,13 +3923,16 @@ class APDCAM10G_data:
                     chip_bytes_per_sample = chip_bits_per_sample // 8 + 1        
                 # accumulate the number of bytes of this chip to the total
                 self.bytes_per_sample[i] += chip_bytes_per_sample
+
             # An ADC board's data is rounded up to integer multiples of 32 bytes
             if ((self.bytes_per_sample[i] * 8) % 32 != 0):
                self.bytes_per_sample[i] = ((self.bytes_per_sample[i] * 8) // 32 + 1) * 32 / 8
+
             if (self.bytes_per_sample[i] * self.sample_number % (self.octet * 8) == 0):
                 self.packets_per_adc[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8) 
             else:
                 # This line should contain +1 at the end, I guess. Now I corrected - D. Barna
+                self.logger.showMessage("[MEASUREMENT] Rouding up packet number")
                 self.packets_per_adc[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8) +1
         self.APDCAM.setSampleNumber(sampleNumber=sample_number)
         
@@ -3903,9 +4053,9 @@ class APDCAM10G_data:
                         break
         if ((mac is None) or (IP is None) or (mtu is None)):
             return "Cannot determine all host network parameters, neither with ip, nor with ifconfig."
-        print("MAC: " + str(self.hostMAC))
-        print("MTU: " + str(self.MTU))
-        print("IP : " + str(self.hostIP))
+        self.logger.showMessage("[MEASUREMENT] MAC: " + str(self.hostMac))
+        self.logger.showMessage("[MEASUREMENT] MTU: " + str(self.MTU))
+        self.logger.showMessage("[MEASUREMENT] IP : " + str(self.hostIP))
 
         self.setOctet()
         return ""    
@@ -3938,6 +4088,18 @@ class APDCAM10G_data:
             return "too small MTU, cannot transfer data."
         return ""
         
+
+    def getPackets(self):
+        """
+        Get the packets (of class APDCAM10G_packet) as a list of lists. The list is a pre-allocated item for all expected
+        packets. There may be missing packets (lost over the network, due to deadtime etc) in which case the
+        corresponding entry in the list is None.
+        The returned object is a list of 4 elements corresponding to the four streams (ADC cards), each list element
+        itself is a list of the packages. The length of these lists does not need to be the same since different channel masks
+        may be set for the different ADC boards in which case a different number of samples fit into the fixed-size UDP packages
+        and therefore there may be a different number of packages for the different ADC boards.
+        """
+        return self.packets
 
     def stopReceive(self):
         """
@@ -3977,10 +4139,16 @@ class APDCAM10G_data:
         self.stream_list = [False] * 4
         # The ADC number (0...) for each stream
         self.stream_adc = [None] * 4 
-        self.packet_counter = [0] * 4
-        self.packet_numbers = [None] * 4
-        self.packet_times = [None] * 4
+
+        #self.packet_counter = [0] * 4
+        #self.packet_numbers = [None] * 4
+        #self.packet_times = [None] * 4
+
+        self.packets = [None] * 4  # Interpreter class for the C&C header bytes
+        self.packetNumber = [0]*4  # Latest received packet number
+
         if (self.APDCAM.dualSATA):
+            self.logger.showMessage("[MEASUREMENT] Dual SATA mode")
             # Check added by D. Barna
             if len(self.APDCAM.status.ADC_address)>2:
                 return "Dual SATA is set but more than 2 ADC boards are present"
@@ -3993,14 +4161,12 @@ class APDCAM10G_data:
                 # But even if this is so, why are only every 2nd strems used?
                 self.stream_list[i * 2] =  True   
                 self.stream_adc[i * 2] = i        
-                self.packet_numbers[i * 2] = np.zeros(self.packets_per_adc[self.stream_adc[i*2]],dtype=np.uint32) 
-                self.packet_times[i * 2] = np.zeros(self.packets_per_adc[self.stream_adc[i*2]],dtype=float) 
+                self.packets[i*2] = [None]*self.packets_per_adc[self.stream_adc[i*2]]
         else:
             for i in range(len(self.APDCAM.status.ADC_address)):
                 self.stream_list[i] =  True  
                 self.stream_adc[i] = i
-                self.packet_numbers[i] = np.zeros(self.packets_per_adc[self.stream_adc[i*2]],dtype=np.uint32)
-                self.packet_times[i] = np.zeros(self.packets_per_adc[self.stream_adc[i*2]],dtype=float)
+                self.packets[i] = [None]*self.packets_per_adc[self.stream_adc[i]]
 
         for i in range(4) :
             if (self.stream_list[i] == True) :
@@ -4100,22 +4266,30 @@ class APDCAM10G_data:
         # Loop until we get the expected number of packages, or the streams fail
         while (stream_running[0] or stream_running[1] or stream_running[2] or stream_running[3]):
             for i_stream in range(4):
-                # Here we check the 'packet_counter' against the expected number of packages. However, there may be missing packages.
-                # Shouldn't we check the package number from the CC Header?
-                if self.stream_list[i_stream] and stream_running[i_stream] and (self.packet_counter[i_stream] < self.packets_per_adc[self.stream_adc[i_stream]]):
+
+                if self.stream_list[i_stream] and stream_running[i_stream] and (self.packetNumber[i_stream] < self.packets_per_adc[self.stream_adc[i_stream]]):
                     try:
+                        error = ""
                         data = self.receiveSockets[i_stream].recv(packet_size)
                         if (len(data) == 0):
                             continue
                         if (len(data) != packet_size):
-                            print("Data size is not equal to packet size.")
-                        self.packet_times[i_stream][self.packet_counter[i_stream]] = time.time()
-                        # self.packet_numbers is a pre-allocated array with the same number of elements as the *expected* number of packages,
-                        # initialized to full zeros. We write this array with the packet numbers from the beginning, overwriting the initial
-                        # zeros. No conflict? Theh 'Packet Counter' of the CC Header of the package (page 28 of the User's manual) is 0-based
-                        # or 1-based?
-                        self.packet_numbers[i_stream][self.packet_counter[i_stream]] = int.from_bytes(data[8:14],'big')
-                        self.packet_counter[i_stream] += 1
+                            error = "Data size is not equal to packet size."
+
+                        packet = APDCAM10G_packet(data,error=error)
+
+                        # Now check if the packet number is within the preallocated buffer's size
+                        if packet.packetNumber() > len(self.packets[i_stream]):
+                            self.logger.showError("Error, number of UDP packages beyond the preallocated array")
+                            continue
+
+                        # We have anyway preallocated the expected number of packet headers, so
+                        # store every packet header at the right index (the list of packets is 0-based, whereas packet numbers
+                        # start from 1! Keep in mind!) If a packet is lost, the corresponding
+                        # entry in the list 'self.packets' will remain None
+                        self.packets[i_stream][packet.packetNumber()-1] = packet
+                        self.packetNumber[i_stream] = packet.packetNumber()
+                        
                     except socket.error as se :
                         stream_running[i_stream] = False
                 else:
@@ -4124,7 +4298,9 @@ class APDCAM10G_data:
             if (self.stream_list[i_stream]):
                 with open("UDPtimes_ADC{:d}.dat".format(self.stream_adc[i_stream]),"wt") as f:
                     f.writelines("{:f}-{:f}\n".format(self.stream_start_time_1,self.stream_start_time_2))
-                    for i in range(self.packet_counter[i_stream]):
-                        f.writelines("{:d}...{:f}...{:d}\n".format(i+1,self.packet_times[i_stream][i],self.packet_numbers[i_stream][i]))
+                    for p in self.packets[i_stream]:
+                        if p is None:
+                            continue
+                        f.writelines("{:d}...{:f}...{:d}\n".format(i_stream+1,p.time(),p.packetNumber()))
         return "",""     
         

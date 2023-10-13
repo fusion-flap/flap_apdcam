@@ -172,7 +172,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.markFunctionlessAction.triggered.connect(self.markFunctionlessControls)
         developerMenu.addAction(self.markFunctionlessAction)
 
-        self.factorySettingsGroupBox = QHGroupBox("Factory settings")
+        self.factorySettingsGroupBox = QHGroupBox()
         self.factorySettingsGroupBox.guiMode = GuiMode.expert
         layout.addWidget(self.factorySettingsGroupBox,0,0)
         self.factorySettingsPassword = QtWidgets.QLineEdit(self)

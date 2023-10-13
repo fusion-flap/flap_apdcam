@@ -43,26 +43,36 @@ class DiagnosticsUdpPacketInspector(QtWidgets.QWidget):
         commands.addWidget(self.getDataButton)
         commands.addStretch(1)
 
-        self.summary = [None]*4
+        self.summaryDisplay = [None]*4
+        self.packetsDisplay = [None]*4
+
         self.stream = [None]*4
-        self.streamWidget = [None]*4
-        self.streamWidgetLayout = [None]*4
         for i in range(4):
-            self.summary[i] = QtWidgets.QLabel("Stream " + str(i+1))
-            layout.addWidget(self.summary[i],1,i)
-            self.stream[i] = QtWidgets.QScrollArea()
-            #self.stream[i].setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-            layout.addWidget(self.stream[i],2,i)
+            self.summaryDisplay[i] = QtWidgets.QTextEdit()
+            self.summaryDisplay[i].setFixedHeight(80)
+            self.summaryDisplay[i].setText("ADC " + str(i+1) + " summary")
+            layout.addWidget(self.summaryDisplay[i],1,i)
+            self.packetsDisplay[i] = QtWidgets.QTextEdit()
+            self.packetsDisplay[i].setText("Packet info listing")
+            layout.addWidget(self.packetsDisplay[i],2,i)
 
     def getData(self):
         self.gui.stopGuiUpdate()
         time.sleep(1)
+
+        for i in range(4):
+            self.packetsDisplay[i].setText("")
+            self.summaryDisplay[i].setText("")
+
         n = self.numberOfSamples.value()
         error,warning,data_receiver = self.gui.camera.measure(numberOfSamples=n,dataReceiver="python",logger=self.gui)
         if error!="":
             self.gui.showError(error)
         if warning!="":
             self.gui.showWarning(warning)
+
+        #self.gui.showMessage("Stream start time 1: " + str(data_receiver.stream_start_time_1))
+        #self.gui.showMessage("Stream start time 2: " + str(data_receiver.stream_start_time_2))
 
         packets = data_receiver.getPackets()
         if packets is None:
@@ -72,38 +82,35 @@ class DiagnosticsUdpPacketInspector(QtWidgets.QWidget):
             self.gui.showError("Received packets is not a list")
             return
 
-        for i in range(4):
-            if self.streamWidget[i] is not None:
-                self.streamWidget[i].deleteLater()
-            self.streamWidget[i] = QtWidgets.QWidget()
-            self.streamWidgetLayout[i] = QtWidgets.QVBoxLayout()
-            self.streamWidget[i].setLayout(self.streamWidgetLayout[i])
-            l = self.streamWidgetLayout[i]
-
-            stream_packets = packets[i]
-            if stream_packets is None:
-                self.gui.showError("Packets is None for stream " + str(i+1))
+        for i_adc in range(len(packets)):
+            if packets[i_adc] is None:
                 continue
 
             first = True
             receivedPackets = 0
-            for p in stream_packets:
+            #self.packetsDisplay[i_adc].setText("")
+            for i_packet in range(len(packets[i_adc])):
+                print("i_packet = " + str(i_packet))
+                p = packets[i_adc][i_packet]
                 if not first:
-                    l.addWidget(QHLine())
-                label = None
-                if p is None:
-                    label = QtWidgets.QLabel("Missing")
-                else:
-                    txt = str(p.packetNumber()) + "@" + str(p.time()) + " Sample: " + str(p.firstSampleNumber()) + "(" + ("full" if p.firstSampleFull() else "partial") + ") - ??? (tbd)"
-                    label = QtWidgets.QLabel(txt)
+                    print("-------------------")
+                    self.packetsDisplay[i_adc].append("--------------------------")
+                print("#" + str(i_packet) + " @" + str(p.time()))
+                self.packetsDisplay[i_adc].append("#" + str(i_packet) + " @" + str(p.time()))
+                print("Planned: " + str(p.plannedFirstSampleNumber) + "(" + str(p.plannedFirstSampleStartByte) + ") -- " + str(p.plannedLastSampleNumber) + "(" + str(p.plannedLastSampleStopByte) + ")")
+                self.packetsDisplay[i_adc].append("Planned: " + str(p.plannedFirstSampleNumber) + "(" + str(p.plannedFirstSampleStartByte) + ") -- " + str(p.plannedLastSampleNumber) + "(" + str(p.plannedLastSampleStopByte) + ")")
+                if p.received():
+                    print("Sample: " + str(p.firstSampleNumber()) + "(" + ("full" if p.firstSampleFull() else "partial") + ")")
+                    self.packetsDisplay[i_adc].append("Sample: " + str(p.firstSampleNumber()) + "(" + ("full" if p.firstSampleFull() else "partial") + ")")
                     receivedPackets += 1
-                #label.setAutoFillBackground(False)
-                label.setStyleSheet("background-color: rgba(255,255,255,1);")
-                l.addWidget(label)
+                else:
+                    print("MISSING")    
+                    self.packetsDisplay[i_adc].append("MISSING")    
                 first = False
 
-            self.summary[i].setText("Expected: " + str(len(stream_packets)) + ". Received: " + str(receivedPackets))
+                
+            self.summaryDisplay[i_adc].append("Bytes/sample: " + str(data_receiver.bytes_per_sample[i_adc]))
+            self.summaryDisplay[i_adc].append("Expected: " + str(len(packets[i_adc])) + ". Received: " + str(receivedPackets))
+            self.summaryDisplay[i_adc].append("Number of data bytes in packet: " + str(data_receiver.octet) + "*8 = " + str(data_receiver.octet*8))
 
-            self.streamWidget[i].setStyleSheet("background-color: rgba(255,255,255,0);")
-            self.stream[i].setWidget(self.streamWidget[i])
         self.gui.startGuiUpdate()

@@ -3771,23 +3771,35 @@ class APDCAM10G_packet:
     
     """
 
-    def __init__(self,data,error="",headerOnly=False):
+    def __init__(self,data=None,error="",headerOnly=False):
+        self.time_ = "--" 
+        self.data = None
+        if data is not None:
+            self.setData(data,error,headerOnly)
 
+    def received(self):
+        """
+        Returns True if the packet has been received, False otherwise
+        """
+        return self.data is not None
+
+    def setData(self,data,error="",headerOnly=False):
         # keep time when the class was initialized (approx. the time when the packet was received)
         self.time_ = time.time()
         self.error_ = error
 
-        if headerOnly:
+        if not headerOnly:
+            # we store a reference, so the data will be kept in memory until this class is living,
+            # even if the original variable goes out of scope somewhere
+            self.data = data
+            self.hasData_ = True
+        else:
             # if we only want to keep the header, we take the first 22 bytes. This creates a copy of these 22 bytes
             # and leaves the python reference count of the original data array unchanged, i.e. it may get
             # deleted when its scope expires
             self.data = data[0:22]
             self.hasData_ = False
-        else:
-            # we store a reference, so the data will be kept in memory until this class is living,
-            # even if the original variable goes out of scope somewhere
-            self.data = data
-            self.hasData_ = True
+        
 
     def error(self):
         return self.error_
@@ -3804,12 +3816,12 @@ class APDCAM10G_packet:
         """
         return int.from_bytes(self.data[0:4],'big') # I assume big endian, not sure
 
-    def stream(self):
+    def streamNumber(self):
         """
-        Returns the stream (ADC card) number: 1..4
+        Returns the stream number: 0..3
         """
         S1 = int.from_bytes(self.data[4:6],'big')
-        return (S1>>14)&3 + 1
+        return (S1>>14)&3 
 
     def udpTestMode(self):
         S1 = int.from_bytes(self.data[4:6],'big')
@@ -3884,7 +3896,7 @@ class APDCAM10G_data:
         if (type(APDCAM) is not APDCAM10G_regCom):
             raise TypeError("An APDCAM10G_regCom class is expected as input to APDCAM10G_data.")
         self.APDCAM = APDCAM
-        self.receiveSockets = [None, None, None, None]
+        self.receiveSockets = [None]*4
         self.MTU = None
         self.hostMac = None
         self.hostIP = None
@@ -3904,36 +3916,84 @@ class APDCAM10G_data:
                 self.receiveSockets[i].close()
             
     def allocate(self,channel_masks=[0xffffffff,0xffffffff,0xffffffff,0xffffffff],sample_number=100000,bits=14):
-        
+        self.logger.showMessage("Bits: " + str(bits))
         if (self.MTU is None):
             raise ValueError("Network parameters should be determined before calling allocate.")
         self.sample_number = sample_number
         self.channel_masks = copy.deepcopy(channel_masks)
         self.bits = bits
         self.bytes_per_sample = [0] * len(self.APDCAM.status.ADC_address)
-        self.packets_per_adc = [0] * len(self.APDCAM.status.ADC_address)
-        for i in range(len(self.APDCAM.status.ADC_address)):
+        self.packets = [None] * len(self.APDCAM.status.ADC_address)      # we collect packets associated with ADCs
+        for i_adc in range(len(self.APDCAM.status.ADC_address)):
+            self.logger.showMessage("ADC BOARD: " + str(i_adc+1))
             for ic in range(4):
-                chip_chmask = (channel_masks[i] >> ic * 8) % 256
-                chip_bits_per_sample = bits *  chip_chmask.bit_length()
+                chip_chmask = (channel_masks[i_adc] >> ic * 8) % 256
+                self.logger.showMessage("   Chip " + str(ic) + " mask: " + str(chip_chmask))
+                # This is the original code, which is wrong. bit_length() returns the number of bits necessary to represent the given number,
+                # and not the number of non-zero bits in the given number!
+                # chip_bits_per_sample = bits *  chip_chmask.bit_length()
+                chip_bits_per_sample = bits * chip_chmask.bit_count()
+
+                self.logger.showMessage("   Chip bits per sample: " + str(chip_bits_per_sample))
                 # Each chip's data is rounded up to full bytes
-                if ((chip_bits_per_sample % 8) == 0):
-                    chip_bytes_per_sample = chip_bits_per_sample // 8
-                else:
-                    chip_bytes_per_sample = chip_bits_per_sample // 8 + 1        
+                chip_bytes_per_sample = chip_bits_per_sample // 8
+                if ((chip_bits_per_sample % 8) != 0):
+                    chip_bytes_per_sample += 1
+
                 # accumulate the number of bytes of this chip to the total
-                self.bytes_per_sample[i] += chip_bytes_per_sample
+                self.bytes_per_sample[i_adc] += chip_bytes_per_sample
 
-            # An ADC board's data is rounded up to integer multiples of 32 bytes
-            if ((self.bytes_per_sample[i] * 8) % 32 != 0):
-               self.bytes_per_sample[i] = ((self.bytes_per_sample[i] * 8) // 32 + 1) * 32 / 8
+            # An ADC board's data is rounded up to integer multiples of 32 bits
 
-            if (self.bytes_per_sample[i] * self.sample_number % (self.octet * 8) == 0):
-                self.packets_per_adc[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8) 
-            else:
-                # This line should contain +1 at the end, I guess. Now I corrected - D. Barna
-                self.logger.showMessage("[MEASUREMENT] Rouding up packet number")
-                self.packets_per_adc[i] = self.bytes_per_sample[i] * self.sample_number // (self.octet * 8) +1
+
+            if ((self.bytes_per_sample[i_adc] * 8) % 32 != 0):
+                # Attention, attention! Here in the original code there was a simple division by 8:
+                # self.bytes_per_sample[i_adc] = ((self.bytes_per_sample[i_adc] * 8) // 32 + 1) * 32 / 8
+                # this unfortunately produces a floating point number, even if the number to be divided
+                # is an integer multiple of 8. Must use integer division !!!
+                self.bytes_per_sample[i_adc] = ((self.bytes_per_sample[i_adc] * 8) // 32 + 1) * 32 // 8
+
+
+            #Calculate the number of packages
+            packets_per_adc = (self.bytes_per_sample[i_adc] * self.sample_number) // (self.octet * 8) 
+            if (self.bytes_per_sample[i_adc] * self.sample_number) % (self.octet * 8) != 0:
+                packets_per_adc += 1
+
+            # pre-allocate the number of packages for each ADC board. We do not store the number of packets per adc
+            # for each ADC board in a separate variable, the length of the pre-allocated packet list, len(self.packets[i_adc])
+            # can be used for that
+            self.packets[i_adc] = [None]*packets_per_adc
+            firstSampleNumber = 0
+            firstSampleStartByte = 0
+            for i_packet in range(packets_per_adc):
+                self.packets[i_adc][i_packet] = APDCAM10G_packet()
+            
+                self.packets[i_adc][i_packet].plannedFirstSampleNumber = firstSampleNumber
+                self.packets[i_adc][i_packet].plannedFirstSampleStartByte = firstSampleStartByte
+
+                # number of the bytes of the first (potentially fractional) sample
+                firstSampleBytes = self.bytes_per_sample[i_adc] - firstSampleStartByte
+
+                # Number of bytes available for further samples
+                remainingBytes = self.octet*8 - firstSampleBytes
+
+                # Number of full samples fitting into the remaining bytes
+                nFullSamples = remainingBytes//self.bytes_per_sample[i_adc]
+
+                # assume a full last sample fitting into the packet
+                self.packets[i_adc][i_packet].plannedLastSampleNumber = firstSampleNumber + nFullSamples
+                self.packets[i_adc][i_packet].plannedLastSampleStopByte = self.bytes_per_sample[i_adc]
+                firstSampleNumber = self.packets[i_adc][i_packet].plannedLastSampleNumber + 1
+                firstSampleStartByte = 0
+
+                # If not, update
+                if remainingBytes%self.bytes_per_sample[i_adc] != 0:
+                    self.packets[i_adc][i_packet].plannedLastSampleNumber += 1
+                    self.packets[i_adc][i_packet].plannedLastSampleStopByte = remainingBytes - nFullSamples*self.bytes_per_sample[i_adc]  # also the number of bytes of the last sample
+                    firstSampleNumber = self.packets[i_adc][i_packet].plannedLastSampleNumber
+                    firstSampleStartByte =  self.packets[i_adc][i_packet].plannedLastSampleStopByte
+                
+
         self.APDCAM.setSampleNumber(sampleNumber=sample_number)
         
 # 		map_locked = MAP_LOCKED;
@@ -4136,40 +4196,24 @@ class APDCAM10G_data:
         self.stopReceive()
         
         # True means the stream will be active
-        self.stream_list = [False] * 4
-        # The ADC number (0...) for each stream
-        self.stream_adc = [None] * 4 
+        self.streamActive = [False]*4  # True/False indicating whether the given stream is active
+        self.streamAdc  = [0]*4      # The ADC number this stream is associated with
+        self.streamLastPacketNumber = [-1]*4    # Latest received packet number in the given stream
+        self.streamErrors = [""]*4
 
-        #self.packet_counter = [0] * 4
-        #self.packet_numbers = [None] * 4
-        #self.packet_times = [None] * 4
-
-        self.packets = [None] * 4  # Interpreter class for the C&C header bytes
-        self.packetNumber = [0]*4  # Latest received packet number
-
-        if (self.APDCAM.dualSATA):
-            self.logger.showMessage("[MEASUREMENT] Dual SATA mode")
-            # Check added by D. Barna
+        if self.APDCAM.dualSATA:
             if len(self.APDCAM.status.ADC_address)>2:
                 return "Dual SATA is set but more than 2 ADC boards are present"
-
             for i in range(len(self.APDCAM.status.ADC_address)):
-                # The following 4 commands cause potentially out-of-index exception, if there are more than 2 ADC boards? D.Barna
-                # With dualSATA config, can we have only 2 ADC boards (User guide section 5.4 intro, page 20 top states that for
-                # 64 channel systems (i.e. only 2 ADC boards?) dualSATA config is used for higher speed. Should one test here
-                # that dualSATA requires only 2 ADC boards?
-                # But even if this is so, why are only every 2nd strems used?
-                self.stream_list[i * 2] =  True   
-                self.stream_adc[i * 2] = i        
-                self.packets[i*2] = [None]*self.packets_per_adc[self.stream_adc[i*2]]
+                self.streamActive[i*2] = True   
+                self.streamAdc   [i*2] = i
         else:
             for i in range(len(self.APDCAM.status.ADC_address)):
-                self.stream_list[i] =  True  
-                self.stream_adc[i] = i
-                self.packets[i] = [None]*self.packets_per_adc[self.stream_adc[i]]
+                self.streamActive[i] = True   
+                self.streamAdc   [i] = i
 
         for i in range(4) :
-            if (self.stream_list[i] == True) :
+            if (self.streamActive[i] == True) :
                 try:
                     self.receiveSockets[i] = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 except socket.error as se:
@@ -4223,7 +4267,7 @@ class APDCAM10G_data:
         
         strcontrol = bytearray([0])       
         for i in range(4) :
-            if (self.stream_list[i]) :
+            if (self.streamActive[i]) :
                 strcontrol[0] = strcontrol[0] | 2**i
         self.stream_start_time_1 = time.time()
         strcontrol[0] = 0x0f
@@ -4262,43 +4306,61 @@ class APDCAM10G_data:
         """
                 
         packet_size = APDCAM10G_data.CC_STREAMHEADER + self.octet * 8
-        stream_running = [True] * 4
+        streamRunning = self.streamActive
         # Loop until we get the expected number of packages, or the streams fail
-        while (stream_running[0] or stream_running[1] or stream_running[2] or stream_running[3]):
+        while (streamRunning[0] or streamRunning[1] or streamRunning[2] or streamRunning[3]):
             for i_stream in range(4):
+                # skip those streams which are not sending data, or which have completed or failed
+                if not self.streamActive[i_stream] or not streamRunning[i_stream]:
+                    continue;
 
-                if self.stream_list[i_stream] and stream_running[i_stream] and (self.packetNumber[i_stream] < self.packets_per_adc[self.stream_adc[i_stream]]):
-                    try:
-                        error = ""
-                        data = self.receiveSockets[i_stream].recv(packet_size)
-                        if (len(data) == 0):
-                            continue
-                        if (len(data) != packet_size):
-                            error = "Data size is not equal to packet size."
-
-                        packet = APDCAM10G_packet(data,error=error)
-
-                        # Now check if the packet number is within the preallocated buffer's size
-                        if packet.packetNumber() > len(self.packets[i_stream]):
-                            self.logger.showError("Error, number of UDP packages beyond the preallocated array")
-                            continue
-
-                        # We have anyway preallocated the expected number of packet headers, so
-                        # store every packet header at the right index (the list of packets is 0-based, whereas packet numbers
-                        # start from 1! Keep in mind!) If a packet is lost, the corresponding
-                        # entry in the list 'self.packets' will remain None
-                        self.packets[i_stream][packet.packetNumber()-1] = packet
-                        self.packetNumber[i_stream] = packet.packetNumber()
+                try:
+                    error = ""
+                    data = self.receiveSockets[i_stream].recv(packet_size)
+                    if (len(data) == 0):
+                        continue
+                    if (len(data) != packet_size):
+                        self.streamErrors[i_stream] += "Data size is not equal to packet size.\n"
                         
-                    except socket.error as se :
-                        stream_running[i_stream] = False
-                else:
-                    stream_running[i_stream] = False
+                    packetNumber = int.from_bytes(data[8:14],'big')
+
+                    # Check for monotonic increase of packet number obtained from the CC header. If non-monotonic, print
+                    # error message and stop reading from this stream
+                    if packetNumber <= self.streamLastPacketNumber[i_stream]:
+                        self.streamErrors[i_stream] += "Non-monotonic packet number in stream " + str(i_stream) + "\n"
+                        streamRunning[i_stream] = False
+                        continue
+
+                    # remember that we store the packets for each ADC and not for the streams. So get the ADC number
+                    # corresponding to this stream. Python copies by reference
+                    packets = self.packets[self.streamAdc[i_stream]]
+
+                    # Check if a too high packet number arrived in the CC header. This would over-index the packets array,
+                    # and is considered a fatal error, so stop the stream
+                    if packetNumber >= len(packets):
+                        streamErrors[i_stream] += "A packet with out-of-range number " + str(packetNumber) + " is received\n"
+                        streamRunning[i_stream] = False
+                        continue
+
+                    # We have anyway preallocated the expected number of packet headers, so
+                    # store every packet header at the right index, corresponding to the packet number
+                    # If a packet is lost, the corresponding entry in the list 'self.packets' will remain None
+                    packets[packetNumber].setData(data,error)
+                    self.streamLastPacketNumber[i_stream] = packetNumber
+
+                    # If we reached the expected (=pre-allocated) number of packets, stop the stream
+                    if packetNumber == len(packets)-1:
+                        streamRunning[i_stream] = False
+
+                # and finally if we fail to read from the stream, mark it as stopped
+                except socket.error as se :
+                    streamRunning[i_stream] = False
+
         for i_stream in range(4):
-            if (self.stream_list[i_stream]):
-                with open("UDPtimes_ADC{:d}.dat".format(self.stream_adc[i_stream]),"wt") as f:
+            if (self.streamActive[i_stream]):
+                with open("UDPtimes_ADC{:d}.dat".format(self.streamAdc[i_stream]),"wt") as f:
                     f.writelines("{:f}-{:f}\n".format(self.stream_start_time_1,self.stream_start_time_2))
-                    for p in self.packets[i_stream]:
+                    for p in self.packets[self.streamAdc[i_stream]]:
                         if p is None:
                             continue
                         f.writelines("{:d}...{:f}...{:d}\n".format(i_stream+1,p.time(),p.packetNumber()))

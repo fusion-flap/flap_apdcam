@@ -150,8 +150,8 @@ class RegisterInspector(QtWidgets.QWidget):
         font = QtGui.QFont("", 0)
         fm = QtGui.QFontMetrics(font)
         pixelsWide = fm.width(self.registerValueBytes.text());
-        #self.registerValueBytes.setFixedWidth(pixelsWide+10);
+        self.registerValueBytes.setFixedWidth(int(pixelsWide*1.1+20));
         pixelsWide = fm.width(self.registerValueBytesBinary.text());
-        self.registerValueBytesBinary.setFixedWidth(pixelsWide+10);
+        self.registerValueBytesBinary.setFixedWidth(int(pixelsWide*1.1+20));
         pixelsWide = fm.width(self.registerValueInt.text());
-        #self.registerValueInt.setFixedWidth(pixelsWide+10);
+        self.registerValueInt.setFixedWidth(int(pixelsWide*1.1+20));

@@ -19,9 +19,9 @@ class QHLine(QtWidgets.QFrame):
         self.setFrameShape(QtWidgets.QFrame.HLine)
         self.setFrameShadow(QtWidgets.QFrame.Sunken)
 
-class DiagnosticsUdpPacketInspector(QtWidgets.QWidget):
+class UdpPacketInspector(QtWidgets.QWidget):
     def __init__(self,parent):
-        super(DiagnosticsUdpPacketInspector,self).__init__(parent)
+        super(UdpPacketInspector,self).__init__(parent)
 
         self.parent = parent
         self.gui = parent.gui

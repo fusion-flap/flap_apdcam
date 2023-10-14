@@ -12,7 +12,8 @@ Qt = QtCore.Qt
 # from PyQt6.QtCore import Qt
 from ApdcamUtils import *
 from GuiMode import *
-from DiagnosticsUdpPacketInspector import *
+from UdpPacketInspector import *
+from RegisterInspector import RegisterInspector
 from functools import partial
 
 class Diagnostics(QtWidgets.QWidget):
@@ -25,6 +26,9 @@ class Diagnostics(QtWidgets.QWidget):
         self.tabs = QtWidgets.QTabWidget(self)
         layout.addWidget(self.tabs)
 
-        self.udpPacketInspector = DiagnosticsUdpPacketInspector(self)
+        self.udpPacketInspector = UdpPacketInspector(self)
         self.tabs.addTab(self.udpPacketInspector,"UDP Packet Inspector")
 
+        self.registerInspector = RegisterInspector(self,self.gui)
+        self.tabs.addTab(self.registerInspector,"Register inspector")
+        

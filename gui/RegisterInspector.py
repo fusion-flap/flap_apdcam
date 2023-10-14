@@ -12,10 +12,10 @@ Qt = importlib.import_module(QtVersion+".QtCore")
 from ApdcamUtils import *
 from GuiMode import *
 
-class Debug(QtWidgets.QWidget):
-    def __init__(self,parent):
-        self.gui = parent
-        super(Debug,self).__init__(parent)
+class RegisterInspector(QtWidgets.QWidget):
+    def __init__(self,parent,gui):
+        self.gui = gui
+        super(RegisterInspector,self).__init__(parent)
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
         layout.addStretch(1)
@@ -47,6 +47,7 @@ class Debug(QtWidgets.QWidget):
         l1.addWidget(QtWidgets.QLabel("Number of bytes:"))
         self.numberOfBytes = QtWidgets.QSpinBox()
         self.numberOfBytes.setMinimum(1)
+        self.numberOfBytes.setFixedWidth(150)
         l1.addWidget(self.numberOfBytes)
 
         l1.addStretch(1)
@@ -79,6 +80,7 @@ class Debug(QtWidgets.QWidget):
         l2.addStretch(1)
         l2.addWidget(QtWidgets.QLabel("Integer value:"))
         self.registerValueInt = QtWidgets.QLineEdit()
+        self.registerValueInt.setFixedWidth(150)
         readOnly(self.registerValueInt)
         l2.addWidget(self.registerValueInt)
 
@@ -148,8 +150,8 @@ class Debug(QtWidgets.QWidget):
         font = QtGui.QFont("", 0)
         fm = QtGui.QFontMetrics(font)
         pixelsWide = fm.width(self.registerValueBytes.text());
-        self.registerValueBytes.setFixedWidth(pixelsWide+10);
+        #self.registerValueBytes.setFixedWidth(pixelsWide+10);
         pixelsWide = fm.width(self.registerValueBytesBinary.text());
         self.registerValueBytesBinary.setFixedWidth(pixelsWide+10);
         pixelsWide = fm.width(self.registerValueInt.text());
-        self.registerValueInt.setFixedWidth(pixelsWide+10);
+        #self.registerValueInt.setFixedWidth(pixelsWide+10);

@@ -23,7 +23,6 @@ from Infrastructure import Infrastructure
 from AdcControl import AdcControl
 from ControlTiming import ControlTiming
 from CameraTimer import CameraTimer
-from Debug import Debug
 from FactoryTest import FactoryTest
 from Plot import Plot
 from SimpleMeasurementControl import SimpleMeasurementControl
@@ -223,8 +222,6 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.expertTabs.addTab(self.diagnostics,"Diagnostics")
         self.diagnostics.settingsSection = "Diagnostics"
 
-        self.debug = Debug(self)
-        self.expertTabs.addTab(self.debug,"Debug")
 
         fs = FactoryTest(self)
         fs.guiMode = GuiMode.factory

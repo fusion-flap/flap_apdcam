@@ -85,14 +85,14 @@ def populateFrequencyCombo(multFrom,multTo,divFrom,divTo,combo):
 
     
 class ControlTiming(QtWidgets.QWidget):
-    def versionSpecificSetup(self,version):
-        self.gui.showWarning("ControlTiming.versionSpecificSetup is not yet implemented")
-        #if version > ???:
-        #    self.sampleDiv.setMinimum(1)
-        #    self.adcOutFreqDiv.setEnabled(True)
-        #else:
-        #    self.sampleDiv.setMinimum(2)
-        #    self.adcOutFreqDiv.setEnabled(False)
+    def versionSpecificSetup(self,fw):
+        version = int(fw[11:14])
+        if version >= 105:
+            self.sampleDiv.setMinimum(1)
+            self.adcOutFreqDiv.setEnabled(True)
+        else:
+            self.sampleDiv.setMinimum(2)
+            self.adcOutFreqDiv.setEnabled(False)
 
     def setSerialPll(self):
         self.gui.camera.setSerialPll(self.serialPllMult.value(),self.serialPllDiv.value())
@@ -384,7 +384,7 @@ class ControlTiming(QtWidgets.QWidget):
         self.adcOutFreqDiv = QtWidgets.QSpinBox()
         hh.addWidget(self.adcOutFreqDiv)
         self.adcOutFreqDiv.settingsName = "ADC output frequency divisor"
-        self.adcOutFreqDiv.setToolTip("Divisor for the ADC output frequency going to the panel")
+        self.adcOutFreqDiv.setToolTip("Divisor for the ADC output frequency going to the panel. Only available from FW version 105.")
         self.gui.showError("Control & Timing / ADC output frequency divisor is not yet connected to an action")
 
         g = QVGroupBox()

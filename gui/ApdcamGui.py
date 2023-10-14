@@ -86,6 +86,11 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
             self.cameraStateRefreshed.emit()
         
+    def versionSpecificSetup(self):
+        children = self.findChildren(QtWidgets.QWidget)
+        for child in children:
+            if hasattr(child,"versionSpecificSetup"):
+                child.versionSpecificSetup(self.camera.status.CC_firmware.decode('utf-8'))
 
     def updateGui(self):
         """
@@ -99,6 +104,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
     
     def onTabChange(self):
         pass
+
 
     def __init__(self, parent=None):
         super().__init__(parent)

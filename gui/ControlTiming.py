@@ -424,7 +424,6 @@ class ControlTiming(QtWidgets.QWidget):
         self.dualSata.setToolTip("Enable dual SATA mode for the system (CC card and all ADC boards)")
         l.addWidget(self.dualSata)
 
-
         g = QVGroupBox("Trigger")
         l.addWidget(g)
         self.trigPlus = QtWidgets.QCheckBox("Ext. Trig. +")

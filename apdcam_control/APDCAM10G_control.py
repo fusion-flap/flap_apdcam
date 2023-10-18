@@ -1797,6 +1797,7 @@ class APDCAM10G_regCom:
         """
         if (self.commSocket is None):
             return "Not connected."
+
         if (dual_SATA_state):
             d = bytearray([0x01])
         else:
@@ -1805,8 +1806,6 @@ class APDCAM10G_regCom:
         if (err != ""):
            return err
         return self.setAdcDualSata('all',dual_SATA_state)
-       # the old implementation
-       #return self.setADCDualSATA(dual_SATA_state=dual_SATA_state)      
 
     # This is the old function by S. Zoletnik. Reimplemented by D. Barna as setAdcDualSata using the more general setRegisterBit utility function
     # def setADCDualSATA(self,dual_SATA_state=True):

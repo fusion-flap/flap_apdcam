@@ -23,7 +23,7 @@ class UdpPacketInspector(QtWidgets.QWidget):
     def __init__(self,parent):
         super(UdpPacketInspector,self).__init__(parent)
 
-        self.parent = parent
+        #self.parent = parent
         self.gui = parent.gui
 
         layout = QtWidgets.QGridLayout()

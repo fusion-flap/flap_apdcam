@@ -136,12 +136,47 @@ class Adc(QtWidgets.QWidget):
         filt[5] = c
         filt[7] = 8+gain
 
-    def set_test_pattern_mode(self):
+    def sata_on_onclick(self,state):
+        # If Shift+clicked...
         modifiers = QtWidgets.QApplication.keyboardModifiers()
         if modifiers == QtCore.Qt.ShiftModifier:
-            print('Shift+Click')
-        else:
-            print("no shift")
+            # loop over all ADC tabs
+            for adc in self.adcControl.adc:
+                # for all ADC tabs other than self, set the same checkbox
+                if not adc is self:
+                    adc.sataOn.setChecked(state)
+
+    def test_mode_onclick(self,state):
+        # If Shift+clicked...
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
+        if modifiers == QtCore.Qt.ShiftModifier:
+            # loop over all ADC tabs
+            for adc in self.adcControl.adc:
+                # for all ADC tabs other than self, set the same checkbox
+                if not adc is self:
+                    adc.test.setChecked(state)
+
+    def sata_sync_onclick(self,state):
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
+        if modifiers == QtCore.Qt.ShiftModifier:
+            for adc in self.adcControl.adc:
+                if not adc is self:
+                    adc.sataSync.setChecked(state)
+
+    def internal_trigger_onclick(self,state):
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
+        if modifiers == QtCore.Qt.ShiftModifier:
+            for adc in self.adcControl.adc:
+                if not adc is self:
+                    adc.internalTrigger.setChecked(state)
+
+    def reverse_bit_order_onclick(self,state):
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
+        if modifiers == QtCore.Qt.ShiftModifier:
+            for adc in self.adcControl.adc:
+                if not adc is self:
+                    adc.reverseBitOrder.setChecked(state)
+                    
 
     def __init__(self,parent,number,address):
         """
@@ -284,6 +319,7 @@ class Adc(QtWidgets.QWidget):
         self.sataOn = QtWidgets.QCheckBox("SATA On")
         self.sataOn.setToolTip("Switch on SATA (must be done for ALL ADCs!)")
         self.sataOn.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setSataOn(self.number,self.sataOn.isChecked())))
+        self.sataOn.clicked.connect(self.sata_on_onclick)
         self.sataOn.guiMode = GuiMode.factory
         g.addWidget(self.sataOn,0,0)
 
@@ -297,27 +333,32 @@ class Adc(QtWidgets.QWidget):
         
         self.sataSync = QtWidgets.QCheckBox("SATA Sync")
         self.sataSync.settingsName = "SATA sync"
-        self.sataSync.setToolTip("Switch SATA sync for this ADC")
+        self.sataSync.setToolTip("Switch SATA sync for this ADC (if Shift+clicked, change for all ADC boards)")
         self.sataSync.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setSataSync(self.number,self.sataSync.isChecked())))
+        self.sataSync.clicked.connect(self.sata_sync_onclick)
         g.addWidget(self.sataSync,2,0)
 
         self.test = QtWidgets.QCheckBox("Test")
         self.test.settingsName = "Test"
-        self.test.setToolTip("Switch Test mode on (?)")
+        self.test.setToolTip("Switch Test mode on. (Set for all ADC boards if Shift-clicked)")
+        # the real action toward the camera: set the "test pattern mode" bit in the corresponding register
         self.test.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setTestPatternMode(self.number,self.test.isChecked())))
+        # We capture the click event so that we can check modifier keys, and set test mode for all other ADCs  as well if Shift is pressed
+        self.test.clicked.connect(self.test_mode_onclick)
         g.addWidget(self.test,3,0)
 
         self.internalTrigger = QtWidgets.QCheckBox("Internal trigger")
         self.internalTrigger.settingsName = "Internal trigger"
         self.internalTrigger.setToolTip("Enable internal trigger output from this ADC board")
-        #self.internalTrigger.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setInternalTriggerAdc(adcBoardNo=self.number,enable=self.internalTrigger.isChecked())))
-        self.internalTrigger.clicked.connect(self.set_test_pattern_mode)
+        self.internalTrigger.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setInternalTriggerAdc(adcBoardNo=self.number,enable=self.internalTrigger.isChecked())))
+        self.internalTrigger.clicked.connect(self.internal_trigger_onclick)
         g.addWidget(self.internalTrigger,4,0)
 
         self.reverseBitOrder = QtWidgets.QCheckBox("Rev. bitord.")
         self.reverseBitOrder.settingsName = "Reverse bit order"
         self.reverseBitOrder.setToolTip("Set reverse bit order in the stream. If checked, least significant bit comes first.")
         self.reverseBitOrder.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setReverseBitord(self.number,self.reverseBitOrder.isChecked())))
+        self.reverseBitOrder.clicked.connect(self.reverse_bit_order_onclick)
         self.reverseBitOrder.guiMode = GuiMode.factory
         g.addWidget(self.reverseBitOrder,5,0)
         g.setRowStretch(g.rowCount(),10)

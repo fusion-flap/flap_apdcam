@@ -3755,7 +3755,7 @@ class APDCAM10G_regCom:
         #return True/False
         return (error,bool(status[0] & 1))
 
- # end of class APDCAM10G_regComm
+# end of class APDCAM10G_regComm
 
 class APDCAM10G_packet:
     """
@@ -3783,6 +3783,10 @@ class APDCAM10G_packet:
         return self.data is not None
 
     def setData(self,data,error="",headerOnly=False):
+        """
+        Set the packet content (including the 22-byte CC board header and the subsequent ADC data
+        """
+
         # keep time when the class was initialized (approx. the time when the packet was received)
         self.time_ = time.time()
         self.error_ = error
@@ -3798,7 +3802,9 @@ class APDCAM10G_packet:
             # deleted when its scope expires
             self.data = data[0:22]
             self.hasData_ = False
-        
+
+    def getAdcData(self):
+        return self.data[22:]
 
     def error(self):
         return self.error_
@@ -3919,43 +3925,50 @@ class APDCAM10G_data:
         if (self.MTU is None):
             raise ValueError("Network parameters should be determined before calling allocate.")
         self.sample_number = sample_number
-        self.channel_masks = copy.deepcopy(channel_masks)
+        self.channelMasks = [[[0]*8]*4]*4  # self.channelMasks[i_adc=0..3][i_chip=0..3][i_channel=0..7]
         self.bits = bits
-        self.bytes_per_sample = [0] * len(self.APDCAM.status.ADC_address)
+        self.bytesPerSample     = [0]        *len(self.APDCAM.status.ADC_address)
+        self.chipBitsPerSample  = [[0,0,0,0]]*len(self.APDCAM.status.ADC_address)
+        self.chipBytesPerSample = [[0,0,0,0]]*len(self.APDCAM.status.ADC_address)
         self.packets = [None] * len(self.APDCAM.status.ADC_address)      # we collect packets associated with ADCs
         for i_adc in range(len(self.APDCAM.status.ADC_address)):
             self.logger.showMessage("ADC BOARD: " + str(i_adc+1))
-            for ic in range(4):
-                chip_chmask = (channel_masks[i_adc] >> ic * 8) % 256
-                self.logger.showMessage("   Chip " + str(ic) + " mask: " + str(chip_chmask))
+            for i_chip in range(4):
+                for i_channel in range(8):
+                    self.channelMasks[i_adc][i_chip][i_channel] = (channel_masks[i_adc]>>(i_chip*8+(7-i_channel))) & 1
+                #chip_chmask = (channel_masks[i_adc] >> i_chip * 8) % 256
+                #self.logger.showMessage("   Chip " + str(i_chip) + " mask: " + str(chip_chmask))
+
                 # This is the original code, which is wrong. bit_length() returns the number of bits necessary to represent the given number,
                 # and not the number of non-zero bits in the given number!
-                # chip_bits_per_sample = bits *  chip_chmask.bit_length()
-                chip_bits_per_sample = bits * chip_chmask.bit_count()
+                # chipBitsPerSample = bits *  chip_chmask.bit_length()
+                # this is the corrected code, which is now replaced by the line below
+                # self.chipBitsPerSample[i_adc][i_chip] = bits * chip_chmask.bit_count()
+                self.chipBitsPerSample[i_adc][i_chip] = bits*sum(self.channelMasks[i_adc][i_chip])
 
-                self.logger.showMessage("   Chip bits per sample: " + str(chip_bits_per_sample))
+                self.logger.showMessage("   Chip bits per sample: " + str(self.chipBitsPerSample[i_adc][i_chip]))
                 # Each chip's data is rounded up to full bytes
-                chip_bytes_per_sample = chip_bits_per_sample // 8
-                if ((chip_bits_per_sample % 8) != 0):
-                    chip_bytes_per_sample += 1
+                self.chipBytesPerSample[i_adc][i_chip] = self.chipBitsPerSample[i_adc][i_chip] // 8
+                if ((self.chipBitsPerSample[i_adc][i_chip] % 8) != 0):
+                    self.chipBytesPerSample[i_adc][i_chip] += 1
 
                 # accumulate the number of bytes of this chip to the total
-                self.bytes_per_sample[i_adc] += chip_bytes_per_sample
+                self.bytesPerSample[i_adc] += self.chipBytesPerSample[i_adc][i_chip]
 
             # An ADC board's data is rounded up to integer multiples of 32 bits
 
 
-            if ((self.bytes_per_sample[i_adc] * 8) % 32 != 0):
+            if ((self.bytesPerSample[i_adc] * 8) % 32 != 0):
                 # Attention, attention! Here in the original code there was a simple division by 8:
-                # self.bytes_per_sample[i_adc] = ((self.bytes_per_sample[i_adc] * 8) // 32 + 1) * 32 / 8
+                # self.bytesPerSample[i_adc] = ((self.bytesPerSample[i_adc] * 8) // 32 + 1) * 32 / 8
                 # this unfortunately produces a floating point number, even if the number to be divided
                 # is an integer multiple of 8. Must use integer division !!!
-                self.bytes_per_sample[i_adc] = ((self.bytes_per_sample[i_adc] * 8) // 32 + 1) * 32 // 8
+                self.bytesPerSample[i_adc] = ((self.bytesPerSample[i_adc] * 8) // 32 + 1) * 32 // 8
 
 
             #Calculate the number of packages
-            packets_per_adc = (self.bytes_per_sample[i_adc] * self.sample_number) // (self.octet * 8) 
-            if (self.bytes_per_sample[i_adc] * self.sample_number) % (self.octet * 8) != 0:
+            packets_per_adc = (self.bytesPerSample[i_adc] * self.sample_number) // (self.octet * 8) 
+            if (self.bytesPerSample[i_adc] * self.sample_number) % (self.octet * 8) != 0:
                 packets_per_adc += 1
 
             # pre-allocate the number of packages for each ADC board. We do not store the number of packets per adc
@@ -3971,24 +3984,24 @@ class APDCAM10G_data:
                 self.packets[i_adc][i_packet].plannedFirstSampleStartByte = firstSampleStartByte
 
                 # number of the bytes of the first (potentially fractional) sample
-                firstSampleBytes = self.bytes_per_sample[i_adc] - firstSampleStartByte
+                firstSampleBytes = self.bytesPerSample[i_adc] - firstSampleStartByte
 
                 # Number of bytes available for further samples
                 remainingBytes = self.octet*8 - firstSampleBytes
 
                 # Number of full samples fitting into the remaining bytes
-                nFullSamples = remainingBytes//self.bytes_per_sample[i_adc]
+                nFullSamples = remainingBytes//self.bytesPerSample[i_adc]
 
                 # assume a full last sample fitting into the packet
                 self.packets[i_adc][i_packet].plannedLastSampleNumber = firstSampleNumber + nFullSamples
-                self.packets[i_adc][i_packet].plannedLastSampleStopByte = self.bytes_per_sample[i_adc]
+                self.packets[i_adc][i_packet].plannedLastSampleStopByte = self.bytesPerSample[i_adc]
                 firstSampleNumber = self.packets[i_adc][i_packet].plannedLastSampleNumber + 1
                 firstSampleStartByte = 0
 
                 # If not, update
-                if remainingBytes%self.bytes_per_sample[i_adc] != 0:
+                if remainingBytes%self.bytesPerSample[i_adc] != 0:
                     self.packets[i_adc][i_packet].plannedLastSampleNumber += 1
-                    self.packets[i_adc][i_packet].plannedLastSampleStopByte = remainingBytes - nFullSamples*self.bytes_per_sample[i_adc]  # also the number of bytes of the last sample
+                    self.packets[i_adc][i_packet].plannedLastSampleStopByte = remainingBytes - nFullSamples*self.bytesPerSample[i_adc]  # also the number of bytes of the last sample
                     firstSampleNumber = self.packets[i_adc][i_packet].plannedLastSampleNumber
                     firstSampleStartByte =  self.packets[i_adc][i_packet].plannedLastSampleStopByte
                 
@@ -4364,4 +4377,87 @@ class APDCAM10G_data:
                             continue
                         f.writelines("{:d}...{:f}...{:d}\n".format(i_stream+1,p.time(),p.packetNumber()))
         return "",""     
+
+    def getChannelSignals(self,adcBoard,channel,strategy):
+        """
+        Skip the trailing missing packages and those which start with a non-full sample. Start interpreting
+        the channel signal from the first received packages which contains a full starting sample.
+
+        Parameters:
+        ^^^^^^^^^^^
+        adcBoard - integer (0..3)
+            The ADC board number, valid numbers are 0 to 3 inclusive
+        channel - integer (0..31)
+            The channel number within the ADC board
+
+        """
+
+        if (adcBoard<0 or len(self.APDCAM.status.ADC_address)<=adcBoard):
+            return None
+
+        chip = channel//8
         
+        if self.channelMasks[adcBoard][chip][channel]
+
+        # skip non-received packets at the beginning and also those which do not start at a full sample. The CC packet header unfortunately
+        # does not contain info about which byte a non-full sample is starting at so we need to skip these.
+        i_packet = 0
+        while i_packet<len(self.packets[adcBoard]) and ( not self.packets[adcBoard][i_packet].received() or not self.packets[adcBoard][i_packet].firstSampleFull() ):
+            i_packet = i_packet+1
+
+        # now, self.packets[adcBoard][i_packet] starts at a full sample. Start casting the series of bytes into channel signals
+
+        channelSignals = []
+
+        sampleSignal = [0]*self.bytesPerSample
+        adcData = self.packets[adcBoard][i_packet].getAdcData()
+        i_data = 0   # iterator within the ADC data
+
+        # now loop over the (continuously) received packets. Stop at an unreceived packet, because then
+        # we loose track.
+        while True:
+            sampleData = None
+            # if an entire sample does not fit into this packet
+            if i_data+self.bytesPerSample[adcBoard] >= len(adcData):
+                # if there is no next packet, or it was not received, break. We check before getting the sample data, because
+                # we do not want to handle a partial sample (even if it contained the given channel we are looking for)
+                if  i_packet+1>=len(self.packets[adcBoard]) or not self.packets[adcBoard][i_packet+1].received() :
+                    break
+                # Take all remaining bytes from this packet
+                sampleData = adcData[i_data:]
+                # Switch to the next packet
+                i_packet += 1
+                adcData = self.packets[adcBoard][i_packet].getAdcData()
+                n = self.bytesPerSample[adcBoard]-len(sampleData)  # 'n' is used for better clarity: number of bytes missing from previous packet for this sample
+                sampleData += adcData[0:n]
+                i_data = n
+            else:
+                sampleData = adcData[i_data:i_data+self.bytesPerSample[adcBoard]]
+                i_data += self.bytesPerSample[adcBoard]
+
+                # if we reached the end of the packet, go to the next one
+                if i_data >= len(adcData):
+                    i_packet += 1
+                    # if there is no next one, or it was not received, break
+                    if i_packet >= len(self.packets[adcBoard]) or not self.packets[adcBoard][i_packet].received():
+                        break
+                    i_data = 0
+
+            # an index to the starting byte of the given chip
+            i_chip = 0
+            # increment the chip start index by all previous chip bytes
+            for i in range(chip):
+                i_chip += self.chipBytesPerSample[adcBoard][i]
+
+            chipData = sampleData[i_chip:i_chip+self.chipBytesPerSample]
+
+            def get_bit(data, num):
+                base = int(num // 8)
+                shift = int(num % 8)
+                # if the bit order is opposite, use (7-shift) instead of shift in the expression below
+                return (data[base] >> shift) & 0x1
+
+            value = 0
+            for bit in range(self.bits):
+                if get_bit(chipData,channel*
+                           value |= (1<<bit)

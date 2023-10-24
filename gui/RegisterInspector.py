@@ -48,6 +48,7 @@ class RegisterInspector(QtWidgets.QWidget):
         self.numberOfBytes = QtWidgets.QSpinBox()
         self.numberOfBytes.setMinimum(1)
         self.numberOfBytes.setFixedWidth(150)
+        self.numberOfBytes.lineEdit().returnPressed.connect(self.getRegister)
         l1.addWidget(self.numberOfBytes)
 
         l1.addStretch(1)
@@ -63,28 +64,31 @@ class RegisterInspector(QtWidgets.QWidget):
 
         l1.addStretch(20)
 
-        l2 = QtWidgets.QHBoxLayout()
+        l2 = QtWidgets.QGridLayout()
         layout.addLayout(l2)
 
-        l2.addWidget(QtWidgets.QLabel("Bytes:"))
+        l2.addWidget(QtWidgets.QLabel("Bytes:"),0,0)
         self.registerValueBytes = QtWidgets.QLineEdit()
         readOnly(self.registerValueBytes)
-        l2.addWidget(self.registerValueBytes)
+        l2.addWidget(self.registerValueBytes,0,1)
 
-        l2.addStretch(1)
-        l2.addWidget(QtWidgets.QLabel("Bytes (binary):"))
+        l2.addWidget(QtWidgets.QLabel("Bytes (binary):"),1,0)
         self.registerValueBytesBinary = QtWidgets.QLineEdit()
         readOnly(self.registerValueBytesBinary)
-        l2.addWidget(self.registerValueBytesBinary)
+        l2.addWidget(self.registerValueBytesBinary,1,1)
 
-        l2.addStretch(1)
-        l2.addWidget(QtWidgets.QLabel("Integer value:"))
+        l2.addWidget(QtWidgets.QLabel("Integer value:"),2,0)
         self.registerValueInt = QtWidgets.QLineEdit()
         self.registerValueInt.setFixedWidth(150)
         readOnly(self.registerValueInt)
-        l2.addWidget(self.registerValueInt)
+        l2.addWidget(self.registerValueInt,2,1)
 
-        l2.addStretch(20)
+        l2.addWidget(QtWidgets.QLabel("As string: "),3,0)
+        self.registerValueAsString = QtWidgets.QLineEdit()
+        readOnly(self.registerValueAsString)
+        l2.addWidget(self.registerValueAsString,3,1)
+
+        #l2.setColumnStretch(l2.columnCount(),1)
 
         layout.addStretch(10)
 
@@ -97,7 +101,7 @@ class RegisterInspector(QtWidgets.QWidget):
             else:
                 reg_address = int(reg_address,10)
         except:
-            self.gui.showError("Register address can not be interpreted (must be an integer in either hex or dec format)")
+            self.gui.show_error("Register address can not be interpreted (must be an integer in either hex or dec format)")
             return
             
         n = self.numberOfBytes.value()
@@ -119,7 +123,7 @@ class RegisterInspector(QtWidgets.QWidget):
 
             err,d = self.gui.camera.readPDI(card_address,reg_address,n,arrayData=True)
             if err != "":
-                self.gui.showError(err)
+                self.gui.show_error(err)
                 return
             data = d[0]
 
@@ -130,7 +134,7 @@ class RegisterInspector(QtWidgets.QWidget):
             self.gui.camera.readCCdata(dataType=1)
             data = self.gui.camera.status.CC_variables[reg_address:reg_address+n]
         else:
-            self.gui.showWarning("Please choose a card")
+            self.gui.show_warning("Please choose a card")
             return
             
 
@@ -146,12 +150,19 @@ class RegisterInspector(QtWidgets.QWidget):
         self.registerValueBytesBinary.setText(t_bin)
         self.registerValueInt.setText(str(int.from_bytes(data,'little' if self.endian.currentText()=="LSB" else 'big')))
 
+        self.registerValueAsString.setText("")
+        try:
+            self.registerValueAsString.setText(data.decode())
+        except:
+            self.registerValueAsString.setText("-- Failed to convert --")
 
-        font = QtGui.QFont("", 0)
-        fm = QtGui.QFontMetrics(font)
-        pixelsWide = fm.width(self.registerValueBytes.text());
-        self.registerValueBytes.setFixedWidth(int(pixelsWide*1.1+20));
-        pixelsWide = fm.width(self.registerValueBytesBinary.text());
-        self.registerValueBytesBinary.setFixedWidth(int(pixelsWide*1.1+20));
-        pixelsWide = fm.width(self.registerValueInt.text());
-        self.registerValueInt.setFixedWidth(int(pixelsWide*1.1+20));
+        # font = QtGui.QFont("", 0)
+        # fm = QtGui.QFontMetrics(font)
+        # pixelsWide = fm.width(self.registerValueBytes.text())
+        # self.registerValueBytes.setFixedWidth(int(pixelsWide*1.1+20))
+        # pixelsWide = fm.width(self.registerValueBytesBinary.text())
+        # self.registerValueBytesBinary.setFixedWidth(int(pixelsWide*1.1+20))
+        # pixelsWide = fm.width(self.registerValueInt.text())
+        # self.registerValueInt.setFixedWidth(int(pixelsWide*1.1+20))
+        # pixelsWide = fm.width(self.registerValueAsString.text())
+        # self.registerValueAsString.setFixedWidth(int(pixelsWide*1.1+20))

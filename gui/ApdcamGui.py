@@ -30,7 +30,7 @@ from GuiMode import *
 
 #sys.path.append('/home/apdcam/Python/apdcam_devel/apdcam_control')
 sys.path.append('/home/barna/fusion-instruments/apdcam/sw/flap_apdcam/apdcam_control')
-from APDCAM10G_control import *
+import APDCAM10G 
 
 """
 The setEnabled method of a QWidget, when it is a tab of a QTabWidget, makes apparantly nothing.
@@ -72,12 +72,12 @@ class ApdcamGui(QtWidgets.QMainWindow):
             # and return, terminating the thread
             if not self.status.connected:
                 print("Camera is  disconnected, stopping the GUI update loop")
-                self.showMessage("Camera is disconnected, stopping the GUI update loop")
+                self.show_message("Camera is disconnected, stopping the GUI update loop")
                 return
 
             if self.updateGuiThreadStop:
                 print("Stopping GUI update loop")
-                self.showMessage("Stopping GUI update loop")
+                self.show_message("Stopping GUI update loop")
                 return
             
             time.sleep(1)
@@ -111,8 +111,8 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
         self.cameraStateRefreshed.connect(self.updateGui)
 
-        self.camera = APDCAM10G_regCom()
-        self.camera.setErrorHandler(lambda msg: self.showError(msg))
+        self.camera = APDCAM10G.controller()
+        self.camera.setErrorHandler(lambda msg: self.show_error(msg))
 
         # Status info is collected into a sub-class 'status'
         class Status:
@@ -271,28 +271,35 @@ class ApdcamGui(QtWidgets.QMainWindow):
         
     def startGuiUpdate(self):
         if not self.status.connected:
-            self.showMessage("Camera is not connected")
+            self.show_message("Camera is not connected")
             return
         if self.updateGuiThread == None:
-            self.showMessage("Starting GUI update")
+            self.show_message("Starting GUI update")
             self.updateGuiThreadStop = False
             self.updateGuiThread = threading.Thread(target=self.pollCameraStatus)
             self.updateGuiThread.start()
         else:
-            self.showMessage("GUI update is already running")
+            self.show_message("GUI update is already running")
 
-    def stopGuiUpdate(self):
+    def stopGuiUpdate(self,wait=True):
         """
         Sets the 'stop' flag for the thread making the periodic update of the widgets from the values
         obtained from the camera, and waits for the thread to terminate
+
+        Parameters:
+        ^^^^^^^^^^^
+        wait - boolean
+            If True, the function does not return until the periodic gui-update thread stopped
+
         """
         
-        self.showMessage("Signaling the GUI update to stop")
+        self.show_message("Signaling the GUI update to stop")
         self.updateGuiThreadStop = True
-        while hasattr(self.updateGuiThread,"is_alive") and self.updateGuiThread.is_alive():
-            print("Still alive")
-            time.sleep(0.1)
         self.updateGuiThread = None
+        if wait:
+            while hasattr(self.updateGuiThread,"is_alive") and self.updateGuiThread.is_alive():
+                #print("Still alive")
+                time.sleep(0.5)
 
     def beforeBackendCall(self,*,name="",where=""):
         if not self.status.connected:
@@ -304,7 +311,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
             msg += "'"
             if where != "":
                 msg += " [" + where + "]"
-            self.showError(msg)
+            self.show_error(msg)
             return False
         return True
 
@@ -313,7 +320,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
             msg = "Function '" + name + "' failed " + str(n) + " times. ";
             if not showall:
                 msg += "Last error: " + errors[len(errors)-1]
-            self.showError(msg)
+            self.show_error(msg)
 
 
     def call(self,function,*,n=1,wait=1,critial=False,showall=False,name='',where=''):
@@ -356,7 +363,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
             ncalls = 0
             for i in range(n):
                 if showall:
-                    self.showMessage("Calling " + function.__qualname__)
+                    self.show_message("Calling " + function.__qualname__)
                 e = function()
 
                 if not isinstance(e,str):
@@ -368,7 +375,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
                     break
                 else:
                     if showall:
-                        self.showError(e)
+                        self.show_error(e)
                     errors.append(e)
                 if n > 1:
                     time.sleep(wait)
@@ -407,7 +414,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
             try:
                 os.makedirs(dir)
             except:
-                self.showError("Could not create camera-specific settings directory " + dir)
+                self.show_error("Could not create camera-specific settings directory " + dir)
                 return ""
         return dir
 
@@ -465,7 +472,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
             # for the filename interactively
             if fileName == "":
                 ask = True
-                self.showMessage("No previous settings file is found in " + self.cameraSettingsDirName())
+                self.show_message("No previous settings file is found in " + self.cameraSettingsDirName())
                 fileName = self.cameraSettingsDirName()
 
         # If fileName is None, pop up a dialog and ask the user
@@ -478,9 +485,9 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
         error = loadSettings(self,fileName)
         if error != "":
-            self.showError(error)
+            self.show_error(error)
         else:
-            self.showMessage("Settings have been loaded from " + fileName)
+            self.show_message("Settings have been loaded from " + fileName)
 
     def saveSettings(self,fileName = "", ask=True):
         '''
@@ -508,15 +515,15 @@ class ApdcamGui(QtWidgets.QMainWindow):
                 return
 
         if fileName == "":
-            self.showError("No filename could be determined. Settings are not saved")
+            self.show_error("No filename could be determined. Settings are not saved")
             return
 
         # call the global function which loads the settings for a given widget. Call it for the topmost widget (self)
         error = saveSettings(self,fileName)
         if error != "":
-            self.showError(error)
+            self.show_error(error)
         else:
-            self.showMessage("Settings have been saved to " + fileName)
+            self.show_message("Settings have been saved to " + fileName)
 
 
     def initSettingsOnConnect(self):
@@ -533,7 +540,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
         
     def loadSettingsFromCamera(self):
         if not self.status.connected:
-            self.showError("Camera is not connected, can not read settings")
+            self.show_error("Camera is not connected, can not read settings")
             return
 
         self.infrastructure.loadSettingsFromCamera()
@@ -561,7 +568,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
                     child.setStyleSheet("background-color: red")
 
 
-    def showMessageWithTime(self,msg):
+    def show_message_with_time(self,msg):
         time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         msg = time + " - " + msg
         if hasattr(self,"messages"):
@@ -576,20 +583,20 @@ class ApdcamGui(QtWidgets.QMainWindow):
             self.logfile.write(msg + "\n")
             self.logfile.flush()
 
-    def showMessage(self,msg):
-        self.showMessageWithTime(msg)
+    def show_message(self,msg):
+        self.show_message_with_time(msg)
 
-    def showWarning(self,msg):
-        self.showMessageWithTime("<font color='orange'>" + msg + "</font>");
+    def show_warning(self,msg):
+        self.show_message_with_time("<font color='orange'>" + msg + "</font>");
 
-    def showError(self,msg):
-        self.showMessageWithTime("<font color='red'>" + msg + "</font>");
+    def show_error(self,msg):
+        self.show_message_with_time("<font color='red'>" + msg + "</font>");
 
     def setControlEnabled(self,control,status):
         if hasattr(control,"setEnabled"):
             control.setEnabled(status)
         else:
-            self.showError("A factory-setting control can not be be toggled between enabled/disabled (alert the developer!)")
+            self.show_error("A factory-setting control can not be be toggled between enabled/disabled (alert the developer!)")
         if isinstance(control,QtWidgets.QPushButton):
             control.setStyleSheet("color: " + ("rgba(255,0,0,1)" if status else "rgba(255,0,0,0.25)"))
         if isinstance(control,QtWidgets.QCheckBox):
@@ -604,13 +611,13 @@ class ApdcamGui(QtWidgets.QMainWindow):
             self.expertModeAction.setIcon(QtGui.QIcon())
         if mode == GuiMode.factory:
             self.factorySettingsModeButton.setText("Quit factory settings mode")
-            self.showWarning("Enter factory settings mode")
+            self.show_warning("Enter factory settings mode")
             self.expertModeAction.setIcon(QtGui.QIcon("checkmark.png"))
             self.simpleModeAction.setIcon(QtGui.QIcon())
         if mode == GuiMode.expert:
             self.factorySettingsModeButton.setText("Enter factory settings mode")
             if oldMode == GuiMode.factory:
-                self.showMessage("Quit factory settings mode")
+                self.show_message("Quit factory settings mode")
             self.expertModeAction.setIcon(QtGui.QIcon("checkmark.png"))
             self.simpleModeAction.setIcon(QtGui.QIcon())
         children = self.findChildren(QtWidgets.QWidget)
@@ -633,12 +640,12 @@ class ApdcamGui(QtWidgets.QMainWindow):
                     
     def toggleFactorySettingsMode(self):
         if self.guiMode == GuiMode.simple:
-            self.showError("This should never happen")
+            self.show_error("This should never happen")
             return
 
         if self.guiMode == GuiMode.expert:
             if self.factorySettingsPassword.text() != "hello":
-                self.showError("Incorrect password")
+                self.show_error("Incorrect password")
                 self.factorySettingsPassword.setText("")
                 return
             self.factorySettingsPassword.setText("")
@@ -662,6 +669,6 @@ class ApdcamGuiApp(QtWidgets.QApplication):
         
 if __name__ == '__main__':
     app = ApdcamGuiApp()
-    #sys.stderr.write = app.showError
-    #sys.stdout.write = app.showMessage
+    #sys.stderr.write = app.show_error
+    #sys.stdout.write = app.show_message
     app.run()

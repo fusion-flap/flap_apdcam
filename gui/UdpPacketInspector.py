@@ -10,15 +10,41 @@ Qt = importlib.import_module(QtVersion+".QtCore")
 
 from ApdcamUtils import *
 sys.path.append('/home/barna/fusion-instruments/apdcam/sw/flap_apdcam/apdcam_control')
-from APDCAM10G_control import *
+import APDCAM10G
 
+def pseudoTestPatternFast(adc_bits=14):
+    # we represent each bit by an integer (0/1)
+    # Even though this pseudo-random sequence has a period of 511, we start with 1022
+    # because we want to have an integer number of times the number of ADC bits. ADC bits is 8, 12 or 14
+    # so we will need an even number of bits, for sure
+    bits = 1022
+    bitseq = bytearray(bits)
+    bitseq[0:8] = [1,1,1,1,1,0,1,1]  # first 8 bits
+    for i in range(bits-8):
+        c = (bitseq[4]+bitseq[8])%2
+        bitseq[1:bits] = bitseq[0:bits-1]  # shift the array forward by 1 index
+        bitseq[0] = c
 
-class QHLine(QtWidgets.QFrame):
-    def __init__(self):
-        super(QHLine, self).__init__()
-        self.setFrameShape(QtWidgets.QFrame.HLine)
-        self.setFrameShadow(QtWidgets.QFrame.Sunken)
+    # Now replicate the bit-sequence as many times as needed to fit an integer times the number
+    # of ADC bits
+    bitseq1 = bitseq
+    for i in range(14):
+        if len(bitseq)%adc_bits == 0:
+            break
+        bitseq = bitseq + bitseq1
 
+    # the number of generated samples (adc_bits bits transformed into integers)    
+    sample_len = len(bitseq)/adc_bits
+
+    pseudo_samples = [0]*sample_len
+    for isample in range(1,sample_len+1):
+        for bit in range(adc_bits):
+            if bitseq[len(bitseq)-isample*adc_bits+bit]:
+                pseudo_samples[isample] |= 1<<bit;
+        
+    return pseudo_samples
+
+        
 class UdpPacketInspector(QtWidgets.QWidget):
     def __init__(self,parent):
         super(UdpPacketInspector,self).__init__(parent)
@@ -56,6 +82,18 @@ class UdpPacketInspector(QtWidgets.QWidget):
             self.packetsDisplay[i].setText("Packet info listing")
             layout.addWidget(self.packetsDisplay[i],2,i)
 
+    def matchPseudo(self,packets):
+        """
+        Generate a peuseo random number pattern according to the standard, and try to match against the received
+        data from the ADC
+
+        Parameters:
+        ^^^^^^^^^^^
+        packets: list of UDP packets from a given ADC board
+        """
+
+        
+
     def getData(self):
         self.gui.stopGuiUpdate()
         time.sleep(1)
@@ -67,19 +105,19 @@ class UdpPacketInspector(QtWidgets.QWidget):
         n = self.numberOfSamples.value()
         error,warning,data_receiver = self.gui.camera.measure(numberOfSamples=n,dataReceiver="python",logger=self.gui)
         if error!="":
-            self.gui.showError(error)
+            self.gui.show_error(error)
         if warning!="":
-            self.gui.showWarning(warning)
+            self.gui.show_warning(warning)
 
-        #self.gui.showMessage("Stream start time 1: " + str(data_receiver.stream_start_time_1))
-        #self.gui.showMessage("Stream start time 2: " + str(data_receiver.stream_start_time_2))
+        #self.gui.show_message("Stream start time 1: " + str(data_receiver.stream_start_time_1))
+        #self.gui.show_message("Stream start time 2: " + str(data_receiver.stream_start_time_2))
 
-        packets = data_receiver.getPackets()
+        packets = data_receiver.packets
         if packets is None:
-            self.gui.showError("Did not receive any data")
+            self.gui.show_error("Did not receive any data")
             return
         if not isinstance(packets,list):
-            self.gui.showError("Received packets is not a list")
+            self.gui.show_error("Received packets is not a list")
             return
 
         for i_adc in range(len(packets)):
@@ -107,10 +145,24 @@ class UdpPacketInspector(QtWidgets.QWidget):
                     print("MISSING")    
                     self.packetsDisplay[i_adc].append("MISSING")    
                 first = False
-
                 
             self.summaryDisplay[i_adc].append("Bytes/sample: " + str(data_receiver.bytes_per_sample[i_adc]))
             self.summaryDisplay[i_adc].append("Expected: " + str(len(packets[i_adc])) + ". Received: " + str(receivedPackets))
             self.summaryDisplay[i_adc].append("Number of data bytes in packet: " + str(data_receiver.octet) + "*8 = " + str(data_receiver.octet*8))
 
         self.gui.startGuiUpdate()
+
+        c1 = data_receiver.get_channel_signals(1,1)
+        c2 = data_receiver.get_channel_signals(2,1)
+        n = 1000
+        if c1 is not None:
+            print("Length of c1: " + str(len(c1)))
+            if len(c1)<n:
+                n = len(c1)
+        if c2 is not None: 
+            print("Length of c2: " + str(len(c2)))
+            if len(c2)<n:
+                n = len(c2)
+
+        for i in range(n):
+            print("  >> " + (str(c1[i]) if c1 is not None else "") + " " + (str(c2[i]) if c2 is not None else ""))

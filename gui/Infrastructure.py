@@ -113,7 +113,7 @@ class Infrastructure(QtWidgets.QWidget):
         self.calibrationLightIntensity.setMinimum(0)
         self.calibrationLightIntensity.setMaximum(4095)
         self.calibrationLightIntensity.valueChanged.connect(self.gui.call(lambda: self.gui.camera.setCallight(self.calibrationLightIntensity.value()),\
-                                                                          name="APDCAM10G_control.setCallight(...)",\
+                                                                          name="APDCAM10G.controller.setCallight(...)",\
                                                                           where=__file__))
         self.calibrationLightIntensity.setToolTip("Set the current of the calibration LED. 0 is complete darkness, maximum value is 4096")
         calib.addWidget(self.calibrationLightIntensity)
@@ -229,7 +229,7 @@ class Infrastructure(QtWidgets.QWidget):
                 self.hvSet[n].setValue(hv)
                 self.hvOn[n].setChecked(hvon>>n)
             else:
-                self.gui.showError("Failed to read HV " + str(n+1) + " from camera: " + err)
+                self.gui.show_error("Failed to read HV " + str(n+1) + " from camera: " + err)
         
                 
         # shutter
@@ -237,7 +237,7 @@ class Infrastructure(QtWidgets.QWidget):
         if err=="":
             self.shutterOpen.setChecked(sh)
         else:
-            self.gui.showError("Failed to read shutter status from camera: " + err)
+            self.gui.show_error("Failed to read shutter status from camera: " + err)
 
         # shutter external control
         err,ext = self.gui.camera.getPcRegister(self.gui.camera.codes_PC.PC_REG_SHMODE)
@@ -248,14 +248,14 @@ class Infrastructure(QtWidgets.QWidget):
             else:
                 self.shutterOpen.setEnabled(False)
         else:
-            self.gui.showError("Failed to read shutter mode from camera: " + err)
+            self.gui.show_error("Failed to read shutter mode from camera: " + err)
 
         # Calibration light
         err,callight = self.gui.camera.getCallight()
         if err=="":
             self.calibrationLightIntensity.setValue(callight)
         else:
-            self.gui.showError("Failed to read calibration light intensity from camera: " + err)
+            self.gui.show_error("Failed to read calibration light intensity from camera: " + err)
 
     def updateGui(self):
         for i in range(4):
@@ -323,7 +323,7 @@ class Infrastructure(QtWidgets.QWidget):
         self.gui.afterBackendCall(True if err=="" else False, [err],name="self.gui.camera.shutterMode(" + str(mode) + ")")
 
 #    def readHvStatus(self):
-#        self.gui.showError("Infrastructure.readHvStatus not implemented yet")
+#        self.gui.show_error("Infrastructure.readHvStatus not implemented yet")
 
     def setHvGroups(self,n):
         """

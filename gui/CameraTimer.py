@@ -17,7 +17,7 @@ class CameraTimer(QtWidgets.QWidget):
         pass
 
     def loadSettingsFromCamera(self):
-        self.gui.showMessage("Loading the settings from the camera is not yet implemented for Camera & Timer tab")
+        self.gui.show_message("Loading the settings from the camera is not yet implemented for Camera & Timer tab")
 
 
     def __init__(self,parent):

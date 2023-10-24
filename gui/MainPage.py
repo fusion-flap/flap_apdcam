@@ -69,11 +69,11 @@ class MainPage(QtWidgets.QWidget):
         layout.addWidget(self.messages)
 
     def cameraOff(self):
+        self.gui.stopGuiUpdate()
         self.cameraConnectedStatus.setText("Camera status: disconnected")
         self.gui.status.connected = False
-        self.gui.camera.close()  # APDCAM10G_control should handle the case if camera is on or off when calling close()
-        self.gui.showMessage("Camera disconnected")
-        self.gui.stopGuiUpdate()
+        self.gui.camera.close()  # APDCAM10G.controller should handle the case if camera is on or off when calling close()
+        self.gui.show_message("Camera disconnected")
 
     def cameraOn(self):
         """
@@ -103,7 +103,7 @@ class MainPage(QtWidgets.QWidget):
             time.sleep(1)  
         if ret != "" :
             self.messages.append(ret)
-            self.gui.showError("Failed to connect to camera at the address " + self.addressEntry.text())
+            self.gui.show_error("Failed to connect to camera at the address " + self.addressEntry.text())
             QtWidgets.QApplication.processEvents()
             self.cameraOff()
             self.gui.status.connected = False
@@ -134,7 +134,7 @@ class MainPage(QtWidgets.QWidget):
         err = self.gui.camera.readStatus()
         if (err != "") :
             self.messages.append(err)
-            self.gui.showError(err)
+            self.gui.show_error(err)
             self.cameraOff()
             return
 

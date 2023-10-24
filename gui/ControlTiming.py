@@ -385,7 +385,7 @@ class ControlTiming(QtWidgets.QWidget):
         hh.addWidget(self.adcOutFreqDiv)
         self.adcOutFreqDiv.settingsName = "ADC output frequency divisor"
         self.adcOutFreqDiv.setToolTip("Divisor for the ADC output frequency going to the panel. Only available from FW version 105.")
-        self.gui.showError("Control & Timing / ADC output frequency divisor is not yet connected to an action")
+        self.gui.show_error("Control & Timing / ADC output frequency divisor is not yet connected to an action")
 
         g = QVGroupBox()
         l.addWidget(g)

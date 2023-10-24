@@ -39,7 +39,7 @@ class Adc(QtWidgets.QWidget):
         # self.overload.setChecked(overload)
         self.overload.setChecked(r[a.ADC_REG_OVDSTATUS]&1)
 #        print("we should clear the latched bit")
-#        self.gui.showWarning("We should clear the latched overload bit")
+#        self.gui.show_warning("We should clear the latched overload bit")
 
         #error,status2 = self.gui.camera.getAdcRegister(self.number,self.gui.camera.codes_ADC.ADC_REG_STATUS2)
         status2 = r[a.ADC_REG_STATUS2]
@@ -109,7 +109,7 @@ class Adc(QtWidgets.QWidget):
             error = self.gui.camera.setTestPattern(adcBoardNo=self.number,value=values[0])
         else:
             if len(values) != 4:
-                self.gui.showError("Test pattern must be a single or four integers")
+                self.gui.show_error("Test pattern must be a single or four integers")
                 return
             error = self.gui.camera.setTestPattern(adcBoardNo=self.number,value=values)
         return error
@@ -136,6 +136,12 @@ class Adc(QtWidgets.QWidget):
         filt[5] = c
         filt[7] = 8+gain
 
+    def set_test_pattern_mode(self):
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
+        if modifiers == QtCore.Qt.ShiftModifier:
+            print('Shift+Click')
+        else:
+            print("no shift")
 
     def __init__(self,parent,number,address):
         """
@@ -249,11 +255,12 @@ class Adc(QtWidgets.QWidget):
                 chk.settingsName = "Channel " + str(channel) + " on"
                 chk.setStyleSheet("padding: 0px; margin: 0px; margin-top:0px; margin-bottom:0px;")
                 chk.setContentsMargins(0,0,0,0)
-                chk.stateChanged.connect(self.gui.call(partial(lambda channel,checkbox: self.gui.camera.setAdcChannelEnable(channel,checkbox.isChecked()),\
-                                                               (self.number-1)*32+channel,\
-                                                               chk), \
-                                                       name = "APDCAM10G_control.setAdcChannelEnable(" + str(self.number) + "," + str(channel) + ",state)"
-                                                       ))
+                # chk.stateChanged.connect(self.gui.call(partial(lambda channel,checkbox: self.gui.camera.setAdcChannelEnable(channel,checkbox.isChecked()),\
+                #                                                (self.number-1)*32+channel,\
+                #                                                chk), \
+                #                                        name = "APDCAM10G.setAdcChannelEnable(" + str(self.number) + "," + str(channel) + ",state)"
+                #                                        ))
+                chk.stateChanged.connect(self.gui.call(partial(self.set_adc_channel_enable,channel=channel)))
                 chk.setToolTip("Enable/disable a given channel")
                 chk.channelNumber = channel
                 self.channelOn[channel-1] = chk
@@ -303,7 +310,8 @@ class Adc(QtWidgets.QWidget):
         self.internalTrigger = QtWidgets.QCheckBox("Internal trigger")
         self.internalTrigger.settingsName = "Internal trigger"
         self.internalTrigger.setToolTip("Enable internal trigger output from this ADC board")
-        self.internalTrigger.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setInternalTriggerAdc(adcBoardNo=self.number,enable=self.internalTrigger.isChecked())))
+        #self.internalTrigger.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setInternalTriggerAdc(adcBoardNo=self.number,enable=self.internalTrigger.isChecked())))
+        self.internalTrigger.clicked.connect(self.set_test_pattern_mode)
         g.addWidget(self.internalTrigger,4,0)
 
         self.reverseBitOrder = QtWidgets.QCheckBox("Rev. bitord.")
@@ -323,7 +331,7 @@ class Adc(QtWidgets.QWidget):
         self.bits.addItem("14")
         self.bits.addItem("12")
         self.bits.addItem("8")
-        self.bits.activated[str].connect(self.gui.call(lambda: self.gui.camera.setAdcResolution(self.number,int(self.bits.currentText()))))
+        self.bits.activated[str].connect(self.gui.call(self.set_adc_resolution))
         g.addWidget(self.bits,0,1)
 
         g.addWidget(QtWidgets.QLabel("Ring buffer:"),1,0)
@@ -351,6 +359,17 @@ class Adc(QtWidgets.QWidget):
         self.testPattern.setToolTip("Test pattern for this ADC. Either an integer (value for all four 8-channel blocks), or 4 integers (for the blocks separately)")
         g.addWidget(self.testPattern,4,1)
         g.setRowStretch(g.rowCount(),1)
+
+        g.addWidget(QtWidgets.QLabel("Bytes/chip:"),5,0)
+        self.bytes_per_chip = QtWidgets.QLineEdit()
+        self.bytes_per_chip.setToolTip("Values of the BPSCH1..BPSCH4 registers of the ADC board indicating the number of bytes per sample for the 4 chips (i.e. 8-channel blocks) in the data stream")
+        readOnly(self.bytes_per_chip)
+        g.addWidget(self.bytes_per_chip,5,1)
+        g.addWidget(QtWidgets.QLabel("Bytes/sample:"),6,0)
+        self.bytes_per_sample = QtWidgets.QLineEdit()
+        self.bytes_per_sample.setToolTip("Number of bytes per sample for this ADC board")
+        readOnly(self.bytes_per_sample)
+        g.addWidget(self.bytes_per_sample,6,1)
 
         g = QGridGroupBox(self)
         topRow.addWidget(g)
@@ -409,7 +428,7 @@ class Adc(QtWidgets.QWidget):
         self.filterEnable = QtWidgets.QCheckBox("Enable")
         self.filterEnable.settingsName = "Enable filter"
         self.filterEnable.setToolTip("Enable the filter (takes immediate effect)")
-        self.filterEnable.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setFilterOn(self.number,self.filterEnable.isChecked()),name="APDCAM10G_control.filterOnOff",where=__file__))
+        self.filterEnable.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setFilterOn(self.number,self.filterEnable.isChecked()),name="APDCAM10G.filterOnOff",where=__file__))
         g.addWidget(self.filterEnable,4,2,1,2)
         
         g.setRowStretch(g.rowCount(),1)
@@ -569,10 +588,58 @@ class Adc(QtWidgets.QWidget):
             self.dac[i].setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
             self.dac[i].setMaximumWidth(54)
             f = partial(lambda ch: self.gui.camera.setOffset(self.number,ch,self.dac[ch-1].value()),i+1)
-            self.dac[i].lineEdit().returnPressed.connect(self.gui.call(f,name="APDCAM10G_control.setOffset(" + str(self.number) + "," + str(i+1) + ",value)",where=__file__))
+            self.dac[i].lineEdit().returnPressed.connect(self.gui.call(f,name="APDCAM10G.setOffset(" + str(self.number) + "," + str(i+1) + ",value)",where=__file__))
             self.dac[i].setToolTip("Specify the value (0..65535) for the DAC for the given channel, which defines the ADC offset. Changes take effect when you hit Enter")
             h.addWidget(self.dac[i])
         h.addStretch(1)
+
+    def show_bytes_per_sample(self):
+        err,adcAddresses = self.gui.camera.adcAddresses(self.number)
+        err,bpsch = self.gui.camera.readPDI(adcAddresses[0],self.gui.camera.codes_ADC.ADC_REG_BPSCH1,4,arrayData=True)
+        if err != "":
+            self.gui.show_error(err)
+            self.bytes_per_chip.setText("")
+            self.bytes_per_sample.setText("")
+        else:
+            bpsch = bpsch[0]
+            bpc = "" # bytes per chip
+            bps = 0
+            for i in range(4):
+                if i > 0:
+                    bpc += " "
+                bpc += str(int(bpsch[i]))
+                bps += int(bpsch[i])
+
+            self.bytes_per_chip.setText(bpc)
+
+            # bytes-per-sample needs to be rounded up to integer times 32 bits, i.e. integer times 4 bytes
+            n = bps//4
+            if n*4 != bps:
+                n += 1
+            bps = n*4
+            self.bytes_per_sample.setText(str(bps))
+
+    def set_adc_channel_enable(self,channel):
+        """
+        Set the bit in the ADC register corresponding to this channel on/off, and in addition
+        query the "bytes per sample of chip" registers (BPSCH1 .. BPSCH4) of the ADC board, and display it
+        """
+        self.bytes_per_sample.setText("")
+        self.bytes_per_chip.setText("")
+        err = self.gui.camera.setAdcChannelEnable((self.number-1)*32+channel,self.channelOn[channel-1].isChecked())
+        if err != "":
+            return err
+        self.show_bytes_per_sample()
+        return ""
+
+    def set_adc_resolution(self):
+        self.bytes_per_sample.setText("")
+        self.bytes_per_chip.setText("")
+        err = self.gui.camera.setAdcResolution(self.number,int(self.bits.currentText()))
+        if err != "":
+            return err
+        self.show_bytes_per_sample()
+        return ""
 
     def loadSettingsFromCamera(self):
 
@@ -585,7 +652,7 @@ class Adc(QtWidgets.QWidget):
                     self.channelOn[i*8+c].setChecked(reg & (1<<(7-c)))
                     self.channelOn[i*8+c].blockSignals(False)
             else:
-                self.gui.showError(err)    
+                self.gui.show_error(err)    
 
         err,bit = self.gui.camera.getSataOn(self.number)
         if err=="":
@@ -593,21 +660,21 @@ class Adc(QtWidgets.QWidget):
             self.sataOn.setChecked(bit)
             self.sataOn.blockSignals(False)
         else:
-            self.showError("Failed to read 'Sata on' bit: " + err)
+            self.show_error("Failed to read 'Sata on' bit: " + err)
         err,bit = self.gui.camera.getSataSync(self.number)
         if err=="":
             self.sataSync.blockSignals(True)
             self.sataSync.setChecked(bit)
             self.sataSync.blockSignals(False)
         else:
-            self.showError("Failed to read 'Sata sync' bit: " + err)
+            self.show_error("Failed to read 'Sata sync' bit: " + err)
         err,bit = self.gui.camera.getTestPatternMode(self.number)
         if err=="":
             self.test.blockSignals(True)
             self.test.setChecked(bit)
             self.test.blockSignals(False)
         else:
-            self.showError("Failed to read 'Test pattern mode' bit: " + err)
+            self.show_error("Failed to read 'Test pattern mode' bit: " + err)
 
         err,bit = self.gui.camera.getInternalTriggerAdc(self.number)
         if err=="":
@@ -615,26 +682,26 @@ class Adc(QtWidgets.QWidget):
             self.internalTrigger.setChecked(bit)
             self.internalTrigger.blockSignals(False)
         else:
-            self.showError("Failed to read 'ADC internal trigger' bit: " + err)
+            self.show_error("Failed to read 'ADC internal trigger' bit: " + err)
         err,bit = self.gui.camera.getReverseBitord(self.number)
         if err=="":
             self.reverseBitOrder.blockSignals(True)
             self.reverseBitOrder.setChecked(bit)
             self.reverseBitOrder.blockSignals(False)
         else:
-            self.showError("Failed to read 'reverse bit order' bit: " + err)
+            self.show_error("Failed to read 'reverse bit order' bit: " + err)
 
         err,bits = self.gui.camera.getAdcResolution(self.number)
         if err=="":
             i = self.bits.findText(str(bits))
             if i<0:
-                self.showError("Invalid resolution obtained from camera: " + str(bits))
+                self.show_error("Invalid resolution obtained from camera: " + str(bits))
             else:
                 self.bits.blockSignals(True)
                 self.bits.setCurrentIndex(i)
                 self.bits.blockSignals(False)
         else:
-            self.showError("Failed to read resolution: " + err)
+            self.show_error("Failed to read resolution: " + err)
         
         err,ringbufsize = self.gui.camera.getRingBufferSize(self.number)
         if err=="":
@@ -642,7 +709,7 @@ class Adc(QtWidgets.QWidget):
             self.ringBuffer.setValue(ringbufsize)
             self.ringBuffer.blockSignals(False)
         else:
-            self.showError("Failed to read ring buffer size: " + err)
+            self.show_error("Failed to read ring buffer size: " + err)
 
         err,testpattern = self.gui.camera.getTestPattern(self.number)
         if err=="":
@@ -655,7 +722,7 @@ class Adc(QtWidgets.QWidget):
             self.testPattern.setText(s)
             self.testPattern.blockSignals(False)
         else:
-            self.showError("Failed to read test pattern: " + err)
+            self.show_error("Failed to read test pattern: " + err)
 
         err,filtercoeffs = self.gui.camera.getFilterCoeffs(self.number)
         if err=="":
@@ -688,16 +755,16 @@ class Adc(QtWidgets.QWidget):
                     self.internalTriggerLevel[i].setValue(reg&(2**14-1)) # mask the lowest 13 bits
                     self.internalTriggerLevel[i].blockSignals(False)
             else:
-                self.showError("Failed to read trigger settings for ADC board " + str(self.number))    
+                self.show_error("Failed to read trigger settings for ADC board " + str(self.number))    
         else:
-            self.showError("Failed to read trigger settings for ADC board " + str(self.number))
+            self.show_error("Failed to read trigger settings for ADC board " + str(self.number))
             
         err,offsets = self.gui.camera.getOffsets(self.number)
         if err=="":
             for i in range(32):
                 self.dac[i].setValue(offsets[i]);
         else:
-            self.showError("Failed to get read offsets for ADC board " + str(self.number))
+            self.show_error("Failed to get read offsets for ADC board " + str(self.number))
             
 class AdcControl(QtWidgets.QWidget):
     def updateGui(self):

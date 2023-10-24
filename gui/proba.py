@@ -1,10 +1,6 @@
 #!/usr/bin/python3
 
-from sys import getrefcount
+f = lambda: [print("egy"),print(2)]
+f()
 
-
-a = bytearray(10)
-print(getrefcount(a))
-b = a[0:2]
-print(getrefcount(a))
 

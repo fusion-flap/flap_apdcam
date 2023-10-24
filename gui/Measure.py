@@ -68,15 +68,15 @@ class Measure(QtWidgets.QWidget):
 
         layout.addStretch(1)
 
-    def showMessage(self,msg):
+    def show_message(self,msg):
         self.messages.append(msg)
 
     def measure(self):
         if not self.gui.status.connected:
-            self.gui.showError("Camera is not connected")
+            self.gui.show_error("Camera is not connected")
             return
         self.gui.stopGuiUpdate()
-        self.gui.showWarning("After the measurement is completed, please re-start the GUI update manually by clicking on the corresponding button in the 'Main' tab")
+        self.gui.show_warning("After the measurement is completed, please re-start the GUI update manually by clicking on the corresponding button in the 'Main' tab")
         time.sleep(1)
         self.gui.saveSettings(ask=False)
         self.gui.camera.measure(numberOfSamples=self.sampleNumber.value(),datapath=self.dataDirectory.text(),timeout=self.timeout.value()*1000)

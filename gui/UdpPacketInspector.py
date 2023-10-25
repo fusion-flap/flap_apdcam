@@ -108,6 +108,8 @@ class UdpPacketInspector(QtWidgets.QWidget):
             self.gui.show_error(error)
         if warning!="":
             self.gui.show_warning(warning)
+        if data_receiver is None:
+            self.gui.show_error("No data_receiver object: " + error)
 
         #self.gui.show_message("Stream start time 1: " + str(data_receiver.stream_start_time_1))
         #self.gui.show_message("Stream start time 2: " + str(data_receiver.stream_start_time_2))
@@ -152,8 +154,8 @@ class UdpPacketInspector(QtWidgets.QWidget):
 
         self.gui.startGuiUpdate()
 
-        c1 = data_receiver.get_channel_signals(1,1)
-        c2 = data_receiver.get_channel_signals(2,1)
+        c1 = data_receiver.get_channel_signals(2,2)
+        c2 = data_receiver.get_channel_signals(2,9)
         n = 1000
         if c1 is not None:
             print("Length of c1: " + str(len(c1)))

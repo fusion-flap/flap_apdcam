@@ -4373,6 +4373,10 @@ class data:
 
         """
 
+        if adc_board<1 or channel<1:
+            print("Bad adc_board or channel value")
+            return None
+
         adc_board -= 1
         channel -= 1
 

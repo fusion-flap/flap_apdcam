@@ -3812,6 +3812,8 @@ class packet:
         """
         Returns the serial number from the CC packet header
         """
+        if self.data is None:
+            return ""
         return int.from_bytes(self.data[0:4],'big') # I assume big endian, not sure
 
     def streamNumber(self):
@@ -3821,7 +3823,9 @@ class packet:
         S1 = int.from_bytes(self.data[4:6],'big')
         return (S1>>14)&3 
 
-    def udpTestMode(self):
+    def udp_test_mode(self):
+        if self.data is None:
+            return None
         S1 = int.from_bytes(self.data[4:6],'big')
         return (((S1>>1)&1) > 0)
 

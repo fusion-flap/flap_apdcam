@@ -12,19 +12,6 @@ from ApdcamUtils import *
 sys.path.append('/home/barna/fusion-instruments/apdcam/sw/flap_apdcam/apdcam_control')
 import APDCAM10G
 
-class QHLine(QtWidgets.QFrame):
-    def __init__(self):
-        super(QHLine, self).__init__()
-        self.setFrameShape(QtWidgets.QFrame.HLine)
-        self.setFrameShadow(QtWidgets.QFrame.Sunken)
-
-
-class QVLine(QtWidgets.QFrame):
-    def __init__(self):
-        super(QVLine, self).__init__()
-        self.setFrameShape(QtWidgets.QFrame.VLine)
-        self.setFrameShadow(QtWidgets.QFrame.Sunken)
-
 def pseudo_test_pattern_fast(adc_bits=14):
     # we represent each bit by an integer (0/1)
     # Even though this pseudo-random sequence has a period of 511, we start with 1022
@@ -75,8 +62,7 @@ class UdpPacketInspector(QtWidgets.QWidget):
         self.numberOfSamples = QtWidgets.QSpinBox()
         self.numberOfSamples.setFixedWidth(300)
         self.numberOfSamples.setMaximum(100000)
-        self.numberOfSamples.setValue(200)
-        self.numberOfSamples.lineEdit().returnPressed.connect(self.get_data)
+        self.numberOfSamples.setValue(1000)
         commands.addWidget(self.numberOfSamples)
         self.getDataButton = QtWidgets.QPushButton("Get data")
         self.getDataButton.setToolTip("Read the specified number of samples from the camera and display an analysis result of the received packets")
@@ -84,34 +70,18 @@ class UdpPacketInspector(QtWidgets.QWidget):
         commands.addWidget(self.getDataButton)
         commands.addStretch(1)
 
-        self.summary_display = [None]*4
-        self.packets_display = [None]*4
-        self.packets_display_layout = [None]*4
+        self.summaryDisplay = [None]*4
+        self.packetsDisplay = [None]*4
 
         self.stream = [None]*4
         for i in range(4):
-            self.summary_display[i] = QtWidgets.QTextEdit()
-            self.summary_display[i].setFixedHeight(80)
-            self.summary_display[i].setText("ADC " + str(i+1) + " summary")
-            layout.addWidget(self.summary_display[i],1,i)
-            self.packets_display[i] = QtWidgets.QScrollArea()
-            self.packets_display[i].setWidgetResizable(True)
-            
-            #self.packetsDisplay[i] = QtWidgets.QTextEdit()
-            #self.packetsDisplay[i].setText("Packet info listing")
-            layout.addWidget(self.packets_display[i],2,i)
-        self.init_packets_displays()
-
-
-    def init_packets_displays(self):
-        for i in range(4):
-            w = self.packets_display[i].widget()
-            if w is not None:
-                w.deleteLater()
-            w = QtWidgets.QWidget()
-            self.packets_display_layout[i] = QtWidgets.QVBoxLayout()
-            w.setLayout(self.packets_display_layout[i])
-            self.packets_display[i].setWidget(w)
+            self.summaryDisplay[i] = QtWidgets.QTextEdit()
+            self.summaryDisplay[i].setFixedHeight(80)
+            self.summaryDisplay[i].setText("ADC " + str(i+1) + " summary")
+            layout.addWidget(self.summaryDisplay[i],1,i)
+            self.packetsDisplay[i] = QtWidgets.QTextEdit()
+            self.packetsDisplay[i].setText("Packet info listing")
+            layout.addWidget(self.packetsDisplay[i],2,i)
 
     def match_pattern(self,signals,pattern):
         """
@@ -137,9 +107,6 @@ class UdpPacketInspector(QtWidgets.QWidget):
         matches = []
 
         n = len(pattern)
-
-        if signals is None:
-            return False,[]
 
         for i in range(n):
             if signals[0] == pattern[i]:
@@ -176,7 +143,8 @@ class UdpPacketInspector(QtWidgets.QWidget):
         self.gui.show_warning("WE SHOULD QUERY THE CAMERA TO GET THE RESOLUTIONS FOR EACH ADC BOARDS, AND GET THE TEST PATTERN CODE TO AUTOMATICALLY MAKE A TEST PATTERN MATCH WITH THE CORRECT RESOLUTION")
 
         for i in range(4):
-            self.summary_display[i].setText("")
+            self.packetsDisplay[i].setText("")
+            self.summaryDisplay[i].setText("")
 
         n = self.numberOfSamples.value()
         error,warning,data_receiver = self.gui.camera.measure(numberOfSamples=n,dataReceiver="python",logger=self.gui)
@@ -198,49 +166,35 @@ class UdpPacketInspector(QtWidgets.QWidget):
             self.gui.show_error("Received packets is not a list")
             return
 
-        self.init_packets_displays()
-        
         for i_adc in range(len(packets)):
             if packets[i_adc] is None:
                 continue
 
             first = True
             receivedPackets = 0
+            #self.packetsDisplay[i_adc].setText("")
             for i_packet in range(len(packets[i_adc])):
                 print("i_packet = " + str(i_packet))
                 p = packets[i_adc][i_packet]
                 if not first:
                     print("-------------------")
-                    l = QHLine()
-                    self.packets_display_layout[i_adc].addWidget(l)
-
-                s = "#" + str(i_packet)
+                    self.packetsDisplay[i_adc].append("--------------------------")
+                print("#" + str(i_packet) + " @" + str(p.time()))
+                self.packetsDisplay[i_adc].append("#" + str(i_packet) + " @" + str(p.time()))
+                print("Planned: " + str(p.plannedFirstSampleNumber) + "(" + str(p.plannedFirstSampleStartByte) + ") -- " + str(p.plannedLastSampleNumber) + "(" + str(p.plannedLastSampleStopByte) + ")")
+                self.packetsDisplay[i_adc].append("Planned: " + str(p.plannedFirstSampleNumber) + "(" + str(p.plannedFirstSampleStartByte) + ") -- " + str(p.plannedLastSampleNumber) + "(" + str(p.plannedLastSampleStopByte) + ")")
                 if p.received():
-                    s += "  Serial: " + str(p.serial())
-                s += "   @" + str(p.time())
-                if p.udp_test_mode():
-                    s += " (UDP test mode!)"
-                print(s)
-                self.packets_display_layout[i_adc].addWidget(QtWidgets.QLabel(s))
-
-                s = "Planned: " + str(p.plannedFirstSampleNumber) + "(" + str(p.plannedFirstSampleStartByte) + ") -- " + str(p.plannedLastSampleNumber) + "(" + str(p.plannedLastSampleStopByte) + ")"
-                print(s)
-                self.packets_display_layout[i_adc].addWidget(QtWidgets.QLabel(s))
-                if p.received():
-                    s = "Sample: " + str(p.firstSampleNumber()) + "(" + ("full" if p.firstSampleFull() else "partial") + ")"
-                    print(s)
-                    self.packets_display_layout[i_adc].addWidget(QtWidgets.QLabel(s))
+                    print("Sample: " + str(p.firstSampleNumber()) + "(" + ("full" if p.firstSampleFull() else "partial") + ")")
+                    self.packetsDisplay[i_adc].append("Sample: " + str(p.firstSampleNumber()) + "(" + ("full" if p.firstSampleFull() else "partial") + ")")
                     receivedPackets += 1
                 else:
                     print("MISSING")    
-                    self.packets_display_layout[i_adc].addWidget(QtWidgets.QLabel("MISSING"))
+                    self.packetsDisplay[i_adc].append("MISSING")    
                 first = False
                 
-            self.packets_display_layout[i_adc].addStretch(1)
-
-            self.summary_display[i_adc].append("Bytes/sample: " + str(data_receiver.bytes_per_sample[i_adc]))
-            self.summary_display[i_adc].append("Expected: " + str(len(packets[i_adc])) + ". Received: " + str(receivedPackets))
-            self.summary_display[i_adc].append("Number of data bytes in packet: " + str(data_receiver.octet) + "*8 = " + str(data_receiver.octet*8))
+            self.summaryDisplay[i_adc].append("Bytes/sample: " + str(data_receiver.bytes_per_sample[i_adc]))
+            self.summaryDisplay[i_adc].append("Expected: " + str(len(packets[i_adc])) + ". Received: " + str(receivedPackets))
+            self.summaryDisplay[i_adc].append("Number of data bytes in packet: " + str(data_receiver.octet) + "*8 = " + str(data_receiver.octet*8))
 
         self.gui.startGuiUpdate()
 

@@ -113,7 +113,7 @@ class UdpPacketInspector(QtWidgets.QWidget):
             w.setLayout(self.packets_display_layout[i])
             self.packets_display[i].setWidget(w)
 
-    def match_pattern(self,signals,pattern):
+    def match_pattern(self,signals,pattern,samplediv):
         """
         Generate a peuseo random number pattern according to the standard, and try to match against the received
         data from the ADC
@@ -132,7 +132,7 @@ class UdpPacketInspector(QtWidgets.QWidget):
         
         """
 
-        # A list os possible matches. Each element of this list is a 2-element list, the first element of which is
+        # A list of matches. Each element of this list is a 2-element list, the first element of which is
         # the starting position of the match within the pattern sequence, the 2nd element is the length of the match
         matches = []
 
@@ -141,10 +141,12 @@ class UdpPacketInspector(QtWidgets.QWidget):
         if signals is None:
             return False,[]
 
+        # Find the locations where the first element of the signals is found
         for i in range(n):
             if signals[0] == pattern[i]:
                 matches.append([i,1])  # So far we matched 1 value at index i
 
+        # If the first signal was not found, we finish
         if len(matches) == 0:
             return False,matches
 
@@ -157,7 +159,7 @@ class UdpPacketInspector(QtWidgets.QWidget):
                     continue
 
                 # index within the pattern sequence, cyclized
-                pattern_index = (match[0]+i_signal)%n
+                pattern_index = (match[0]+i_signal*samplediv)%n
 
                 # If we match this element as well, increase the number of 
                 if pattern[pattern_index] == signals[i_signal]:
@@ -246,25 +248,28 @@ class UdpPacketInspector(QtWidgets.QWidget):
 
         pattern = pseudo_test_pattern_fast(14)
 
-        for i_adc in range(2):
-            print("--------- ADC " + str(i_adc+1) + " ------------")
-            for i_channel in range(32):
-                print("CHANNEL: " + str(i_channel+1))
-                signals = data_receiver.get_channel_signals(i_adc+1,i_channel+1)
-                full,matches = self.match_pattern(signals,pattern)
-                print(full, matches)
+        # for i_adc in range(2):
+        #     print("--------- ADC " + str(i_adc+1) + " ------------")
+        #     for i_channel in range(32):
+        #         print("CHANNEL: " + str(i_channel+1))
+        #         signals = data_receiver.get_channel_signals(i_adc+1,i_channel+1)
+        #         full,matches = self.match_pattern(signals,pattern)
+        #         print(full, matches)
 
-        # c1 = data_receiver.get_channel_signals(2,2)
-        # c2 = data_receiver.get_channel_signals(2,9)
-        # n = 1000
-        # if c1 is not None:
-        #     print("Length of c1: " + str(len(c1)))
-        #     if len(c1)<n:
-        #         n = len(c1)
-        # if c2 is not None: 
-        #     print("Length of c2: " + str(len(c2)))
-        #     if len(c2)<n:
-        #         n = len(c2)
+        c1 = data_receiver.get_channel_signals(1,1)
+        c2 = data_receiver.get_channel_signals(2,1)
 
-        # for i in range(n):
-        #     print("  >> " + (str(c1[i]) if c1 is not None else "") + " " + (str(c2[i]) if c2 is not None else ""))
+        print("BITS: " + str(data_receiver.bits))
+
+        print("----- pattern matching --------")
+        self.gui.camera.readStatus()
+        samplediv = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_SAMPLEDIV:self.gui.camera.codes_CC.CC_REGISTER_SAMPLEDIV+2]
+        samplediv = int.from_bytes(samplediv,'big')
+
+
+        print("Samplediv: " + str(samplediv))
+
+        print(self.match_pattern(c1,pattern,samplediv))
+        print(self.match_pattern(c2,pattern,samplediv))
+        print("-------------------------------")
+        

@@ -487,7 +487,8 @@ class ControlTiming(QtWidgets.QWidget):
         self.extClockDiv.setValue(div)
         
         # sample dividier value
-        div = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_SAMPLEDIV]
+        div = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_SAMPLEDIV:self.gui.camera.codes_CC.CC_REGISTER_SAMPLEDIV+2]
+        div = int.from_bytes(div,'big')
         self.sampleDiv.setValue(div)
 
         # Clock source

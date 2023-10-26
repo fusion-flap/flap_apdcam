@@ -4461,6 +4461,7 @@ class data:
                 base = int(num // 8)
                 shift = int(num % 8)
                 # if the bit order is opposite, use (7-shift) instead of shift in the expression below
+                # I think that one should be used...
                 return (data[base] >> shift) & 0x1
 
             channel_of_chip = channel%8
@@ -4471,7 +4472,7 @@ class data:
             for bit in range(self.bits):
                 if get_bit(chip_data,channel_start+bit):
                     # Sanyi *believes* least significant bit comes first
-                    value |= (1<<bit)
+                    value |= (1<<(self.bits-1-bit))
 
             channel_signals.append(value)
 

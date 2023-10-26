@@ -4315,12 +4315,6 @@ class data:
                         
                     packetNumber = int.from_bytes(data[8:14],'big')
 
-                    filename = str(i_stream) + "-" + str(packetNumber) + ".dat"
-                    f = open(filename,"w")
-                    for d in data[22:]:
-                        f.write(str(int(d)) + "\n")
-                    f.close()
-
                     # Check for monotonic increase of packet number obtained from the CC header. If non-monotonic, print
                     # error message and stop reading from this stream
                     if packetNumber <= self.streamLastPacketNumber[i_stream]:
@@ -4405,11 +4399,6 @@ class data:
         channel_signals = []
         
         adc_data = self.packets[adc_board][i_packet].getAdcData()
-
-        f = open("adc-data.dat","w")
-        for b in adc_data:
-            f.write(str(int(b)) + "\n")
-        f.close()
 
         i_data = 0   # index within the ADC data
 

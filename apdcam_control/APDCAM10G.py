@@ -3508,7 +3508,7 @@ class controller:
         else:
             # Native Python measurement
             data_receiver = data(self,logger)
-            ret = data_receiver.getNetParameters()
+            ret = data_receiver.get_net_parameters()
             if (ret != ""):
                 logger.show_error(ret)
                 return ret,"",data_receiver
@@ -3767,7 +3767,7 @@ class packet:
         self.time_ = "--" 
         self.data = None
         if data is not None:
-            self.setData(data,error,headerOnly)
+            self.set_data(data,error,headerOnly)
 
     def received(self):
         """
@@ -3775,7 +3775,7 @@ class packet:
         """
         return self.data is not None
 
-    def setData(self,data,error="",headerOnly=False):
+    def set_data(self,data,error=""):
         """
         Set the packet content (including the 22-byte CC board header and the subsequent ADC data
         """
@@ -3784,19 +3784,9 @@ class packet:
         self.time_ = time.time()
         self.error_ = error
 
-        if not headerOnly:
-            # we store a reference, so the data will be kept in memory until this class is living,
-            # even if the original variable goes out of scope somewhere
-            self.data = data
-            self.hasData_ = True
-        else:
-            # if we only want to keep the header, we take the first 22 bytes. This creates a copy of these 22 bytes
-            # and leaves the python reference count of the original data array unchanged, i.e. it may get
-            # deleted when its scope expires
-            self.data = data[0:22]
-            self.hasData_ = False
+        self.data = data
 
-    def getAdcData(self):
+    def get_adc_data(self):
         return self.data[22:]
 
     def error(self):
@@ -3804,9 +3794,6 @@ class packet:
 
     def time(self):
         return self.time_
-
-    def hasData(self):
-        return self.hasData_
 
     def serial(self):
         """
@@ -4010,7 +3997,7 @@ class data:
         
         return ""
         
-    def getNetParameters(self):
+    def get_net_parameters(self):
         """
         Determine parameters of the network and host. The network name is assumed to be
         known in self.APDCAM.interface. See self.APDCAM.getInterface(). Puts the results into
@@ -4122,10 +4109,10 @@ class data:
         self.logger.show_message("[MEASUREMENT] MTU: " + str(self.MTU))
         self.logger.show_message("[MEASUREMENT] IP : " + str(self.hostIP))
 
-        self.setOctet()
+        self.set_octet()
         return ""    
        
-    def setOctet(self):
+    def set_octet(self):
         """
         Calculates the octet setting for camera data communication and saves it in 
         self.octet.
@@ -4142,12 +4129,12 @@ class data:
 
         """
         if (self.MTU is None):
-            ret = self.getNetParameters()
+            ret = self.get_net_parameters()
             if (ret != ""):
                 return ret
-        maxAdcDataLength = self.MTU-\
+        max_adc_data_length = self.MTU-\
                             (self.IPV4_HEADER+self.UDP_HEADER+self.CC_STREAMHEADER)
-        self.octet = maxAdcDataLength//8
+        self.octet = max_adc_data_length//8
         if (self.octet < 1):
             return "too small MTU, cannot transfer data."
         return ""
@@ -4336,7 +4323,7 @@ class data:
                     # We have anyway preallocated the expected number of packet headers, so
                     # store every packet header at the right index, corresponding to the packet number
                     # If a packet is lost, the corresponding entry in the list 'self.packets' will remain None
-                    packets[packetNumber].setData(data,error)
+                    packets[packetNumber].set_data(data,error)
                     self.streamLastPacketNumber[i_stream] = packetNumber
 
                     # If we reached the expected (=pre-allocated) number of packets, stop the stream
@@ -4357,7 +4344,7 @@ class data:
                         f.writelines("{:d}...{:f}...{:d}\n".format(i_stream+1,p.time(),p.packetNumber()))
         return "",""     
 
-    def get_channel_signals(self,adc_board,channel):
+    def get_channel_data(self,adc_board,channel):
         """
         Skip the trailing missing packages and those which start with a non-full sample. Start interpreting
         the channel signal from the first received packages which contains a full starting sample.
@@ -4398,7 +4385,7 @@ class data:
         # The values of a given channel (uninterrupted sequence)
         channel_signals = []
         
-        adc_data = self.packets[adc_board][i_packet].getAdcData()
+        adc_data = self.packets[adc_board][i_packet].get_adc_data()
 
         i_data = 0   # index within the ADC data
 
@@ -4416,7 +4403,7 @@ class data:
                 sample_data = adc_data[i_data:]
                 # Switch to the next packet
                 i_packet += 1
-                adc_data = self.packets[adc_board][i_packet].getAdcData()
+                adc_data = self.packets[adc_board][i_packet].get_adc_data()
                 # Calculate the number of bytes missing from previous packet for this sample. 'n' is used for better clarity:
                 n = self.bytes_per_sample[adc_board]-len(sample_data)  
                 # append this many bytes to the sample data
@@ -4449,9 +4436,7 @@ class data:
             def get_bit(data, num):
                 base = int(num // 8)
                 shift = int(num % 8)
-                # if the bit order is opposite, use (7-shift) instead of shift in the expression below
-                # I think that one should be used...
-                return (data[base] >> shift) & 0x1
+                return (data[base] >> (7-shift)) & 0x1
 
             channel_of_chip = channel%8
             # The starting bit index of the given channel. Check how many preceding channels are enabled. 
@@ -4460,7 +4445,6 @@ class data:
             value = 0
             for bit in range(self.bits):
                 if get_bit(chip_data,channel_start+bit):
-                    # Sanyi *believes* least significant bit comes first
                     value |= (1<<(self.bits-1-bit))
 
             channel_signals.append(value)

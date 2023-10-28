@@ -91,7 +91,7 @@ class ControlTiming(QtWidgets.QWidget):
             self.sampleDiv.setMinimum(1)
             self.adcOutFreqDiv.setEnabled(True)
         else:
-            self.sampleDiv.setMinimum(2)
+            self.sampleDiv.setMinimum(3)
             self.adcOutFreqDiv.setEnabled(False)
 
     def setSerialPll(self):

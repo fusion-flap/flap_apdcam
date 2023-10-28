@@ -150,6 +150,8 @@ class UdpPacketInspector(QtWidgets.QWidget):
         if len(matches) == 0:
             return False,matches
 
+        print("Length of initial matches: " + str(len(matches)))
+
         full_match = False
         for i_signal in range(1,len(signals)):
             for match in matches:
@@ -167,9 +169,32 @@ class UdpPacketInspector(QtWidgets.QWidget):
                     # If this is the last signal value and we matched, we have a full match
                     if i_signal == len(signals)-1:
                         full_match = True
+                else:
+                    for j in range(n):
+                        if signals[i_signal] == pattern[j]:
+                            print("Not found where needed (" + str(pattern_index) + "), but elsewhere: " + str(j))
 
         return full_match,matches
 
+    def find_in_pattern(self,signals,pattern):
+        n = 1000000
+        for i in range(len(signals)):
+            if signals[i] is None:
+                continue
+            if(len(signals[i]) < n):
+                n = len(signals[i])
+        for s in range(n):
+            line = f'{s:03d}'+ ": " 
+            for i in range(len(signals)):
+                if signals[i] is None:
+                    continue
+                try:
+                    index = pattern.index(signals[i][s])
+                    index = "[" + f'{index:03d}' + "]  "
+                except:
+                    index = "[---]  "
+                line += f'{signals[i][s]:6d}' + " " + index
+            print(line)
 
     def get_data(self):
         self.gui.stopGuiUpdate()
@@ -252,12 +277,16 @@ class UdpPacketInspector(QtWidgets.QWidget):
         #     print("--------- ADC " + str(i_adc+1) + " ------------")
         #     for i_channel in range(32):
         #         print("CHANNEL: " + str(i_channel+1))
-        #         signals = data_receiver.get_channel_signals(i_adc+1,i_channel+1)
+        #         signals = data_receiver.get_channel_data(i_adc+1,i_channel+1)
         #         full,matches = self.match_pattern(signals,pattern)
         #         print(full, matches)
 
-        c1 = data_receiver.get_channel_signals(1,1)
-        c2 = data_receiver.get_channel_signals(2,1)
+        c11 = data_receiver.get_channel_data(1,1)
+        c18 = data_receiver.get_channel_data(1,8)
+        c19 = data_receiver.get_channel_data(1,9)
+        c115 = data_receiver.get_channel_data(1,15)
+        c21 = data_receiver.get_channel_data(2,1)
+        c22 = data_receiver.get_channel_data(2,2)
 
         print("BITS: " + str(data_receiver.bits))
 
@@ -266,10 +295,16 @@ class UdpPacketInspector(QtWidgets.QWidget):
         samplediv = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_SAMPLEDIV:self.gui.camera.codes_CC.CC_REGISTER_SAMPLEDIV+2]
         samplediv = int.from_bytes(samplediv,'big')
 
-
         print("Samplediv: " + str(samplediv))
 
-        print(self.match_pattern(c1,pattern,samplediv))
-        print(self.match_pattern(c2,pattern,samplediv))
+        self.find_in_pattern([c11,c18,c19,c115,c21,c22],pattern)
+
+        print(self.match_pattern(c11,pattern,samplediv))
+        print(self.match_pattern(c18,pattern,samplediv))
+        print(self.match_pattern(c19,pattern,samplediv))
+        print(self.match_pattern(c115,pattern,samplediv))
+        print(self.match_pattern(c21,pattern,samplediv))
+        print(self.match_pattern(c22,pattern,samplediv))
+
         print("-------------------------------")
         

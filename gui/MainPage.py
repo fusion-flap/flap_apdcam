@@ -129,7 +129,7 @@ class MainPage(QtWidgets.QWidget):
             self.cameraType.append("   Serial no.:   " +  str(self.gui.camera.status.ADC_serial[i]))
             self.gui.adcControl.addAdc(i+1,self.gui.camera.status.ADC_address[i])
 
-        self.gui.versionSpecificSetup()
+        self.gui.version_specific_setup()
 
         err = self.gui.camera.readStatus()
         if (err != "") :

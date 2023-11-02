@@ -86,11 +86,11 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
             self.cameraStateRefreshed.emit()
         
-    def versionSpecificSetup(self):
+    def version_specific_setup(self):
         children = self.findChildren(QtWidgets.QWidget)
         for child in children:
-            if hasattr(child,"versionSpecificSetup"):
-                child.versionSpecificSetup(self.camera.status.CC_firmware.decode('utf-8'))
+            if hasattr(child,"version_specific_setup"):
+                child.version_specific_setup(self.camera.status.CC_firmware.decode('utf-8'))
 
     def updateGui(self):
         """
@@ -254,7 +254,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.show()
         self.setGuiMode(GuiMode.expert)
 
-        if self.early_messages:
+        if hasattr(self,"early_messages") and self.early_messages != "":
             self.messages.setText(self.early_messages)
 
         self.updateGuiThreadStop = True

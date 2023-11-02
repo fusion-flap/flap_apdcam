@@ -139,36 +139,55 @@ class APDCAM10G_codes_v1:
     # These addresses are valid for DIT+Settings block 
     # The address is calculated from the Settings table as <byte address>-7+71
     # DATATYPE inndicates which block the variable is in (0: settings, 1: variables)
+
+    # DIT (Device Identification Table) - acquired from the camera starting from byte #7
+    # The documentation lists by byte number, hence a -7 offset for the DIT registers
+    CC_REGISTER_BOARDTYPE = 7-7
+    CC_DATATYPE_BOARDTYPE = 0
     CC_REGISTER_FIRMWARE = 17-7
     CC_DATATYPE_FIRMWARE = 0
+    CC_REGISTER_FIRMWAREGROUPVERSION = 31-7
+    CC_DATATYPE_FIRMWAREGROUPVERSION = 0
+    CC_REGISTER_UPGRADEDATE = 33-7
+    CC_DATATYPE_UPGRADEDATE = 0
+    CC_REGISTER_MAN_FIRMWAREGROUP = 37-7
+    CC_DATATYPE_MAN_FIRMWAREGROUP = 0
+    CC_REGISTER_MAN_PROGRAMDATE = 51-7
+    CC_DATATYPE_MAN_PROGRAMDATE = 0
     CC_REGISTER_MAN_SERIAL = 55-7
     CC_DATATYPE_MAN_SERIAL = 0
+    CC_REGISTER_MAN_TESTRESULT = 59-7
+    CC_DATATYPE_MAN_TESTRESULT = 0
+    # SETTINGS - the documentation lists from byte #7, + we need to skip the 71-7 bytes of the DIT
+    # hence the offset -7+71-7
+    CC_REGISTER_DEV_NAME = 8-7+71-7
+    CC_DATATYPE_DEV_NAME = 0
     CC_REGISTER_DEV_SERIAL = 58-7+71-7
     CC_DATATYPE_DEV_SERIAL = 0
     CC_REGISTER_CLOCK_CONTROL = 263-7+71-7
     CC_DATATYPE_CLOCK_CONTROL = 0
     CC_REGISTER_CLOCK_ENABLE = 264-7+71-7
     CC_DATATYPE_CLOCK_ENABLE = 0
+    CC_REGISTER_BASE_PLL_MULT = 265-7+71-7
+    CC_DATATYPE_BASE_PLL_MULT = 0
+    CC_REGISTER_BASE_PLL_DIV_ADC = 267-7+71-7  # This goes to clock signal F1 (to ADC)
+    CC_DATATYPE_BASE_PLL_DIV_ADC = 0
     CC_REGISTER_EXT_DCM_MULT = 270-7+71-7
     CC_DATATYPE_EXT_DCM_MULT = 0
     CC_REGISTER_EXT_DCM_DIV = 271-7+71-7
     CC_DATATYPE_EXT_DCM_DIV = 0
-    CC_REGISTER_BASE_PLL_MULT = 265-7+71-7
-    CC_DATATYPE_BASE_PLL_MULT = 0
-    CC_REGISTER_BASE_PLL_DIV_ADC = 267-7+71-7  # why is it not called CC_REGISTER_BASE_PLL_DIV like the previous one?
-    CC_DATATYPE_BASE_PLL_DIV_ADC = 0
-    CC_REGISTER_TRIGSTATE = 282-7+71-7
-    CC_DATATYPE_TRIGSTATE = 0
-    CC_REGISTER_TRIGDELAY = 283-7+71-7
-    CC_DATATYPE_TRIGDELAY = 0    
-    CC_REGISTER_SERIAL_PLL_DIV = 288-7+71-7
-    CC_DATATYPE_SERIAL_PLL_DIV = 0
-    CC_REGISTER_SERIAL_PLL_MULT = 287-7+71-7
-    CC_DATATYPE_SERIAL_PLL_MULT = 0
     CC_REGISTER_SAMPLEDIV = 272-7+71-7
     CC_DATATYPE_SAMPLEDIV = 0
     CC_REGISTER_SAMPLECOUNT = 276-7+71-7
     CC_DATATYPE_SAMPLECOUNT = 0
+    CC_REGISTER_TRIGSTATE = 282-7+71-7
+    CC_DATATYPE_TRIGSTATE = 0
+    CC_REGISTER_TRIGDELAY = 283-7+71-7
+    CC_DATATYPE_TRIGDELAY = 0    
+    CC_REGISTER_SERIAL_PLL_MULT = 287-7+71-7
+    CC_DATATYPE_SERIAL_PLL_MULT = 0
+    CC_REGISTER_SERIAL_PLL_DIV = 288-7+71-7
+    CC_DATATYPE_SERIAL_PLL_DIV = 0
     CC_REGISTER_SATACONTROL = 292-7+71-7
     CC_DATATYPE_SATACONTROL = 0
     CC_REGISTER_UDPOCTET1 = 311-7+71-7
@@ -318,6 +337,95 @@ class APDCAM10G_codes_v2:
     AN_FLASHPAGE=0xFF03
     AN_PDIDATA=0xFF04
 
+    # These addresses are valid for DIT+Settings block 
+    # The address is calculated from the Settings table as <byte address>-7+71
+    # DATATYPE inndicates which block the variable is in (0: settings, 1: variables)
+
+    # DIT (Device Identification Table) - acquired from the camera starting from byte #7
+    # The documentation lists by byte number, hence a -7 offset for the DIT registers
+    CC_REGISTER_BOARDTYPE = 7-7
+    CC_DATATYPE_BOARDTYPE = 0
+    CC_REGISTER_FIRMWARE = 17-7
+    CC_DATATYPE_FIRMWARE = 0
+    CC_REGISTER_FIRMWAREGROUPVERSION = 31-7
+    CC_DATATYPE_FIRMWAREGROUPVERSION = 0
+    CC_REGISTER_UPGRADEDATE = 33-7
+    CC_DATATYPE_UPGRADEDATE = 0
+    CC_REGISTER_MAN_FIRMWAREGROUP = 37-7
+    CC_DATATYPE_MAN_FIRMWAREGROUP = 0
+    CC_REGISTER_MAN_PROGRAMDATE = 51-7
+    CC_DATATYPE_MAN_PROGRAMDATE = 0
+    CC_REGISTER_MAN_SERIAL = 55-7
+    CC_DATATYPE_MAN_SERIAL = 0
+    CC_REGISTER_MAN_TESTRESULT = 59-7
+    CC_DATATYPE_MAN_TESTRESULT = 0
+    # SETTINGS - the documentation lists from byte #7, + we need to skip the 71-7 bytes of the DIT
+    # hence the offset -7+71-7
+    CC_REGISTER_DEV_NAME = 8-7+71-7
+    CC_DATATYPE_DEV_NAME = 0
+    CC_REGISTER_DEV_SERIAL = 58-7+71-7
+    CC_DATATYPE_DEV_SERIAL = 0
+    CC_REGISTER_CLOCK_CONTROL = 263-7+71-7
+    CC_DATATYPE_CLOCK_CONTROL = 0
+    CC_REGISTER_CLOCK_ENABLE = 264-7+71-7
+    CC_DATATYPE_CLOCK_ENABLE = 0
+    CC_REGISTER_BASE_PLL_MULT = 265-7+71-7
+    CC_DATATYPE_BASE_PLL_MULT = 0
+    CC_REGISTER_BASE_PLL_DIV_ADC = 267-7+71-7  # This goes to clock signal F1 (to ADC)
+    CC_DATATYPE_BASE_PLL_DIV_ADC = 0
+    CC_REGISTER_EXT_DCM_MULT = 270-7+71-7
+    CC_DATATYPE_EXT_DCM_MULT = 0
+    CC_REGISTER_EXT_DCM_DIV = 271-7+71-7
+    CC_DATATYPE_EXT_DCM_DIV = 0
+    CC_REGISTER_SAMPLEDIV = 272-7+71-7
+    CC_DATATYPE_SAMPLEDIV = 0
+    CC_REGISTER_SAMPLECOUNT = 276-7+71-7
+    CC_DATATYPE_SAMPLECOUNT = 0
+# New in Firmware 1.05
+    CC_REGISTER_EIO_ADC_DIV = 282-7+71-7
+    CC_DATATYPE_EIO_ADC_DIV = 0
+# Firmware before 1.05
+#    CC_REGISTER_TRIGSTATE = 282-7+71-7
+#    CC_DATATYPE_TRIGSTATE = 0
+    CC_REGISTER_TRIGDELAY = 283-7+71-7
+    CC_DATATYPE_TRIGDELAY = 0    
+    CC_REGISTER_SERIAL_PLL_MULT = 287-7+71-7
+    CC_DATATYPE_SERIAL_PLL_MULT = 0
+    CC_REGISTER_SERIAL_PLL_DIV = 288-7+71-7
+    CC_DATATYPE_SERIAL_PLL_DIV = 0
+    CC_REGISTER_SATACONTROL = 292-7+71-7
+    CC_DATATYPE_SATACONTROL = 0
+# new in Firmware 1.05
+    CC_REGISTER_G1TRIGCONTROL = 293-7+71-7
+    CC_DATATYPE_G1TRIGCONTROL = 0
+    CC_REGISTER_G2GATECONTROL = 294-7+71-7
+    CC_DATATYPE_G2GATECONTROL = 0
+
+    CC_REGISTER_UDPOCTET1 = 311-7+71-7
+    CC_DATATYPE_UDPOCTET1 = 0
+    CC_REGISTER_UDPMAC1 = 313-7+71-7
+    CC_DATATYPE_UDPMAC1 = 0
+    CC_REGISTER_IP1 = 320-7+71-7
+    CC_DATATYPE_IP1 = 0
+    CC_REGISTER_UDPPORT1 = 323-7+71-7
+    CC_DATATYPE_UDPPORT1 = 0
+    CC_REGISTER_CAMCONTROL = 495-7+71-7
+    CC_DATATYPE_CAMCONTROL = 0
+    CC_REGISTER_CAMOUTPUT = 499-7+71-7
+    CC_DATATYPE_CAMOUTPUT = 0
+    CC_REGISTER_CAMCLKDIV = 497-7+71-7
+    CC_DATATYPE_CAMCLKDIV = 0
+    CC_REGISTER_CAMSETTIMER = 375-7+71-7
+    CC_DATATYPE_CAMSETTIMER = 0
+    CC_REGISTER_CAMONTIME = 379-7+71-7
+    CC_DATATYPE_CAMONTIME = 0
+    CC_REGISTER_CAMOFFTIME = 381-7+71-7
+    CC_DATATYPE_CAMOFFTIME = 0
+    CC_REGISTER_CAMNROFPULSES = 383-7+71-7
+    CC_DATATYPE_CAMNROFPULSES = 0
+    CC_CAMTIMER_OFFSET = 12
+
+    
 class APDCAM10G_ADCcodes_v1 :  
     """
     Register addresses and other defines for the 10G ADC board V1
@@ -622,8 +730,10 @@ class controller:
 
         #Extracting camera information
         d = self.status.CC_settings 
-        self.status.CC_serial = int.from_bytes(d[APDCAM10G_codes_v1.CC_REGISTER_MAN_SERIAL:APDCAM10G_codes_v1.CC_REGISTER_MAN_SERIAL+4],byteorder='little',signed=False)
-        self.status.CC_firmware = d[APDCAM10G_codes_v1.CC_REGISTER_FIRMWARE:APDCAM10G_codes_v1.CC_REGISTER_FIRMWARE+14]
+        #self.status.CC_serial = int.from_bytes(d[APDCAM10G_codes_v1.CC_REGISTER_MAN_SERIAL:APDCAM10G_codes_v1.CC_REGISTER_MAN_SERIAL+4],byteorder='little',signed=False)
+        self.status.CC_serial = int.from_bytes(d[self.codes_CC.CC_REGISTER_MAN_SERIAL:self.codes_CC.CC_REGISTER_MAN_SERIAL+4],byteorder='little',signed=False)
+        #self.status.CC_firmware = d[APDCAM10G_codes_v1.CC_REGISTER_FIRMWARE:APDCAM10G_codes_v1.CC_REGISTER_FIRMWARE+14]
+        self.status.CC_firmware = d[self.codes_CC.CC_REGISTER_FIRMWARE:self.codes_CC.CC_REGISTER_FIRMWARE+14]
         self.log("Manufacturer serial number: " + str(self.status.CC_serial))
         self.log("Firmware: " + str(self.status.CC_firmware))
         if (self.status.CC_firmware[0:11] != b"BSF12-0001-"):
@@ -845,7 +955,8 @@ class controller:
         userData =bytes([0,dataCode])
         self.lock.acquire()
         for rep in range(self.repeatNumber) :
-            err = self.sendCommand(APDCAM10G_codes_v1.OP_SENDACK,userData,sendImmediately=True)
+            #err = self.sendCommand(APDCAM10G_codes_v1.OP_SENDACK,userData,sendImmediately=True)
+            err = self.sendCommand(self.codes_CC.OP_SENDACK,userData,sendImmediately=True)
             if (err != ""):
                 time.sleep(0.001)
                 print("repeat readCCdata/1 {:d}".format(rep))
@@ -859,7 +970,8 @@ class controller:
                 continue
             d = d[22:len(d)]
             resp_command = int.from_bytes(d[0:2],'big',signed=False)
-            if (resp_command != APDCAM10G_codes_v1.AN_ACK) :
+            #if (resp_command != APDCAM10G_codes_v1.AN_ACK) :
+            if (resp_command != self.codes_CC.AN_ACK) :
                 err1 = "readCCdata/3 Invalid response by camera (wrong command:{:X}).".format(resp_command)
                 #print(err1)
                 #print("repeat readCCdata/3 {:d}".format(rep))
@@ -889,6 +1001,32 @@ class controller:
         else :
             self.status.CC_variables = d
         return ""
+
+    def set_eio_adc_clock_divider(self,value):
+        """
+        Set the divider value for the ADC clock output at the EIO connector
+
+        Parameters:
+        ^^^^^^^^^^^
+        value - even integer between 2-254. If it is not even, it is rounded down
+
+        Returns:
+        ^^^^^^^^
+        error - error message, or empty string
+
+        """
+        if not hasattr(self.codes_CC,"OP_SETEIOCLKDIV"):
+            return "This camera version can not set the ADC clock output divider"
+
+        if value > 255:
+            value = 255
+        if value < 1:
+            value = 1
+        if value%2 != 0 and value != 1:
+            value -= 1
+        data = bytes([value])
+        return self.sendCommand(self.codes_CC.OP_SETEIOCLKDIV,data,sendImmediately=True)
+
         
     def readAdcRegisters(self):
         """
@@ -1177,13 +1315,15 @@ class controller:
             for i in range(n_read):
                 userData = bytes([cardAddress[i]])+registerAddress[i].to_bytes(4,'big',signed=False)+\
                            numberOfBytes[i].to_bytes(2,'big',signed=False) 
-                err = self.sendCommand(APDCAM10G_codes_v1.OP_READPDI,userData,sendImmediately=False)
+                #err = self.sendCommand(APDCAM10G_codes_v1.OP_READPDI,userData,sendImmediately=False)
+                err = self.sendCommand(self.codes_CC.OP_READPDI,userData,sendImmediately=False)
                 if err != "" :
                     self.lock.release()
                     return err,None
                 if (w != 0) :
                     userData = w.to_bytes(2,'big',signed=False)
-                    err = self.sendCommand(APDCAM10G_codes_v1.OP_WAIT,userData,sendImmediately=False)
+                    #err = self.sendCommand(APDCAM10G_codes_v1.OP_WAIT,userData,sendImmediately=False)
+                    err = self.sendCommand(self.codes_CC.OP_WAIT,userData,sendImmediately=False)
                     if err != "" :
                         self.lock.release()
                         return err,None 
@@ -1336,13 +1476,15 @@ class controller:
                 else:
                     userData = userData + bytearray(data[i])
                     
-                err = self.sendCommand(APDCAM10G_codes_v1.OP_WRITEPDI,userData,sendImmediately=False)
+                #err = self.sendCommand(APDCAM10G_codes_v1.OP_WRITEPDI,userData,sendImmediately=False)
+                err = self.sendCommand(self.codes_CC.OP_WRITEPDI,userData,sendImmediately=False)
                 if err != "" :
                     self.lock.release()
                     return err
                 if (w != 0):
                     userData = w.to_bytes(2,'big',signed=False)
-                    err = self.sendCommand(APDCAM10G_codes_v1.OP_WAIT,userData,sendImmediately=False)
+                    #err = self.sendCommand(APDCAM10G_codes_v1.OP_WAIT,userData,sendImmediately=False)
+                    err = self.sendCommand(self.codes_CC.OP_WAIT,userData,sendImmediately=False)
                     if err != "" :
                         self.lock.release()
                         return err
@@ -1382,10 +1524,12 @@ class controller:
         err = self.readCCdata(dataType=0)
         if (err != ""):
             return err
-        mode  = self.status.CC_settings[APDCAM10G_codes_v1.CC_REGISTER_CAMCONTROL+1]
+        #mode  = self.status.CC_settings[APDCAM10G_codes_v1.CC_REGISTER_CAMCONTROL+1]
+        mode  = self.status.CC_settings[self.codes_CC.CC_REGISTER_CAMCONTROL+1]
         mode = mode & 0xfc
         data = bytearray([0,mode])
-        err = self.sendCommand(APDCAM10G_codes_v1.OP_SETCTCONTROL,data,sendImmediately=True)
+        #err = self.sendCommand(APDCAM10G_codes_v1.OP_SETCTCONTROL,data,sendImmediately=True)
+        err = self.sendCommand(self.codes_CC.OP_SETCTCONTROL,data,sendImmediately=True)
         return err
         
     def timerArm(self):
@@ -1394,31 +1538,37 @@ class controller:
         err = self.readCCdata(dataType=0)
         if (err != ""):
             return err
-        mode  = self.status.CC_settings[APDCAM10G_codes_v1.CC_REGISTER_CAMCONTROL+1]
+        #mode  = self.status.CC_settings[APDCAM10G_codes_v1.CC_REGISTER_CAMCONTROL+1]
+        mode  = self.status.CC_settings[self.codes_CC.CC_REGISTER_CAMCONTROL+1]
         mode = mode & 0xfc
         mode = mode | 0x02
         data = bytearray([0,mode])
-        err = self.sendCommand(APDCAM10G_codes_v1.OP_SETCTCONTROL,data,sendImmediately=True)
+        #err = self.sendCommand(APDCAM10G_codes_v1.OP_SETCTCONTROL,data,sendImmediately=True)
+        err = self.sendCommand(self.codes_CC.OP_SETCTCONTROL,data,sendImmediately=True)
         if (err != ""):
             return err
         mode = mode | 1
         data = bytearray([0,mode])
-        err = self.sendCommand(APDCAM10G_codes_v1.OP_SETCTCONTROL,data,sendImmediately=True)
+        #err = self.sendCommand(APDCAM10G_codes_v1.OP_SETCTCONTROL,data,sendImmediately=True)
+        err = self.sendCommand(self.codes_CC.OP_SETCTCONTROL,data,sendImmediately=True)
         return err
     
     def timerRun(self):      
         err = self.readCCdata(dataType=0)
         if (err != ""):
             return err
-        mode  = self.status.CC_settings[APDCAM10G_codes_v1.CC_REGISTER_CAMCONTROL+1]
+        #mode  = self.status.CC_settings[APDCAM10G_codes_v1.CC_REGISTER_CAMCONTROL+1]
+        mode  = self.status.CC_settings[self.codes_CC.CC_REGISTER_CAMCONTROL+1]
         mode = mode & 0xfd
         data = bytearray([0,mode])
-        err = self.sendCommand(APDCAM10G_codes_v1.OP_SETCTCONTROL,data,sendImmediately=True)
+        #err = self.sendCommand(APDCAM10G_codes_v1.OP_SETCTCONTROL,data,sendImmediately=True)
+        err = self.sendCommand(self.codes_CC.OP_SETCTCONTROL,data,sendImmediately=True)
         if (err != ""):
             return err
         mode = mode | 3
         data = bytearray([0,mode])
-        err = self.sendCommand(APDCAM10G_codes_v1.OP_SETCTCONTROL,data,sendImmediately=True)
+        #err = self.sendCommand(APDCAM10G_codes_v1.OP_SETCTCONTROL,data,sendImmediately=True)
+        err = self.sendCommand(self.codes_CC.OP_SETCTCONTROL,data,sendImmediately=True)
         return err
 
     def setTimerOutput(self) :
@@ -1426,7 +1576,8 @@ class controller:
                      [self.CAMTIMER.outputEnable | (self.CAMTIMER.outputPolarity << 4), \
                       self.CAMTIMER.outputIdleState | (self.CAMTIMER.outputArmedState << 4)]\
                       )
-        err = self.sendCommand(APDCAM10G_codes_v1.OP_SETCTOUTPUT,data,sendImmediately=False)
+        #err = self.sendCommand(APDCAM10G_codes_v1.OP_SETCTOUTPUT,data,sendImmediately=False)
+        err = self.sendCommand(self.codes_CC.OP_SETCTOUTPUT,data,sendImmediately=False)
         if (err != ""):
             return err
     
@@ -1443,18 +1594,21 @@ class controller:
         if (self.CAMTIMER.intTriggerEnable):
             data = data | 0x40
         data = bytes([0,data])
-        err = self.sendCommand(APDCAM10G_codes_v1.OP_SETCTCONTROL,data,sendImmediately=False)
+        #err = self.sendCommand(APDCAM10G_codes_v1.OP_SETCTCONTROL,data,sendImmediately=False)
+        err = self.sendCommand(self.codes_CC.OP_SETCTCONTROL,data,sendImmediately=False)
         if (err != ""):
             return err
         data = bytes(\
                      [self.CAMTIMER.outputEnable | (self.CAMTIMER.outputPolarity << 4), \
                       self.CAMTIMER.outputIdleState | (self.CAMTIMER.outputArmedState << 4)]\
                       )
-        err = self.sendCommand(APDCAM10G_codes_v1.OP_SETCTOUTPUT,data,sendImmediately=False)
+        #err = self.sendCommand(APDCAM10G_codes_v1.OP_SETCTOUTPUT,data,sendImmediately=False)
+        err = self.sendCommand(self.codes_CC.OP_SETCTOUTPUT,data,sendImmediately=False)
         if (err != ""):
             return err
         data = self.CAMTIMER.clockDiv.to_bytes(2,byteorder='big',signed=False)
-        err = self.sendCommand(APDCAM10G_codes_v1.OP_SETCTCLKDIV,data,sendImmediately=False)    
+        #err = self.sendCommand(APDCAM10G_codes_v1.OP_SETCTCLKDIV,data,sendImmediately=False)    
+        err = self.sendCommand(self.codes_CC.OP_SETCTCLKDIV,data,sendImmediately=False)    
         if (err != ""):
             return err
         for i in range(10):
@@ -1478,7 +1632,8 @@ class controller:
                 data[7:9] = self.CAMTIMER.timers[i].pulseOff.to_bytes(2,byteorder='big',signed=False)
                 data[9:14] = self.CAMTIMER.timers[i].numberOfPulses.to_bytes(4,byteorder='big',signed=False)
                 data[9] = (data[9] & 0x0f) | (self.CAMTIMER.timers[i].channelEnable << 4)
-            err = self.sendCommand(APDCAM10G_codes_v1.OP_SETCTTIMER ,data,sendImmediately=False)   
+            #err = self.sendCommand(APDCAM10G_codes_v1.OP_SETCTTIMER ,data,sendImmediately=False)   
+            err = self.sendCommand(self.codes_CC.OP_SETCTTIMER ,data,sendImmediately=False)   
             if (err != ""):
                 return err
         err = self.sendCommand(None,None,sendImmediately=True)   
@@ -1724,14 +1879,31 @@ class controller:
         self.lock.release()
         return err
 
-    def setSampleNumber(self,sampleNumber=0):
-        if (self.commSocket is None):
-            return "Not connected.", None
-        d=bytearray(6)
-        for i in range(6):
-            d[5 - i] = (sampleNumber // 2 ** (i * 8)) % 256
-        err = self.sendCommand(self.codes_CC.OP_SETSAMPLECOUNT,d,sendImmediately=True)
-        return err
+
+    def set_sample_number(self,sample_number=0):
+
+        # Firmware version before 1.05
+        if hasattr(self.codes_CC,"OP_SETSAMPLECOUNT"):
+            if (self.commSocket is None):
+                return "Not connected.", None
+            d = sample_number.to_bytes(6,'big')
+#            d=bytearray(6)
+#            for i in range(6):
+#                d[5 - i] = (sample_number // 2 ** (i * 8)) % 256
+            err = self.sendCommand(self.codes_CC.OP_SETSAMPLECOUNT,d,sendImmediately=True)
+            return err
+
+        # Firmware version 1.05 and higher
+        if hasattr(self.codes_CC,"OP_SETG1TRIGGERMODULE"):
+            # assume that readCCdata was called recently! implement a flag later!
+            data = bytearray(11)
+            data[0] = self.status.CC_settings[self.codes_CC.CC_REGISTER_G1TRIGCONTROL]
+            data[1:5] = self.status.CC_settings[self.codes_CC.CC_REGISTER_TRIGDELAY:self.codes_CC.CC_REGISTER_TRIGDELAY+4]
+            data[6:12] = sample_number.to_bytes(6,'big')
+            err = self.sendCommand(self.codes_CC.OP_SETG1TRIGGERMODULE,data,sendImmediately=True)
+            return err
+
+        return "This should never happen in APDCAM10G.set_sample_number"
 
     def setSerialPll(self,mult,div):
         """
@@ -3134,94 +3306,117 @@ class controller:
         err, bit = self.getAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,5)
         return err,bit
     
-    # def setTrigger(self,externalTriggerPolarity=None,internalTrigger=False,triggerDelay = 0):
-    #     """
-    #     Sets the trigger scheme in the camera. Old implementation by S. Zoletnik
+    def set_gate(self, external_gate_enabled=False, external_gate_inverted=False, internal_gate_enabled=False, internal_gate_inverted=False, cam_timer0_enabled=False, cam_timer0_inverted=False, clear=False):
 
-    #     Parameters
-    #     ----------
-    #     externalTriggerPolarity: None: no external trigger
-    #                                 0: Positive edge
-    #                                 1: Negative edge
-    #     internalTrigger: True enables internal trigger
-    #     triggerDelay:  Trigger with this delay [microsec]
+        if not hasattr(self.codes_CC,"OP_SETG2GATEMODULE"):
+            return "APDCAM10G.set_gate can not be used for this firmware"
 
-    #     Returns
-    #     -------
-    #     error: string
-    #            "" if no error, otherwise error message
+        data = 0
+        if external_gate_enabled:
+            data |= 1<<1
+        if external_gate_inverted:
+            data |= 1<<0
+        if internal_gate_enabled:
+            data |= 1<<3
+        if internal_gate_inverted:
+            data |= 1<<2
+        if cam_timer0_enabled:
+            data |= 1<<5
+        if cam_timer0_inverted:
+            data |= 1<<4
+        if clear:
+            data |= 1<<7
 
-    #     """
+        return self.sendCommand(self.codes_CC.OP_SETG2GATEMODULE,data,sendImmediately=True)
 
-    #     if (triggerDelay < 0):
-    #         td = int(0)
-    #     else:
-    #         td = int(triggerDelay)
-    #     d = 0x40
-    #     if (externalTriggerPolarity is not None):
-    #         if (externalTriggerPolarity == 0):
-    #             d = d | 0x01
-    #         else:
-    #             d = d | 0x02
-    #     if (internalTrigger):
-    #         d = d | 0x04
-    #     userData = bytes([d]) + td.to_bytes(4,'big',signed=False) 
-    #     err = self.sendCommand(self.codes_CC.OP_SETTRIGGER,userData,sendImmediately=True)
-    #     if (err != ""):
-    #         return err
-    #     return  self.setInternalTriggerADC(enable=internalTrigger)        
-
-    def setTrigger(self, externalTriggerPos=False, externalTriggerNeg=False, internalTrigger=False, triggerDelay = 0, disableWhileStreamsOff = True):
+    def set_trigger(self, external_trigger_pos=False, external_trigger_neg=False, internal_trigger=False, cam_timer0_pos=None, cam_timer0_neg=None, software_trigger=None, clear_output=None, clear_trigger=None, trigger_delay = 0, disable_while_streams_off = None):
         """
         Sets the trigger scheme in the camera. New implementation by D. Barna
 
         Parameters
         ^^^^^^^^^^
-        externalTriggerPos (bool)
+        external_trigger_pos (bool)
             Enable triggering on the rising edge of the external signal
 
-        externalTriggerNeg (bool)
+        external_trigger_neg (bool)
             Enable triggering on the falling edge of the external signal
         
-        internalTrigger: boolean
+        internal_trigger: boolean
             If True, internal triggering (trigger signal coming from any of the ADC boards) is enabled
         
-        triggerDelay:       Trigger with this delay [microsec]
+        trigger_delay:       Trigger with this delay [microsec]
 
-        disableWhileStreamsOff: ???
+        disable_while_streams_off: ???
 
         Returns
         ^^^^^^^
         Error message or empty string
         """
 
-        if (triggerDelay < 0):
-            td = int(0)
-        else:
-            td = int(triggerDelay)
+        error = ""
 
-        d=0
-        if disableWhileStreamsOff:
-            d |= 1<<6 # disable trigger events while streams are off
+        if (trigger_delay < 0):
+            trigger_delay = int(0)
+        else:
+            trigger_delay = int(trigger_delay)
+
+        control=0
+
+        if hasattr(self.codes_CC.OP_SETTRIGGER):
+            if disable_while_streams_off:
+                control |= 1<<6 # disable trigger events while streams are off
+        else:
+            if disable_while_streams_off is not None:
+                error += "With this firmware, one can not use disable_while_streams_off in APDCAM10G.set_trigger. Ignonring."
 
         # external trigger
-        if externalTriggerPos:
-            d |= 1<<0
-        if externalTriggerNeg:
-            d |= 1<<1
+        if external_trigger_pos:
+            control |= 1<<0
+        if external_trigger_neg:
+            control |= 1<<1
 
         # enable accepting internal triggers coming from any of the ADC boards
         if internalTrigger:
-            d |= 1<<2
-            
-        userData = bytes([d]) + td.to_bytes(4,'big',signed=False) 
-        err = self.sendCommand(self.codes_CC.OP_SETTRIGGER,userData,sendImmediately=True)
-        if (err != ""):
-            return err
+            control |= 1<<2
 
+        if hasattr(self.codes_CC.OP_SETG1TRIGGERMODULE):
+            if cam_timer0_pos:
+                control |= 1<<3
+            if cam_timer0_neg:
+                control |= 1<<4
+            if software_trigger:
+                control |= 1<<5
+            if clear_output:
+                control |= 1<<6
+            if clear_trigger:
+                control |= 1<<7
+        else:
+            if cam_timer0_pos is not None:
+                error += ("\n" if error != "" else "") + "cam_timer0_pos can not be set for this firmware. Ignoring"
+            if cam_timer0_neg is not None:
+                error += ("\n" if error != "" else "") + "cam_timer0_neg can not be set for this firmware. Ignoring"
+            if software_trigger is not None:
+                error += ("\n" if error != "" else "") + "software_trigger can not be set for this firmware. Ignoring"
+            if clear_output is not None:
+                error += ("\n" if error != "" else "") + "clear_output can not be set for this firmware. Ignoring"
+            if clear_trigger is not None:
+                error += ("\n" if error != "" else "") + "clear_trigger can not be set for this firmware. Ignoring"
+                
         # enable outputting the internal trigger on all ADC boards as well (still not on the channel-level!)
-        return  self.setInternalTriggerAdc(adcBoardNo='all',enable=internalTrigger)        
-        
+        err = self.setInternalTriggerAdc(adcBoardNo='all',enable=internal_trigger)
+        if err != "":
+            error += ("\n" if error != "" else "") + err
+
+        user_data = bytes([control]) + trigger_delay.to_bytes(4,'big',signed=False) 
+        if hasattr(self.codes_CC.OP_SETTRIGGER):
+            err = self.sendCommand(self.codes_CC.OP_SETTRIGGER,user_data,sendImmediately=True)
+        elif hasattr(self.codes_CC.OP_SETG1TRIGGERMODULE):
+            user_data += self.status.CC_settings[self.codes_CC.CC_REGISTER_SAMPLECOUNT,self.codes_CC.CC_REGISTER_SAMPLECOUNT+6]
+            err = self.sendCommand(self.codes_CC.OP_SETG1TRIGGERMODULE,user_data,sendImmediately=True)
+        if (err != ""):
+            error += ("\n" if error != "" else "") + err
+
+        return error
 
     def clearAllInternalTrigger(self):
         """
@@ -3394,6 +3589,8 @@ class controller:
         err = self.setTrigger(externalTriggerPos=externalTriggerPos,
                               externalTriggerNeg=externalTriggerNeg,
                               internalTrigger=internalTrigger,
+                              camTimer0Pos=False, # This should be set correctly for firmware v1.05 and above
+                              camTimer0Neg=False, # This should be set correctly for firmware v1.05 and above
                               triggerDelay=triggerDelay)
 
         self.measurePara.externalTriggerPos = externalTriggerPos
@@ -3658,10 +3855,13 @@ class controller:
         
         self.readCCdata(dataType=0)
         for i in range(1):
-            d_octet = self.status.CC_settings[APDCAM10G_codes_v1.CC_REGISTER_UDPOCTET1+16*i:APDCAM10G_codes_v1.CC_REGISTER_UDPOCTET1+16*i+2]
+            #d_octet = self.status.CC_settings[APDCAM10G_codes_v1.CC_REGISTER_UDPOCTET1+16*i:APDCAM10G_codes_v1.CC_REGISTER_UDPOCTET1+16*i+2]
+            d_octet = self.status.CC_settings[self.codes_CC.CC_REGISTER_UDPOCTET1+16*i:self.codes_CC.CC_REGISTER_UDPOCTET1+16*i+2]
             octet = int.from_bytes(d_octet,'big',signed=False)
-            d_ip = self.status.CC_settings[APDCAM10G_codes_v1.CC_REGISTER_IP1+16*i:APDCAM10G_codes_v1.CC_REGISTER_IP1+16*i+4]
-            d_port = self.status.CC_settings[APDCAM10G_codes_v1.CC_REGISTER_UDPPORT1+16*i:APDCAM10G_codes_v1.CC_REGISTER_UDPPORT1+16*i+2]
+            #d_ip = self.status.CC_settings[APDCAM10G_codes_v1.CC_REGISTER_IP1+16*i:APDCAM10G_codes_v1.CC_REGISTER_IP1+16*i+4]
+            d_ip = self.status.CC_settings[self.codes_CC.CC_REGISTER_IP1+16*i:self.codes_CC.CC_REGISTER_IP1+16*i+4]
+            #d_port = self.status.CC_settings[APDCAM10G_codes_v1.CC_REGISTER_UDPPORT1+16*i:APDCAM10G_codes_v1.CC_REGISTER_UDPPORT1+16*i+2]
+            d_port = self.status.CC_settings[self.codes_CC.CC_REGISTER_UDPPORT1+16*i:self.codes_CC.CC_REGISTER_UDPPORT1+16*i+2]
             port = int.from_bytes(d_port,'big',signed=False)
             print("Stream {:d}...octet:{:d}... IP:{:d}.{:d}.{:d}.{:d}...port:{:d}".format(i+1,octet,\
                   int(d_ip[0]),int(d_ip[1]),int(d_ip[2]),int(d_ip[3]),port))
@@ -3672,7 +3872,8 @@ class controller:
             data[3:7] = bytes([239,123,13,100])
             p = 10003
             data[7:9] = p.to_bytes(2,'big')
-            err = self.sendCommand(APDCAM10G_codes_v1.OP_SETMULTICASTUDPSTREAM,data,sendImmediately=True)
+            #err = self.sendCommand(APDCAM10G_codes_v1.OP_SETMULTICASTUDPSTREAM,data,sendImmediately=True)
+            err = self.sendCommand(self.codes_CC.OP_SETMULTICASTUDPSTREAM,data,sendImmediately=True)
             print(err)
             
             data = bytearray(15)
@@ -3682,15 +3883,19 @@ class controller:
             data[9:13] = bytes([239,123,13,100])
             p = 10003
             data[13:15] = p.to_bytes(2,'big')
-            err = self.sendCommand(APDCAM10G_codes_v1.OP_SETUDPSTREAM,data,sendImmediately=True)
+            #err = self.sendCommand(APDCAM10G_codes_v1.OP_SETUDPSTREAM,data,sendImmediately=True)
+            err = self.sendCommand(self.codes_CC.OP_SETUDPSTREAM,data,sendImmediately=True)
             print(err)
  
         self.readCCdata(dataType=0)                       
         for i in range(4):
-            d_octet = self.status.CC_settings[APDCAM10G_codes_v1.CC_REGISTER_UDPOCTET1+16*i:APDCAM10G_codes_v1.CC_REGISTER_UDPOCTET1+16*i+2]
+            #d_octet = self.status.CC_settings[APDCAM10G_codes_v1.CC_REGISTER_UDPOCTET1+16*i:APDCAM10G_codes_v1.CC_REGISTER_UDPOCTET1+16*i+2]
+            d_octet = self.status.CC_settings[self.codes_CC.CC_REGISTER_UDPOCTET1+16*i:self.codes_CC.CC_REGISTER_UDPOCTET1+16*i+2]
             octet = int.from_bytes(d_octet,'big',signed=False)
-            d_ip = self.status.CC_settings[APDCAM10G_codes_v1.CC_REGISTER_IP1+16*i:APDCAM10G_codes_v1.CC_REGISTER_IP1+16*i+4]
-            d_port = self.status.CC_settings[APDCAM10G_codes_v1.CC_REGISTER_UDPPORT1+16*i:APDCAM10G_codes_v1.CC_REGISTER_UDPPORT1+16*i+2]
+            #d_ip = self.status.CC_settings[APDCAM10G_codes_v1.CC_REGISTER_IP1+16*i:APDCAM10G_codes_v1.CC_REGISTER_IP1+16*i+4]
+            d_ip = self.status.CC_settings[self.codes_CC.CC_REGISTER_IP1+16*i:self.codes_CC.CC_REGISTER_IP1+16*i+4]
+            #d_port = self.status.CC_settings[APDCAM10G_codes_v1.CC_REGISTER_UDPPORT1+16*i:APDCAM10G_codes_v1.CC_REGISTER_UDPPORT1+16*i+2]
+            d_port = self.status.CC_settings[self.codes_CC.CC_REGISTER_UDPPORT1+16*i:self.codes_CC.CC_REGISTER_UDPPORT1+16*i+2]
             port = int.from_bytes(d_port,'big',signed=False)
             print("Stream {:d}...octet:{:d}... IP:{:d}.{:d}.{:d}.{:d}...port:{:d}".format(i+1,octet,\
                   int(d_ip[0]),int(d_ip[1]),int(d_ip[2]),int(d_ip[3]),port))

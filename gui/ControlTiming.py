@@ -85,14 +85,15 @@ def populateFrequencyCombo(multFrom,multTo,divFrom,divTo,combo):
 
     
 class ControlTiming(QtWidgets.QWidget):
-    def versionSpecificSetup(self,fw):
+
+    def version_specific_setup(self,fw):
         version = int(fw[11:14])
         if version >= 105:
             self.sampleDiv.setMinimum(1)
-            self.adcOutFreqDiv.setEnabled(True)
+            self.adc_out_freq_div.setEnabled(True)
         else:
-            self.sampleDiv.setMinimum(3)
-            self.adcOutFreqDiv.setEnabled(False)
+            self.sampleDiv.setMinimum(2)
+            self.adc_out_freq_div.setEnabled(False)
 
     def setSerialPll(self):
         self.gui.camera.setSerialPll(self.serialPllMult.value(),self.serialPllDiv.value())
@@ -353,6 +354,15 @@ class ControlTiming(QtWidgets.QWidget):
         self.sampleFreq.setValue(float(frequencyFormat.format(2)))
         g.addWidget(self.sampleFreq,4,4)
 
+        g.addWidget(QtWidgets.QLabel("ADC out (EIO):"),5,0)
+        self.adc_out_freq_div = QtWidgets.QSpinBox()
+        g.addWidget(self.adc_out_freq_div,5,3)
+        self.adc_out_freq_div.settingsName = "ADC output (EIO) frequency divisor"
+        self.adc_out_freq_div.setMinimum(1)
+        self.adc_out_freq_div.setMaximum(254)
+        self.adc_out_freq_div.setToolTip("Divisor for the ADC output frequency going to the EIO connector. Only available from FW version 105. Must be an even number up to 254 or 1!")
+        self.adc_out_freq_div.lineEdit().returnPressed.connect(self.gui.call(lambda: self.gui.camera.set_eio_adc_clock_divider(self.adc_out_freq_div.value())))
+        
         l.addStretch(1)
 
         l = QtWidgets.QVBoxLayout()
@@ -378,14 +388,6 @@ class ControlTiming(QtWidgets.QWidget):
         self.extSample.setToolTip("Use external signal for sampling, rather than ADC frequency divided by SAMPLEDIVIDER")
         g.addWidget(self.extSample)
 
-        hh = QtWidgets.QHBoxLayout()
-        g.addLayout(hh)
-        hh.addWidget(QtWidgets.QLabel("ADC out freq. divisor:"))
-        self.adcOutFreqDiv = QtWidgets.QSpinBox()
-        hh.addWidget(self.adcOutFreqDiv)
-        self.adcOutFreqDiv.settingsName = "ADC output frequency divisor"
-        self.adcOutFreqDiv.setToolTip("Divisor for the ADC output frequency going to the panel. Only available from FW version 105.")
-        self.gui.show_error("Control & Timing / ADC output frequency divisor is not yet connected to an action")
 
         g = QVGroupBox()
         l.addWidget(g)
@@ -450,7 +452,12 @@ class ControlTiming(QtWidgets.QWidget):
         self.triggerDelay.setToolTip("Data stream output will start with this delay after the trigger")
         h.addWidget(self.triggerDelay)
 
-        triggerFunc = self.gui.call(lambda: self.gui.camera.setTrigger(self.trigPlus.isChecked(),self.trigMinus.isChecked(),self.internalTrig.isChecked(),self.triggerDelay.value(),self.disableWhenStreamOff.isChecked()))
+        g = QVGroupBox("Gate")
+        l.addWidget(g)
+        self.external_gate_enabled = QtWidgets.QCheckBox("External gate")
+        g.addWidget(self.external_gate_enabled)
+
+        triggerFunc = self.gui.call(lambda: self.gui.camera.set_trigger(self.trigPlus.isChecked(),self.trigMinus.isChecked(),self.internalTrig.isChecked(),self.triggerDelay.value(),self.disableWhenStreamOff.isChecked()))
 
         self.trigPlus.stateChanged.connect(triggerFunc)
         self.trigMinus.stateChanged.connect(triggerFunc)

@@ -1,7 +1,7 @@
 import sys
 
 import importlib
-from QtVersion import QtVersion
+from .QtVersion import QtVersion
 QtWidgets = importlib.import_module(QtVersion+".QtWidgets")
 QtGui     = importlib.import_module(QtVersion+".QtGui")
 Qt = importlib.import_module(QtVersion+".QtCore")
@@ -9,9 +9,9 @@ Qt = importlib.import_module(QtVersion+".QtCore")
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 
-from ApdcamUtils import *
+from .ApdcamUtils import *
 import matplotlib.pyplot as plt
-from DetachedWindow import DetachedWindow
+from .DetachedWindow import DetachedWindow
 
 class MplCanvas(FigureCanvasQTAgg):
 

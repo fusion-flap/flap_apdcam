@@ -664,7 +664,7 @@ class Terminal:
     def show_error(self,s):
         print(self.FAIL + s + self.ENDCs)
         
-class controller:
+class APDCAM10G_control:
     """
     This class is for reading/writing APDCAM-10G registers and sending commands
     Create an instance and call the connect() method
@@ -730,10 +730,16 @@ class controller:
 
         #Extracting camera information
         d = self.status.CC_settings 
-        #self.status.CC_serial = int.from_bytes(d[APDCAM10G_codes_v1.CC_REGISTER_MAN_SERIAL:APDCAM10G_codes_v1.CC_REGISTER_MAN_SERIAL+4],byteorder='little',signed=False)
-        self.status.CC_serial = int.from_bytes(d[self.codes_CC.CC_REGISTER_MAN_SERIAL:self.codes_CC.CC_REGISTER_MAN_SERIAL+4],byteorder='little',signed=False)
-        #self.status.CC_firmware = d[APDCAM10G_codes_v1.CC_REGISTER_FIRMWARE:APDCAM10G_codes_v1.CC_REGISTER_FIRMWARE+14]
-        self.status.CC_firmware = d[self.codes_CC.CC_REGISTER_FIRMWARE:self.codes_CC.CC_REGISTER_FIRMWARE+14]
+
+        # Note that here we use the hard-coded APDCAM10G_codes_v1.CC_REGISTER_MAN_SERIAL symbol because this function is called
+        # to read the CC board settings, that is, also when reading the camera firmware version, i.e. before the
+        # firmware is known and self.codes_CC is set to the correct object based on camera firmware version.
+        # So we must rely on CC_REGISTER_MAN_SERIAL not changing between firmware versions
+        # The same holds at some other places within this function
+        self.status.CC_serial = int.from_bytes(d[APDCAM10G_codes_v1.CC_REGISTER_MAN_SERIAL:APDCAM10G_codes_v1.CC_REGISTER_MAN_SERIAL+4],byteorder='little',signed=False)
+        #self.status.CC_serial = int.from_bytes(d[self.codes_CC.CC_REGISTER_MAN_SERIAL:self.codes_CC.CC_REGISTER_MAN_SERIAL+4],byteorder='little',signed=False)
+        self.status.CC_firmware = d[APDCAM10G_codes_v1.CC_REGISTER_FIRMWARE:APDCAM10G_codes_v1.CC_REGISTER_FIRMWARE+14]
+        #self.status.CC_firmware = d[self.codes_CC.CC_REGISTER_FIRMWARE:self.codes_CC.CC_REGISTER_FIRMWARE+14]
         self.log("Manufacturer serial number: " + str(self.status.CC_serial))
         self.log("Firmware: " + str(self.status.CC_firmware))
         if (self.status.CC_firmware[0:11] != b"BSF12-0001-"):
@@ -955,8 +961,13 @@ class controller:
         userData =bytes([0,dataCode])
         self.lock.acquire()
         for rep in range(self.repeatNumber) :
-            #err = self.sendCommand(APDCAM10G_codes_v1.OP_SENDACK,userData,sendImmediately=True)
-            err = self.sendCommand(self.codes_CC.OP_SENDACK,userData,sendImmediately=True)
+            # Note that here we use the hard-coded APDCAM10G_codes_v1.OP_SENDACK symbol because this function is called
+            # to read the CC board settings, that is, also when reading the camera firmware version, i.e. before the
+            # firmware is known and self.codes_CC is set to the correct object based on camera firmware version.
+            # So we must rely on OP_SENDACK not changing between firmware versions
+            # The same holds at some other places within this function
+            err = self.sendCommand(APDCAM10G_codes_v1.OP_SENDACK,userData,sendImmediately=True)
+            #err = self.sendCommand(self.codes_CC.OP_SENDACK,userData,sendImmediately=True)
             if (err != ""):
                 time.sleep(0.001)
                 print("repeat readCCdata/1 {:d}".format(rep))
@@ -970,8 +981,8 @@ class controller:
                 continue
             d = d[22:len(d)]
             resp_command = int.from_bytes(d[0:2],'big',signed=False)
-            #if (resp_command != APDCAM10G_codes_v1.AN_ACK) :
-            if (resp_command != self.codes_CC.AN_ACK) :
+            if (resp_command != APDCAM10G_codes_v1.AN_ACK) :
+            #if (resp_command != self.codes_CC.AN_ACK) :
                 err1 = "readCCdata/3 Invalid response by camera (wrong command:{:X}).".format(resp_command)
                 #print(err1)
                 #print("repeat readCCdata/3 {:d}".format(rep))
@@ -1002,7 +1013,7 @@ class controller:
             self.status.CC_variables = d
         return ""
 
-    def set_eio_adc_clock_divider(self,value):
+    def setEioAdcClockDivider(self,value):
         """
         Set the divider value for the ADC clock output at the EIO connector
 
@@ -1880,7 +1891,7 @@ class controller:
         return err
 
 
-    def set_sample_number(self,sample_number=0):
+    def setSampleNumber(self,sample_number=0):
 
         # Firmware version before 1.05
         if hasattr(self.codes_CC,"OP_SETSAMPLECOUNT"):
@@ -2305,9 +2316,9 @@ class controller:
             
         Returns
         ^^^^^^^
-        string
+        error
             "" or error text.
-        list
+        values
             List of test pattern values.
             if 'adcBoardNo' is 'all', then the list contains as many elements as the number of ADC boards, and all list element
             is a list of 4 numbers corresponding to the 4 blocks of the ADC board
@@ -2552,28 +2563,6 @@ class controller:
             time.sleep(0.005)
         return (err,values)
         
-    def gePCRegister(self,register,numberOfBytes=1):
-        """
-        Get the value of a register
-
-        Parameters
-        ^^^^^^^^^^
-        register:
-            Address of the register
-
-        Returns
-        ^^^^^^^
-        err
-            Error message or empty string
-        value
-            The value of the register 
-        """
-
-        err,adcAddresses = self.adcAddresses(adcBoardNo)
-
-        return self.readPDI(self.codes_PC.PC_CARD,register,numberOfBytes=numberOfBytes,arrayData=False)
-
-
     def setAdcRegister(self,adcBoardNo,register,value,numberOfBytes=1):
         """
         Set a given register to a given value
@@ -2653,7 +2642,7 @@ class controller:
     
     def setAdcRegisterBit(self,adcBoardNo,register,bit,state):
         """
-        Set a single bit in the CONTROL (0x000B) register of the ADC. To do so, it first reads the value of the register,
+        Set a single bit in the given register of the ADC. To do so, it first reads the value of the register,
         changes the given bit to the desired value, and then writes it back to the register
 
         Parameters
@@ -2733,7 +2722,7 @@ class controller:
         values = []
         err = ""
         for adcAddress in adcAddresses:
-            err_tmp,d = self.readPDI(adcAddress,register,numberOfBytes=numberOfBytes,arrayData=False)
+            err_tmp,d = self.readPDI(adcAddress,register,numberOfBytes=1,arrayData=False)
             if err_tmp != "":
                 if err != "":
                     err += ", "
@@ -3306,47 +3295,69 @@ class controller:
         err, bit = self.getAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,5)
         return err,bit
     
-    def set_gate(self, external_gate_enabled=False, external_gate_inverted=False, internal_gate_enabled=False, internal_gate_inverted=False, cam_timer0_enabled=False, cam_timer0_inverted=False, clear=False):
+    def setGate(self, externalGateEnabled=False, externalGateInverted=False, internalGateEnabled=False, internalGateInverted=False, camTimer0Enabled=False, camTimer0Inverted=False, clear=False):
+        """
+        Set the G1 trigger module parameters. 
+        """
 
         if not hasattr(self.codes_CC,"OP_SETG2GATEMODULE"):
             return "APDCAM10G.set_gate can not be used for this firmware"
 
         data = 0
-        if external_gate_enabled:
+        if externalGateEnabled:
             data |= 1<<1
-        if external_gate_inverted:
+        if externalGateInverted:
             data |= 1<<0
-        if internal_gate_enabled:
+        if internalGateEnabled:
             data |= 1<<3
-        if internal_gate_inverted:
+        if internalGateInverted:
             data |= 1<<2
-        if cam_timer0_enabled:
+        if camTimer0Enabled:
             data |= 1<<5
-        if cam_timer0_inverted:
+        if camTimer0Inverted:
             data |= 1<<4
         if clear:
             data |= 1<<7
 
         return self.sendCommand(self.codes_CC.OP_SETG2GATEMODULE,data,sendImmediately=True)
 
-    def set_trigger(self, external_trigger_pos=False, external_trigger_neg=False, internal_trigger=False, cam_timer0_pos=None, cam_timer0_neg=None, software_trigger=None, clear_output=None, clear_trigger=None, trigger_delay = 0, disable_while_streams_off = None):
+    def setTrigger(self, externalTriggerPos=False, externalTriggerNeg=False, internalTrigger=False, camTimer0Pos=None, camTimer0Neg=None, softwareTrigger=None, clearOutput=None, clearTriggerStatus=None, triggerDelay = 0, disableWhileStreamsOff = None):
         """
         Sets the trigger scheme in the camera. New implementation by D. Barna
 
         Parameters
         ^^^^^^^^^^
-        external_trigger_pos (bool)
+        externalTriggerPos (bool)
             Enable triggering on the rising edge of the external signal
 
-        external_trigger_neg (bool)
+        externalTriggerNeg (bool)
             Enable triggering on the falling edge of the external signal
         
-        internal_trigger: boolean
+        internalTrigger: boolean
             If True, internal triggering (trigger signal coming from any of the ADC boards) is enabled
-        
-        trigger_delay:       Trigger with this delay [microsec]
 
-        disable_while_streams_off: ???
+        camTimer0Pos: boolean
+            If True, enable triggering on the rising edge of the camera timer0 module signal
+            (only available in firmware v1.05 or above, it is ignored otherwise with an error message)
+
+        camTimer0Neg: boolean
+            If True, enable triggering on the falling edge of the camera timer0 module signal
+            (only available in firmware v1.05 or above, it is ignored otherwise with an error message)
+        
+        softwareTrigger: boolean
+            Enable a software trigger flag as a gate signal
+            (only available in firmware v1.05 or above, it is ignored otherwise with an error message)
+
+        clearOutput: boolean
+            Clear the output of the gate module (?)
+            (only available in firmware v1.05 or above, it is ignored otherwise with an error message)
+
+        clearTriggerStatus: boolean
+
+
+        triggerDelay:       Trigger with this delay [microsec]
+
+        disableWhileStreamsOff: ???
 
         Returns
         ^^^^^^^
@@ -3355,62 +3366,62 @@ class controller:
 
         error = ""
 
-        if (trigger_delay < 0):
-            trigger_delay = int(0)
+        if (triggerDelay < 0):
+            triggerDelay = int(0)
         else:
-            trigger_delay = int(trigger_delay)
+            triggerDelay = int(triggerDelay)
 
         control=0
 
-        if hasattr(self.codes_CC.OP_SETTRIGGER):
-            if disable_while_streams_off:
+        if hasattr(self.codes_CC,"OP_SETTRIGGER"):
+            if disableWhileStreamsOff:
                 control |= 1<<6 # disable trigger events while streams are off
         else:
-            if disable_while_streams_off is not None:
-                error += "With this firmware, one can not use disable_while_streams_off in APDCAM10G.set_trigger. Ignonring."
+            if disableWhileStreamsOff is not None:
+                error += "With this firmware, one can not use disableWhileStreamsOff in APDCAM10G.set_trigger. Ignonring."
 
         # external trigger
-        if external_trigger_pos:
+        if externalTriggerPos:
             control |= 1<<0
-        if external_trigger_neg:
+        if externalTriggerNeg:
             control |= 1<<1
 
         # enable accepting internal triggers coming from any of the ADC boards
         if internalTrigger:
             control |= 1<<2
 
-        if hasattr(self.codes_CC.OP_SETG1TRIGGERMODULE):
-            if cam_timer0_pos:
+        if hasattr(self.codes_CC,"OP_SETG1TRIGGERMODULE"):
+            if camTimer0Pos:
                 control |= 1<<3
-            if cam_timer0_neg:
+            if camTimer0Neg:
                 control |= 1<<4
-            if software_trigger:
+            if softwareTrigger:
                 control |= 1<<5
-            if clear_output:
+            if clearOutput:
                 control |= 1<<6
-            if clear_trigger:
+            if clearTriggerStatus:
                 control |= 1<<7
         else:
-            if cam_timer0_pos is not None:
-                error += ("\n" if error != "" else "") + "cam_timer0_pos can not be set for this firmware. Ignoring"
-            if cam_timer0_neg is not None:
-                error += ("\n" if error != "" else "") + "cam_timer0_neg can not be set for this firmware. Ignoring"
-            if software_trigger is not None:
-                error += ("\n" if error != "" else "") + "software_trigger can not be set for this firmware. Ignoring"
-            if clear_output is not None:
-                error += ("\n" if error != "" else "") + "clear_output can not be set for this firmware. Ignoring"
-            if clear_trigger is not None:
-                error += ("\n" if error != "" else "") + "clear_trigger can not be set for this firmware. Ignoring"
+            if camTimer0Pos is not None:
+                error += ("\n" if error != "" else "") + "camTimer0Pos can not be set for this firmware. Ignoring"
+            if camTimer0Neg is not None:
+                error += ("\n" if error != "" else "") + "camTimer0Neg can not be set for this firmware. Ignoring"
+            if softwareTrigger is not None:
+                error += ("\n" if error != "" else "") + "softwareTrigger can not be set for this firmware. Ignoring"
+            if clearOutput is not None:
+                error += ("\n" if error != "" else "") + "clearOutput can not be set for this firmware. Ignoring"
+            if clearTriggerStatus is not None:
+                error += ("\n" if error != "" else "") + "clearTriggerStatus can not be set for this firmware. Ignoring"
                 
         # enable outputting the internal trigger on all ADC boards as well (still not on the channel-level!)
-        err = self.setInternalTriggerAdc(adcBoardNo='all',enable=internal_trigger)
+        err = self.setInternalTriggerAdc(adcBoardNo='all',enable=internalTrigger)
         if err != "":
             error += ("\n" if error != "" else "") + err
 
-        user_data = bytes([control]) + trigger_delay.to_bytes(4,'big',signed=False) 
-        if hasattr(self.codes_CC.OP_SETTRIGGER):
+        user_data = bytes([control]) + triggerDelay.to_bytes(4,'big',signed=False) 
+        if hasattr(self.codes_CC,"OP_SETTRIGGER"):
             err = self.sendCommand(self.codes_CC.OP_SETTRIGGER,user_data,sendImmediately=True)
-        elif hasattr(self.codes_CC.OP_SETG1TRIGGERMODULE):
+        elif hasattr(self.codes_CC,"OP_SETG1TRIGGERMODULE"):
             user_data += self.status.CC_settings[self.codes_CC.CC_REGISTER_SAMPLECOUNT,self.codes_CC.CC_REGISTER_SAMPLECOUNT+6]
             err = self.sendCommand(self.codes_CC.OP_SETG1TRIGGERMODULE,user_data,sendImmediately=True)
         if (err != ""):

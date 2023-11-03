@@ -1,7 +1,7 @@
 # https://stackoverflow.com/questions/43293056/move-qwidget-from-one-window-to-another-in-pyqt
 
 import importlib
-from QtVersion import QtVersion
+from .QtVersion import QtVersion
 QtWidgets = importlib.import_module(QtVersion+".QtWidgets")
 QtGui     = importlib.import_module(QtVersion+".QtGui")
 Qt = importlib.import_module(QtVersion+".QtCore")

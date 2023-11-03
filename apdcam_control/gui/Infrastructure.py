@@ -2,15 +2,15 @@ import sys
 from functools import partial
 
 import importlib
-from QtVersion import QtVersion
+from .QtVersion import QtVersion
 QtWidgets = importlib.import_module(QtVersion+".QtWidgets")
 QtGui     = importlib.import_module(QtVersion+".QtGui")
 Qt = importlib.import_module(QtVersion+".QtCore")
 
 #from PyQt6.QtWidgets import QApplication, QWidget,  QFormLayout, QVBoxLayout, QHBoxLayout, QGridLayout, QTabWidget, QLineEdit, QDateEdit, QPushButton, QTextEdit, QGroupBox, QLabel, QCheckBox, QSpinBox
 #from PyQt6.QtCore import Qt
-from ApdcamUtils import *
-from GuiMode import *
+from .ApdcamUtils import *
+from .GuiMode import *
 
 class Infrastructure(QtWidgets.QWidget):
     def __init__(self,parent):
@@ -125,6 +125,14 @@ class Infrastructure(QtWidgets.QWidget):
         self.pcError = QtWidgets.QLineEdit()
         readOnly(self.pcError)
         l.addWidget(self.pcError)
+
+        self.dualSata = QtWidgets.QCheckBox("Dual SATA")
+        #self.dualSata.factorySetting = True
+        self.dualSata.guiMode = GuiMode.factory
+        self.dualSata.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setDualSata(self.dualSata.isChecked())))
+        self.dualSata.setToolTip("Enable dual SATA mode for the system (CC card and all ADC boards)")
+        l1.addWidget(self.dualSata)
+        
 
         l1.addStretch(1)
 
@@ -256,6 +264,19 @@ class Infrastructure(QtWidgets.QWidget):
             self.calibrationLightIntensity.setValue(callight)
         else:
             self.gui.show_error("Failed to read calibration light intensity from camera: " + err)
+
+        ccDualSata = bool(self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_SATACONTROL] & 1)
+        err,adcDualSata = self.gui.camera.getAdcRegisterBit('all',self.gui.camera.codes_ADC.ADC_REG_CONTROL,1)
+        dualSataOk = True
+        for aaa in adcDualSata:
+            if bool(aaa) != ccDualSata:
+                self.gui.show_error("Inconsistency in the camera: some ADC has a different 'Dual SATA' setting from that of the CC board")
+                dualSataOk = False
+                break
+        if dualSataOk:
+            self.dualSata.blockSignals(True)
+            self.dualSata.setChecked(ccDualSata)
+            self.dualSata.blockSignals(False)
 
     def updateGui(self):
         for i in range(4):

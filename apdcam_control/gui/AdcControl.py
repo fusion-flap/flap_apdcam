@@ -2,7 +2,7 @@ import sys
 from functools import partial
 
 import importlib
-from QtVersion import *
+from .QtVersion import *
 QtWidgets = importlib.import_module(QtVersion+".QtWidgets")
 QtGui = importlib.import_module(QtVersion+".QtGui")
 Qt = importlib.import_module(QtVersion+".QtCore")
@@ -10,8 +10,8 @@ Qt = importlib.import_module(QtVersion+".QtCore")
 # from PyQt6.QtWidgets import QApplication, QWidget,  QFormLayout, QVBoxLayout, QHBoxLayout, QGridLayout, QTabWidget, QLineEdit, QDateEdit, QPushButton, QTextEdit, QGroupBox, QLabel, QCheckBox, QSpinBox, QScrollArea
 # from PyQt6.QtCore import Qt,QLocale
 # from PyQt6.QtGui import QDoubleValidator
-from ApdcamUtils import *
-from GuiMode import *
+from .ApdcamUtils import *
+from .GuiMode import *
 
 class Adc(QtWidgets.QWidget):
     def updateGui(self):
@@ -47,6 +47,18 @@ class Adc(QtWidgets.QWidget):
         self.led2.setChecked((status2>>3)&1)
         self.internalTriggerDisplay.setChecked((status2>>0)&1)
 
+        # err,testpattern = self.gui.camera.getTestPattern(self.number)
+        # if err=="":
+        #     s = ""
+        #     for i in range(len(testpattern)):
+        #         if i>0:
+        #             s += " ";
+        #         s += str(testpattern[i])
+        #     self.testPattern.blockSignals(True)
+        #     self.testPattern.setText(s)
+        #     self.testPattern.blockSignals(False)
+        # else:
+        #     self.gui.show_error("Failed to read test pattern: " + err)
         
     def name(self):
         return "ADC " + str(self.number) + " (@" + str(self.address) + ")"

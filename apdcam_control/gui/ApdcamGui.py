@@ -8,29 +8,30 @@ import os
 import glob
 
 import importlib
-from QtVersion import QtVersion
+from .QtVersion import QtVersion
 QtWidgets = importlib.import_module(QtVersion+".QtWidgets")
 QtGui = importlib.import_module(QtVersion+".QtGui")
 QtCore = importlib.import_module(QtVersion+".QtCore")
 
-
-from ApdcamUtils import *
-from ApdcamSettings import *
-from MainPage import MainPage
-from Measure import Measure
-from Diagnostics import Diagnostics
-from Infrastructure import Infrastructure
-from AdcControl import AdcControl
-from ControlTiming import ControlTiming
-from CameraTimer import CameraTimer
-from FactoryTest import FactoryTest
-from Plot import Plot
-from SimpleMeasurementControl import SimpleMeasurementControl
-from GuiMode import *
+from .ApdcamUtils import *
+from .ApdcamSettings import *
+from .MainPage import MainPage
+from .Measure import Measure
+from .Diagnostics import Diagnostics
+from .Infrastructure import Infrastructure
+from .AdcControl import AdcControl
+from .ControlTiming import ControlTiming
+from .CameraTimer import CameraTimer
+from .FactoryTest import FactoryTest
+from .Plot import Plot
+from .SimpleMeasurementControl import SimpleMeasurementControl
+from .GuiMode import *
 
 #sys.path.append('/home/apdcam/Python/apdcam_devel/apdcam_control')
-sys.path.append('/home/barna/fusion-instruments/apdcam/sw/flap_apdcam/apdcam_control')
-import APDCAM10G 
+#sys.path.append('/home/barna/fusion-instruments/apdcam/sw/flap_apdcam/apdcam_control')
+#import APDCAM10G
+
+from ..APDCAM10G_control import APDCAM10G_control
 
 """
 The setEnabled method of a QWidget, when it is a tab of a QTabWidget, makes apparantly nothing.
@@ -111,7 +112,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
         self.cameraStateRefreshed.connect(self.updateGui)
 
-        self.camera = APDCAM10G.controller()
+        self.camera = APDCAM10G_control()
         self.camera.setErrorHandler(lambda msg: self.show_error(msg))
 
         # Status info is collected into a sub-class 'status'
@@ -665,10 +666,6 @@ class ApdcamGuiApp(QtWidgets.QApplication):
         self.exec()
 
     
-
-        
-if __name__ == '__main__':
-    app = ApdcamGuiApp()
-    #sys.stderr.write = app.show_error
-    #sys.stdout.write = app.show_message
-    app.run()
+#if __name__ == '__main__':
+#    app = ApdcamGuiApp()
+#    app.run()

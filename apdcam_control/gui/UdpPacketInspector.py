@@ -3,14 +3,14 @@ import re
 import time
 
 import importlib
-from QtVersion import QtVersion
+from .QtVersion import QtVersion
 QtWidgets = importlib.import_module(QtVersion+".QtWidgets")
 QtGui     = importlib.import_module(QtVersion+".QtGui")
 Qt = importlib.import_module(QtVersion+".QtCore")
 
-from ApdcamUtils import *
+from .ApdcamUtils import *
 sys.path.append('/home/barna/fusion-instruments/apdcam/sw/flap_apdcam/apdcam_control')
-import APDCAM10G
+import APDCAM10G_control
 
 class QHLine(QtWidgets.QFrame):
     def __init__(self):
@@ -76,8 +76,14 @@ class UdpPacketInspector(QtWidgets.QWidget):
         self.numberOfSamples.setFixedWidth(300)
         self.numberOfSamples.setMaximum(100000)
         self.numberOfSamples.setValue(200)
+        self.numberOfSamples.setToolTip("Set the number of samples to be read from the camera")
         self.numberOfSamples.lineEdit().returnPressed.connect(self.get_data)
         commands.addWidget(self.numberOfSamples)
+        self.useTestPattern = QtWidgets.QCheckBox("Use test pattern")
+        self.useTestPattern.setToolTip("Set the camera (only temporarily) to send the short pseudo-random sequence, then reset the test pattern flag to the original value")
+        self.useTestPattern.setChecked(True)
+        commands.addWidget(self.useTestPattern)
+
         self.getDataButton = QtWidgets.QPushButton("Get data")
         self.getDataButton.setToolTip("Read the specified number of samples from the camera and display an analysis result of the received packets")
         self.getDataButton.clicked.connect(self.get_data)
@@ -176,31 +182,44 @@ class UdpPacketInspector(QtWidgets.QWidget):
 
         return full_match,matches
 
-    def find_in_pattern(self,signals,pattern):
-        n = 1000000
-        for i in range(len(signals)):
-            if signals[i] is None:
-                continue
-            if(len(signals[i]) < n):
-                n = len(signals[i])
-        for s in range(n):
-            line = f'{s:03d}'+ ": " 
-            for i in range(len(signals)):
-                if signals[i] is None:
-                    continue
+    def find_in_pattern(self,channel_data,pattern):
+        # Each element of this list is a 2-element list, of which the first element is the index in the pseudo-random sequence,
+        # the second element is a string containing info about the match. 
+        result = []
+        for i in range(len(channel_data)):
+            # If no channel data has been found in the pattern sequence so far, store a "[dataindex:patternindex]" string
+            # as a feedback for the user, where dataindex is the index of the data series (if this is non-zero, the user
+            # will recognize that earlier data values were not matched), and patternindex is the index within the pseudo-random
+            # sequence where the match was found
+            if len(result) == 0:
                 try:
-                    index = pattern.index(signals[i][s])
-                    index = "[" + f'{index:03d}' + "]  "
+                    index = pattern.index(channel_data[i])
+                    result.append([index, "[" + str(i) + ":" + str(index) + "]"])
                 except:
-                    index = "[---]  "
-                line += f'{signals[i][s]:6d}' + " " + index
-            print(line)
+                    return result
+            # otherwise if there was a previous match already, we report relative index offsets w.r.t. the last match.
+            # Ideally these increments should be equal to SAMPLEDIV
+            else:
+                # relative index w.r.t. to the last match position
+                for j in range(1,len(pattern)):
+                    index = (result[len(result)-1][0]+j) % len(pattern)
+                    if pattern[index] == channel_data[i]:
+                        result.append([index,"+" + str(j)])
+                    else:
+                        result.append([result[len(result)-1][0],"[--]"])
+        return result
 
     def get_data(self):
         self.gui.stopGuiUpdate()
         time.sleep(1)
 
         self.gui.show_warning("WE SHOULD QUERY THE CAMERA TO GET THE RESOLUTIONS FOR EACH ADC BOARDS, AND GET THE TEST PATTERN CODE TO AUTOMATICALLY MAKE A TEST PATTERN MATCH WITH THE CORRECT RESOLUTION")
+
+        useTestPattern = self.useTestPattern.isChecked()
+        origTestPatterns = []
+        if useTestPattern:
+            error,origTestPatterns = self.gui.camera.getTestPattern('all')
+            self.gui.camera.setTestPattern('all',6)
 
         for i in range(4):
             self.summary_display[i].setText("")
@@ -213,6 +232,7 @@ class UdpPacketInspector(QtWidgets.QWidget):
             self.gui.show_warning(warning)
         if data_receiver is None:
             self.gui.show_error("No data_receiver object: " + error)
+            print("No data_receiver obejct: " + error)
 
         #self.gui.show_message("Stream start time 1: " + str(data_receiver.stream_start_time_1))
         #self.gui.show_message("Stream start time 2: " + str(data_receiver.stream_start_time_2))
@@ -271,40 +291,41 @@ class UdpPacketInspector(QtWidgets.QWidget):
 
         self.gui.startGuiUpdate()
 
-        pattern = pseudo_test_pattern_fast(14)
+        if useTestPattern:
+            self.gui.camera.readStatus()
+            samplediv = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_SAMPLEDIV:self.gui.camera.codes_CC.CC_REGISTER_SAMPLEDIV+2]
+            samplediv = int.from_bytes(samplediv,'big')
 
-        # for i_adc in range(2):
-        #     print("--------- ADC " + str(i_adc+1) + " ------------")
-        #     for i_channel in range(32):
-        #         print("CHANNEL: " + str(i_channel+1))
-        #         signals = data_receiver.get_channel_data(i_adc+1,i_channel+1)
-        #         full,matches = self.match_pattern(signals,pattern)
-        #         print(full, matches)
+            self.gui.showError("Must set the bits here correctly!")
+            for i_adc in range(len(self.gui.camera.status.ADC_address)):
+                bits = int(self.gui.adcControl.adc[i_adc].bits.currentText())
+                pattern = pseudo_test_pattern_fast(bits)
+                error_display = None
+                all_channels_ok = True
+                for i_channel in range(32):
+                    if not self.gui.adcControl.adc[i_adc].channelOn[i_channel].isChecked():
+                        continue
+                    channel_data = data_receiver.get_channel_data(i_adc+1,i_channel+1)
+                    ok,matches = self.match_pattern(channel_data,pattern,samplediv)
+                    
+                    if not ok:
+                        all_channels_ok = False
+                        if error_display is None:
+                            error_display = QtWidgets.QTextEdit()
+                            self.packets_display_layout[i_adc].addWidget(error_display)
+                        details = self.find_in_pattern(channel_data,pattern)
+                        error_display.append("--------- channel " + str(i_channel+1) + " -------------")
+                        s = ""
+                        for a in details:
+                            if s != "":
+                                s += " "
+                            s += a[1]
+                        error_display.append(s)
 
-        c11 = data_receiver.get_channel_data(1,1)
-        c18 = data_receiver.get_channel_data(1,8)
-        c19 = data_receiver.get_channel_data(1,9)
-        c115 = data_receiver.get_channel_data(1,15)
-        c21 = data_receiver.get_channel_data(2,1)
-        c22 = data_receiver.get_channel_data(2,2)
+                if not all_channels_ok:
+                    self.summary_display[i_adc].append("<font color='red'>Pattern match failed for some channels</font>")
+            self.gui.camera.setTestPattern('all',origTestPatterns)
 
-        print("BITS: " + str(data_receiver.bits))
 
-        print("----- pattern matching --------")
-        self.gui.camera.readStatus()
-        samplediv = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_SAMPLEDIV:self.gui.camera.codes_CC.CC_REGISTER_SAMPLEDIV+2]
-        samplediv = int.from_bytes(samplediv,'big')
 
-        print("Samplediv: " + str(samplediv))
-
-        self.find_in_pattern([c11,c18,c19,c115,c21,c22],pattern)
-
-        print(self.match_pattern(c11,pattern,samplediv))
-        print(self.match_pattern(c18,pattern,samplediv))
-        print(self.match_pattern(c19,pattern,samplediv))
-        print(self.match_pattern(c115,pattern,samplediv))
-        print(self.match_pattern(c21,pattern,samplediv))
-        print(self.match_pattern(c22,pattern,samplediv))
-
-        print("-------------------------------")
         

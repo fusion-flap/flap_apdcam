@@ -1,7 +1,7 @@
 import sys
 
 import importlib
-from QtVersion import QtVersion
+from .QtVersion import QtVersion
 QtWidgets = importlib.import_module(QtVersion+".QtWidgets")
 QtGui = importlib.import_module(QtVersion+".QtGui")
 QtCore = importlib.import_module(QtVersion+".QtCore")
@@ -9,8 +9,8 @@ Qt = QtCore.Qt
 
 # from PyQt6.QtWidgets import QApplication, QWidget,  QFormLayout, QVBoxLayout, QHBoxLayout, QGridLayout, QTabWidget, QLineEdit, QDateEdit, QPushButton, QTextEdit, QGroupBox, QLabel, QSpinBox, QCheckBox
 # from PyQt6.QtCore import Qt
-from ApdcamUtils import *
-from GuiMode import *
+from .ApdcamUtils import *
+from .GuiMode import *
 from functools import partial
 
 def null_func():
@@ -92,8 +92,16 @@ class ControlTiming(QtWidgets.QWidget):
             self.sampleDiv.setMinimum(1)
             self.adc_out_freq_div.setEnabled(True)
         else:
-            self.sampleDiv.setMinimum(2)
+            self.sampleDiv.setMinimum(3)
             self.adc_out_freq_div.setEnabled(False)
+            self.external_gate_enabled.setEnabled(False)
+            self.external_gate_inverted.setEnabled(False)
+            self.internal_gate_enabled.setEnabled(False)
+            self.internal_gate_inverted.setEnabled(False)
+            self.camtimer0_gate_enabled.setEnabled(False)
+            self.camtimer0_gate_inverted.setEnabled(False)
+            self.clear_gate.setEnabled(False)
+
 
     def setSerialPll(self):
         self.gui.camera.setSerialPll(self.serialPllMult.value(),self.serialPllDiv.value())
@@ -419,12 +427,6 @@ class ControlTiming(QtWidgets.QWidget):
         l = QtWidgets.QVBoxLayout()
         layout.addLayout(l)
 
-        self.dualSata = QtWidgets.QCheckBox("Dual SATA")
-        #self.dualSata.factorySetting = True
-        self.dualSata.guiMode = GuiMode.factory
-        self.dualSata.stateChanged.connect(self.gui.call(lambda: self.gui.camera.setDualSata(self.dualSata.isChecked())))
-        self.dualSata.setToolTip("Enable dual SATA mode for the system (CC card and all ADC boards)")
-        l.addWidget(self.dualSata)
 
         g = QVGroupBox("Trigger")
         l.addWidget(g)
@@ -452,18 +454,76 @@ class ControlTiming(QtWidgets.QWidget):
         self.triggerDelay.setToolTip("Data stream output will start with this delay after the trigger")
         h.addWidget(self.triggerDelay)
 
-        g = QVGroupBox("Gate")
-        l.addWidget(g)
-        self.external_gate_enabled = QtWidgets.QCheckBox("External gate")
-        g.addWidget(self.external_gate_enabled)
+        triggerFunc = self.gui.call(lambda: self.gui.camera.setTrigger(self.trigPlus.isChecked(),self.trigMinus.isChecked(),self.internalTrig.isChecked(),self.triggerDelay.value(),self.disableWhenStreamOff.isChecked()))
 
-        triggerFunc = self.gui.call(lambda: self.gui.camera.set_trigger(self.trigPlus.isChecked(),self.trigMinus.isChecked(),self.internalTrig.isChecked(),self.triggerDelay.value(),self.disableWhenStreamOff.isChecked()))
 
         self.trigPlus.stateChanged.connect(triggerFunc)
         self.trigMinus.stateChanged.connect(triggerFunc)
         self.internalTrig.stateChanged.connect(triggerFunc)
         self.disableWhenStreamOff.stateChanged.connect(triggerFunc)
         self.triggerDelay.lineEdit().returnPressed.connect(triggerFunc)
+
+        g = QVGroupBox("Gate")
+        l.addWidget(g)
+        self.external_gate_enabled = QtWidgets.QCheckBox("External gate enabled")
+        g.addWidget(self.external_gate_enabled)
+        self.external_gate_enabled.setToolTip("Enable the external gate in the G1 trigger module")
+        self.external_gate_enabled.settingsName = "Enable external gate"
+
+        self.external_gate_inverted = QtWidgets.QCheckBox("External gate inverted")
+        g.addWidget(self.external_gate_inverted)
+        self.external_gate_inverted.setToolTip("External gate is inverted")
+        self.external_gate_inverted.settingsName = "External gate inverted"
+
+        self.internal_gate_enabled = QtWidgets.QCheckBox("Internal gate enabled")
+        g.addWidget(self.internal_gate_enabled)
+        self.internal_gate_enabled.setToolTip("Enable the internal gate in the G1 trigger module")
+        self.internal_gate_enabled.settingsName = "Enable internal gate"
+
+        self.internal_gate_inverted = QtWidgets.QCheckBox("Internal gate inverted")
+        g.addWidget(self.internal_gate_inverted)
+        self.internal_gate_inverted.setToolTip("Internal gate is inverted")
+        self.internal_gate_inverted.settingsName = "Internal gate inverted"
+
+        self.camtimer0_gate_enabled = QtWidgets.QCheckBox("Camera timer #0 enabled")
+        g.addWidget(self.camtimer0_gate_enabled)
+        self.camtimer0_gate_enabled.setToolTip("Enable the camera timer #0 in the G1 trigger module")
+        self.camtimer0_gate_enabled.settingsName = "Enable camera timer #0 gate"
+
+        self.camtimer0_gate_inverted = QtWidgets.QCheckBox("Camera timer #0 gate inverted")
+        g.addWidget(self.camtimer0_gate_inverted)
+        self.camtimer0_gate_inverted.setToolTip("Camera timer #0 gate is inverted")
+        self.camtimer0_gate_inverted.settingsName = "Camera timer #0 gate inverted"
+
+        self.clear_gate = QtWidgets.QPushButton("Clear gate")
+        g.addWidget(self.clear_gate)
+        self.clear_gate.setToolTip("Clear the gate signal by software")
+
+        gate_func_clear = self.gui.call(lambda: self.gui.camera.setGate(externalGateEnabled = self.external_gate_nabled.isChecked(), \
+                                                                        externalGateInverted = self.external_gate_inverted.isChecked(), \
+                                                                        internalGateEnabled = self.internal_gate_enabled.isChecked(), \
+                                                                        internalGateInverted = self.internal_gate_inverted.isChecked(), \
+                                                                        camTimer0Enabled = self.camtimer0_gate_enabled.isChecked(), \
+                                                                        camTimer0Inverted = self.camtimer0_gate_inverted.isChecked(),
+                                                                        clear=True))
+        self.clear_gate.clicked.connect(gate_func_clear)
+
+
+        gate_func = self.gui.call(lambda: self.gui.camera.setGate(externalGateEnabled = self.external_gate_nabled.isChecked(), \
+                                                                  externalGateInverted = self.external_gate_inverted.isChecked(), \
+                                                                  internalGateEnabled = self.internal_gate_enabled.isChecked(), \
+                                                                  internalGateInverted = self.internal_gate_inverted.isChecked(), \
+                                                                  camTimer0Enabled = self.camtimer0_gate_enabled.isChecked(), \
+                                                                  camTimer0Inverted = self.camtimer0_gate_inverted.isChecked(),
+                                                                  clear=False))
+        self.external_gate_enabled.stateChanged.connect(gate_func)
+        self.external_gate_inverted.stateChanged.connect(gate_func)
+        self.internal_gate_enabled.stateChanged.connect(gate_func)
+        self.internal_gate_inverted.stateChanged.connect(gate_func)
+        self.camtimer0_gate_enabled.stateChanged.connect(gate_func)
+        self.camtimer0_gate_inverted.stateChanged.connect(gate_func)
+        
+        
 
         # h = QtWidgets.QHBoxLayout()
         # l.addLayout(h)
@@ -483,36 +543,62 @@ class ControlTiming(QtWidgets.QWidget):
         # Set the base (adc) pll mult/div values, and frequency
         mult = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_BASE_PLL_MULT]
         div = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_BASE_PLL_DIV_ADC]
+        self.adcPllMult.blockSignals(True)
         self.adcPllMult.setValue(mult)
+        self.adcPllMult.blockSignals(False)
+        self.adcPllDiv.blockSignals(True)
         self.adcPllDiv.setValue(div)
+        self.adcPllDiv.blockSignals(False)
         setFreqCombo(self.adcPllMult,self.adcPllDiv,self.adcPllFreq)
 
         # Set the external clock PLL mult/div values
         mult = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_EXT_DCM_MULT]
         div = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_EXT_DCM_DIV]
+        self.extClockMult.blockSignals(True)
         self.extClockMult.setValue(mult)
+        self.extClockMult.blockSignals(False)
+        self.extClockDiv.blockSignals(True)
         self.extClockDiv.setValue(div)
+        self.extClockDiv.blockSignals(False)
         
         # sample dividier value
         div = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_SAMPLEDIV:self.gui.camera.codes_CC.CC_REGISTER_SAMPLEDIV+2]
         div = int.from_bytes(div,'big')
+        self.sampleDiv.blockSignals(True)
         self.sampleDiv.setValue(div)
+        self.sampleDiv.blockSignals(False)
 
         # Clock source
         clock_control = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_CLOCK_CONTROL]
         sourceExternal = clock_control & (1<<2)
         autoExternal = clock_control & (1<<3)
         externalSample = clock_control & (1<<4)
+        self.adcClockExt.blockSignals(True)
         self.adcClockExt.setChecked(sourceExternal)
+        self.adcClockExt.blockSignals(False)
+        self.autoExtClock.blockSignals(True)
         self.autoExtClock.setChecked(autoExternal)
+        self.autoExtClock.blockSignals(False)
+        self.extSample.blockSignals(True)
         self.extSample.setChecked(externalSample)
+        self.extSample.blockSignals(False)
 
         # Trigger settings
         reg = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_TRIGSTATE]
+        self.trigPlus.blockSignals(True)
         self.trigPlus.setChecked(reg & (1<<0))
+        self.trigPlus.blockSignals(False)
+        self.trigMinus.blockSignals(True)
         self.trigMinus.setChecked(reg & (1<<1))
+        self.trigMinus.blockSignals(False)
+        self.internalTrig.blockSignals(True)
         self.internalTrig.setChecked(reg & (1<<2))
+        self.internalTrig.blockSignals(False)
+        self.disableWhenStreamOff.blockSignals(True)
         self.disableWhenStreamOff.setChecked(reg & (1<<6))
+        self.disableWhenStreamOff.blockSignals(False)
         td = int.from_bytes(self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_TRIGDELAY:self.gui.camera.codes_CC.CC_REGISTER_TRIGDELAY+4],'big',signed=False)
+        self.triggerDelay.blockSignals(True)
         self.triggerDelay.setValue(td)
+        self.triggerDelay.blockSignals(False)
 

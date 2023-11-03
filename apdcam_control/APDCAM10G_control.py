@@ -1891,16 +1891,16 @@ class APDCAM10G_control:
         return err
 
 
-    def setSampleNumber(self,sample_number=0):
+    def setSampleNumber(self,sampleNumber=0):
 
         # Firmware version before 1.05
         if hasattr(self.codes_CC,"OP_SETSAMPLECOUNT"):
             if (self.commSocket is None):
                 return "Not connected.", None
-            d = sample_number.to_bytes(6,'big')
+            d = sampleNumber.to_bytes(6,'big')
 #            d=bytearray(6)
 #            for i in range(6):
-#                d[5 - i] = (sample_number // 2 ** (i * 8)) % 256
+#                d[5 - i] = (sampleNumber // 2 ** (i * 8)) % 256
             err = self.sendCommand(self.codes_CC.OP_SETSAMPLECOUNT,d,sendImmediately=True)
             return err
 
@@ -1910,11 +1910,11 @@ class APDCAM10G_control:
             data = bytearray(11)
             data[0] = self.status.CC_settings[self.codes_CC.CC_REGISTER_G1TRIGCONTROL]
             data[1:5] = self.status.CC_settings[self.codes_CC.CC_REGISTER_TRIGDELAY:self.codes_CC.CC_REGISTER_TRIGDELAY+4]
-            data[6:12] = sample_number.to_bytes(6,'big')
+            data[6:12] = sampleNumber.to_bytes(6,'big')
             err = self.sendCommand(self.codes_CC.OP_SETG1TRIGGERMODULE,data,sendImmediately=True)
             return err
 
-        return "This should never happen in APDCAM10G.set_sample_number"
+        return "This should never happen in APDCAM10G.setSampleNumber"
 
     def setSerialPll(self,mult,div):
         """
@@ -3597,12 +3597,19 @@ class APDCAM10G_control:
         if triggerDelay is None: # default value, i.e. parameter not specified, then take it from the camera
             triggerDelay = int.from_bytes(self.status.CC_settings[self.codes_CC.CC_REGISTER_TRIGDELAY:self.codes_CC.CC_REGISTER_TRIGDELAY+4],'big')
 
-        err = self.setTrigger(externalTriggerPos=externalTriggerPos,
-                              externalTriggerNeg=externalTriggerNeg,
-                              internalTrigger=internalTrigger,
-                              camTimer0Pos=False, # This should be set correctly for firmware v1.05 and above
-                              camTimer0Neg=False, # This should be set correctly for firmware v1.05 and above
-                              triggerDelay=triggerDelay)
+        if hasattr(self.codes_CC,"OP_SETTRIGGER"):
+            err = self.setTrigger(externalTriggerPos=externalTriggerPos,
+                                  externalTriggerNeg=externalTriggerNeg,
+                                  internalTrigger=internalTrigger,
+                                  triggerDelay=triggerDelay)
+        elif hasattr(self.codes_CC,"OP_SETG1TRIGGERMODULE"):
+            print("FIXME! self.setTrigger in measure() must be updated for this firmware")
+            err = self.setTrigger(externalTriggerPos=externalTriggerPos,
+                                  externalTriggerNeg=externalTriggerNeg,
+                                  internalTrigger=internalTrigger,
+                                  camTimer0Pos=False,
+                                  camTimer0Neg=False,
+                                  triggerDelay=triggerDelay)
 
         self.measurePara.externalTriggerPos = externalTriggerPos
         self.measurePara.externalTriggerNeg = externalTriggerNeg
@@ -4099,8 +4106,8 @@ class data:
 
         """
         self.logger = logger
-        if (type(APDCAM) is not controller):
-            raise TypeError("An APDCAM10G.controller class is expected as input to APDCAM10G.data")
+        if (type(APDCAM) is not APDCAM10G_control):
+            raise TypeError("An APDCAM10G_control class is expected as input to APDCAM10G.data")
         self.APDCAM = APDCAM
         self.receiveSockets = [None]*4
         self.MTU = None

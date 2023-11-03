@@ -156,8 +156,6 @@ class UdpPacketInspector(QtWidgets.QWidget):
         if len(matches) == 0:
             return False,matches
 
-        print("Length of initial matches: " + str(len(matches)))
-
         full_match = False
         for i_signal in range(1,len(signals)):
             for match in matches:
@@ -175,10 +173,6 @@ class UdpPacketInspector(QtWidgets.QWidget):
                     # If this is the last signal value and we matched, we have a full match
                     if i_signal == len(signals)-1:
                         full_match = True
-                else:
-                    for j in range(n):
-                        if signals[i_signal] == pattern[j]:
-                            print("Not found where needed (" + str(pattern_index) + "), but elsewhere: " + str(j))
 
         return full_match,matches
 
@@ -201,12 +195,15 @@ class UdpPacketInspector(QtWidgets.QWidget):
             # Ideally these increments should be equal to SAMPLEDIV
             else:
                 # relative index w.r.t. to the last match position
+                this_element_found = False
                 for j in range(1,len(pattern)):
                     index = (result[len(result)-1][0]+j) % len(pattern)
                     if pattern[index] == channel_data[i]:
                         result.append([index,"+" + str(j)])
-                    else:
-                        result.append([result[len(result)-1][0],"[--]"])
+                        this_element_found = True
+                        break
+                if not this_element_found:
+                    result.append([result[len(result)-1][0],"[-]"])
         return result
 
     def get_data(self):
@@ -296,7 +293,6 @@ class UdpPacketInspector(QtWidgets.QWidget):
             samplediv = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_SAMPLEDIV:self.gui.camera.codes_CC.CC_REGISTER_SAMPLEDIV+2]
             samplediv = int.from_bytes(samplediv,'big')
 
-            self.gui.showError("Must set the bits here correctly!")
             for i_adc in range(len(self.gui.camera.status.ADC_address)):
                 bits = int(self.gui.adcControl.adc[i_adc].bits.currentText())
                 pattern = pseudo_test_pattern_fast(bits)
@@ -324,6 +320,8 @@ class UdpPacketInspector(QtWidgets.QWidget):
 
                 if not all_channels_ok:
                     self.summary_display[i_adc].append("<font color='red'>Pattern match failed for some channels</font>")
+                else:
+                    self.summary_display[i_adc].append("<font color='green'>Pattern match OK for all channels</font>")
             self.gui.camera.setTestPattern('all',origTestPatterns)
 
 

@@ -91,9 +91,15 @@ class ControlTiming(QtWidgets.QWidget):
         if version >= 105:
             self.sampleDiv.setMinimum(1)
             self.adc_out_freq_div.setEnabled(True)
+            self.disableWhileStreamsOff.setEnabled(False)
         else:
-            self.sampleDiv.setMinimum(3)
+            self.sampleDiv.setMinimum(2)
             self.adc_out_freq_div.setEnabled(False)
+            self.camTimer0TrigPos.setEnabled(False)
+            self.camTimer0TrigNeg.setEnabled(False)
+            self.generateSoftwareTriggerButton.setEnabled(False)
+            self.clearTriggerOutputButton.setEnabled(False)
+            self.clearTriggerStatusButton.setEnabled(False)
             self.external_gate_enabled.setEnabled(False)
             self.external_gate_inverted.setEnabled(False)
             self.internal_gate_enabled.setEnabled(False)
@@ -442,10 +448,33 @@ class ControlTiming(QtWidgets.QWidget):
         self.internalTrig.settingsName = "Internal trigger"
         self.internalTrig.setToolTip("Enable triggering on ADC channels (individual channels need to be enabled, and their threshold set in the 'ADC Control' tab)")
         g.addWidget(self.internalTrig)
-        self.disableWhenStreamOff = QtWidgets.QCheckBox("Disable when stream off")
-        self.disableWhenStreamOff.settingsName = "Disable when stream off"
-        self.disableWhenStreamOff.setToolTip("If set, trigger events are disabled while streams are off. Otherwise triggers are registered even if streams are off, and data transmission starts immediately when streams are enabled again")
-        g.addWidget(self.disableWhenStreamOff)
+
+        self.camTimer0TrigPos = QtWidgets.QCheckBox("Camera timer 0 +")
+        self.camTimer0TrigPos.settingsName = "Camera timer 0 trigger on rising edge"
+        self.camTimer0TrigPos.setToolTip("Enable triggering on rising edge of camera timer 0 signal")
+        g.addWidget(self.camTimer0TrigPos)
+        self.camTimer0TrigNeg = QtWidgets.QCheckBox("Camera timer 0 -")
+        self.camTimer0TrigNeg.settingsName = "Camera timer 0 trigger on falling edge"
+        self.camTimer0TrigNeg.setToolTip("Enable triggering on falling edge of camera timer 0 signal")
+        g.addWidget(self.camTimer0TrigNeg)
+
+        self.generateSoftwareTriggerButton = QtWidgets.QPushButton("Generate SW trigger")
+        self.generateSoftwareTriggerButton.setToolTip("Generate software trigger... (more explanation...)")
+        self.generateSoftwareTriggerButton.clicked.connect(lambda: self.setTrigger(softwareTrigger=True))
+        g.addWidget(self.generateSoftwareTriggerButton)
+
+        self.clearTriggerOutputButton = QtWidgets.QPushButton("Clear output")
+        self.clearTriggerOutputButton.clicked.connect(lambda: self.setTrigger(clearOutput=True))
+        g.addWidget(self.clearTriggerOutputButton)
+
+        self.clearTriggerStatusButton = QtWidgets.QPushButton("Clear trigger status")
+        self.clearTriggerStatusButton.clicked.connect(lambda: self.setTrigger(clearTriggerStatus=True))
+        g.addWidget(self.clearTriggerStatusButton)
+
+        self.disableWhileStreamsOff = QtWidgets.QCheckBox("Disable while streams off")
+        self.disableWhileStreamsOff.settingsName = "Disable while streams off"
+        self.disableWhileStreamsOff.setToolTip("If set, trigger events are disabled while streams are off. Otherwise triggers are registered even if streams are off, and data transmission starts immediately when streams are enabled again")
+        g.addWidget(self.disableWhileStreamsOff)
         h = QtWidgets.QHBoxLayout()
         g.addLayout(h)
         h.addWidget(QtWidgets.QLabel("Trigger delay [\u03bcs]:"))
@@ -454,14 +483,12 @@ class ControlTiming(QtWidgets.QWidget):
         self.triggerDelay.setToolTip("Data stream output will start with this delay after the trigger")
         h.addWidget(self.triggerDelay)
 
-        triggerFunc = self.gui.call(lambda: self.gui.camera.setTrigger(self.trigPlus.isChecked(),self.trigMinus.isChecked(),self.internalTrig.isChecked(),self.triggerDelay.value(),self.disableWhenStreamOff.isChecked()))
-
-
-        self.trigPlus.stateChanged.connect(triggerFunc)
-        self.trigMinus.stateChanged.connect(triggerFunc)
-        self.internalTrig.stateChanged.connect(triggerFunc)
-        self.disableWhenStreamOff.stateChanged.connect(triggerFunc)
-        self.triggerDelay.lineEdit().returnPressed.connect(triggerFunc)
+        
+        self.trigPlus.stateChanged.connect(self.setTrigger)
+        self.trigMinus.stateChanged.connect(self.setTrigger)
+        self.internalTrig.stateChanged.connect(self.setTrigger)
+        self.disableWhileStreamsOff.stateChanged.connect(self.setTrigger)
+        self.triggerDelay.lineEdit().returnPressed.connect(self.setTrigger)
 
         g = QVGroupBox("Gate")
         l.addWidget(g)
@@ -538,6 +565,25 @@ class ControlTiming(QtWidgets.QWidget):
 
         layout.addStretch(1)
 
+    def setTrigger(self,softwareTrigger=False, clearOutput=False, clearTriggerStatus=False):
+        if hasattr(self.gui.camera.codes_CC,"OP_SETG1TRIGGERMODULE"):
+            self.gui.camera.setTrigger(externalTriggerPos=self.trigPlus.isChecked(), \
+                                       externalTriggerNeg=self.trigMinus.isChecked(), \
+                                       internalTrigger=self.internalTrig.isChecked(), \
+                                       camTimer0Pos=self.camTimer0TrigPos.isChecked(), \
+                                       camTimer0Neg=self.camTimer0TrigNeg.isChecked(), \
+                                       softwareTrigger=softwareTrigger, \
+                                       clearOutput=clearOutput, \
+                                       clearTriggerStatus=clearTriggerStatus, \
+                                       triggerDelay=self.triggerDelay.value())
+        else:
+            self.gui.camera.setTrigger(externalTriggerPos=self.trigPlus.isChecked(), \
+                                       externalTriggerNeg=self.trigMinus.isChecked(), \
+                                       internalTrigger=self.internalTrig.isChecked(), \
+                                       triggerDelay=self.triggerDelay.value(), \
+                                       disableWhileStreamsOff=self.disableWhileStreamsOff.isChecked())
+
+
     def loadSettingsFromCamera(self):
 
         # Set the base (adc) pll mult/div values, and frequency
@@ -594,9 +640,9 @@ class ControlTiming(QtWidgets.QWidget):
         self.internalTrig.blockSignals(True)
         self.internalTrig.setChecked(reg & (1<<2))
         self.internalTrig.blockSignals(False)
-        self.disableWhenStreamOff.blockSignals(True)
-        self.disableWhenStreamOff.setChecked(reg & (1<<6))
-        self.disableWhenStreamOff.blockSignals(False)
+        self.disableWhileStreamsOff.blockSignals(True)
+        self.disableWhileStreamsOff.setChecked(reg & (1<<6))
+        self.disableWhileStreamsOff.blockSignals(False)
         td = int.from_bytes(self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_TRIGDELAY:self.gui.camera.codes_CC.CC_REGISTER_TRIGDELAY+4],'big',signed=False)
         self.triggerDelay.blockSignals(True)
         self.triggerDelay.setValue(td)

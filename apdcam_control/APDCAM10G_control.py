@@ -4,8 +4,10 @@ Created on Tue Jun 12 19:34:00 2018
 
 APDCAM-10G register access functions
 
-@author: Sandor Zoletnik, Centre for Energy Research  
-         zoletnik.sandor@ek-cer.hu
+@authors: Sandor Zoletnik, Centre for Energy Research  
+          zoletnik.sandor@ek-cer.hu
+          Daniel Barna, Wigner Resesarch Centre for Physics
+          daniel.barna@fusioninstruments.com
 """
 
 import threading
@@ -40,6 +42,208 @@ def ADC2DAC_channel_mapping():
         data2[data1[i]-1] = i+1
     return data2
 
+
+class APDCAM10G_register_bits:
+    def __init__(self, firstBit, lastBit, shortName, description):
+        self.firstBit = firstBit
+        self.lastBit  = lastBit
+        self.nBits = self.lastBit-self.firstBit+1
+        self.mask = 2**self.nBits-1
+        self.shortName = shortName
+        self.description = description
+    def value(self,data):
+        """
+        Get the value represented by the specified bits from the integer 'data'
+        """
+        return (data>>self.firstBit) & self.mask
+
+
+# bytearray converters. They must provide a value(self,data) function, which takes a bytearray (data), and
+# return a list. Each element of this list itself is a 3-element list: 1st element is a value (numerical or string), 2nd element
+# is a short description, 3rd element is a long description
+class APDCAM10G_register2int:
+    def __init__(self, byteOrder=None, signed=False):
+        if byteOrder.lower() == 'msb':
+            self.byteOrder = 'big'
+        elif byteOrder.lower() == 'lsb':
+            self.byteOrder = 'little'
+        else:
+            self.byteOrder = byteOrder
+        self.signed = signed
+    def value(self, data):
+        v = int.from_bytes(data,byteorder=self.byteOrder,signed=self.signed)
+        return [[[v,'','MSB' if self.byteOrder == 'big' else 'LSB']]]
+
+class APDCAM10G_register2bits:    
+    def __init__(self, bits, byteOrder='msb', bytePeriod=None):
+        if byteOrder.upper() == 'MSB':
+            self.byteOrder = 'big'
+        elif byteOrder.upper() == 'LSB':
+            self.byteOrder = 'little'
+        else:
+            self.byteOrder = byteOrder
+        self.bits = bits
+        self.bytePeriod = bytePeriod
+    def value(self,data):
+        bytePeriod = self.bytePeriod
+        if self.bytePeriod is None:
+            bytePeriod = len(data)
+        n = len(data)//bytePeriod
+        result = []
+        for i in range(n):
+            subresult = []
+            v = int.from_bytes(data[i*bytePeriod:(i+1)*bytePeriod],byteorder=self.byteOrder,signed=False)
+            for b in reversed(self.bits):
+                tooltip = b.description
+                if b.firstBit == b.lastBit:
+                    tooltip += " (bit " + str(b.firstBit) + ")"
+                else:
+                    tooltip += " (bits " + str(b.firstBit) + str("..") + str(b.lastBit) + ")"
+                subresult.append([b.value(v),b.shortName,tooltip])
+            result.append(subresult)
+        return result
+
+class APDCAM10G_register2str:    
+    def value(self,data):
+        try:
+            return [[[data.decode('utf-8'),'','']]]
+        except:
+            return [[[">>> can not decode string <<<",'','']]]
+
+class APDCAM10G_register:
+    def __init__(self, startByte, numberOfBytes, description, interpreter=APDCAM10G_register2int(byteOrder='msb',signed=False)):
+        self.startByte = startByte
+        self.numberOfBytes = numberOfBytes
+        self.description = description
+        self.interpreter = interpreter
+    def value(self,data):
+        """
+        Parameters:
+        ^^^^^^^^^^^
+        data - bytearray, the content of the entire register table of the given board
+        """
+        return self.interpreter.value(data[self.startByte:self.startByte+self.numberOfBytes])
+
+class APDCAM10G_cc_settings_table_v1:
+    # typedefs/shorthands
+    b = APDCAM10G_register_bits
+    r = APDCAM10G_register
+    r2i  = APDCAM10G_register2int
+    r2b  = APDCAM10G_register2bits
+    r2s  = APDCAM10G_register2str
+    BOARD_VERSION = r(7-7, 10, 'Board type', interpreter=r2s())
+    FIRMWARE_GROUP = r(17-7, 30-17+1, 'Firmware group',interpreter=r2s())
+    FIRMWARE_GROUP_VERSION = r(31-7,2,'Firmware group version',interpreter=r2b([b(0,7,'VL','Version low'),b(8,15,'VH','Version high')]))
+    UPGRADEDATE = r(33-7, 36-33+1,'Upgrade date',interpreter=r2b([b(0,7,'D','Day'),b(8,15,'M','Month'),b(16,23,'Y2','Year last digit'),b(24,31,'Y1','Year 3rd digit')]))
+    MAN_FIRMWAREGROUP = r(37-7,50-37+1,'Manufacturer firmware group',interpreter=r2s())
+    MAN_PROGRAMDATE = r(51-7,54-51+1,'Manufacturer program date',interpreter=r2b([b(0,7,'D','Day'),b(8,15,'M','Month'),b(16,23,'Y2','Year 4th digit'),b(24,31,'Y1','Year 3rd digit')]))
+    MAN_SERIAL = r(55-7,58-55+1,'Manufacturer serial number')
+    MAN_TESTRESULT = r(59-7,62-59+1,'Manufacturer test result')
+    SETTINGS_VERSION = r(7-7+71-7,1,'Settings version')
+    DEV_NAME = r(8-7+71-7,55-8+1,'Device name',interpreter=r2s())
+    DEV_TYPE = r(56-7+71-7,2,'Device type')
+    DEV_SERIAL = r(58-7+71-7,4,'Device serial number')
+    COMPANY = r(62-7+71-7,18,'Company name',interpreter=r2s())
+    HOST_NAME = r(80-7+71-7,12,'Host name',interpreter=r2s())
+    CONFIG = r(92-7+71-7,2,'Configuration',interpreter=r2b([b(0,0,'LOCK','Device is locked')]))
+    USER_TEXT = r(94-7+71-7,15,'User text',interpreter=r2s())
+    MANAGE_MAC = r(135-7+71-7,140-135+1,'Management port static MAC address')
+    MANAGE_IPV4_ADDRESS = r(141-7+71-7,144-141+1,'Management port IPv4 address')
+    MANAGE_IPV4_MASK    = r(145-7+71-7,148-145+1,'Management port IPv4 network mask')
+    MANAGE_MAC_MODE = r(149-7+71-7,1,'Management port MAC mode (0 - factorydefault, 1 - CW-Auto, 2 - static)')
+    MANAGE_IP_MODE = r(150-7+71-7,1,'Management port IP mode (1 - static, 2 - DHCP)')
+    MANAGE_GW_MODE = r(151-7+71-7,1,'Management port gateway mode (0 - None, 1 - static, 2 - DHCP)')
+    MANAGE_GW_IPV4_ADDRESS = r(152-7+71-7,155-152+1,'Management port gateway IPv4 address')
+    MANAGE_ARP = r(156-7+71-7,1,'Management port ARP (Advertisement Report Period) [s]')
+    MANAGE_IGMP = r(157-7+71-7,1,'Management port IGMP report period [s]')
+    MANAGE_IPV4_TTL = r(158-7+71-7,1,'Management port IPv4 Time To Live (TTL value in the IPv4 header)')
+#    MANAGE_MAC_DEFAULT =r(
+
+class APDCAM10G_adc_register_table_v1:
+    # typedefs/shorthands
+    b = APDCAM10G_register_bits
+    r = APDCAM10G_register
+    r2i  = APDCAM10G_register2int
+    r2b  = APDCAM10G_register2bits
+    r2s  = APDCAM10G_register2str
+    BOARDVER    = r(0x0000, 1, 'Board version number')
+    VERSION     = r(0x0001, 2, 'Microcontroller program version')
+    SERIAL      = r(0x0003, 2, 'Board serial number')
+    XCVERSION   = r(0x0005, 2, 'FPGA program vesion')
+    STATUS1     = r(0x0008, 1, 'STATUS1 register', interpreter=r2b([b(0,0,"BPLLOCK","Base PLL locked")]))
+    STATUS2     = r(0x0009, 1, 'STATUS2 register', interpreter=r2b([b(0,0,"ITS","Internal trigger status")]))
+    TEMPERATURE = r(0x000A, 1, 'Board temperature')
+    CONTROL     = r(0x000B, 1, "CONTROL register", interpreter=r2b([b(0,0,"SATAonoff","SATA channels on/off"),\
+                                                                    b(1,1,"DSM","Dual SATA mode"), \
+                                                                    b(2,2,"SS","SATA Sync"), \
+                                                                    b(3,3,"TM","Test mode on"), \
+                                                                    b(4,4,"FIL","Filter on"),  \
+                                                                    b(5,5,"ITE","Internal trigger enabled"), \
+                                                                    b(6,6,"RBO","Reverse bit order in the stream (1=LSbit first)")]))
+    DSLVCLKMUL  = r(0x000C, 1, 'SATA clock multiplier relative to 20 MHz internal clock')
+    DSLVCLKDIV  = r(0x000D, 1, 'SATA clock divider relative to 20 MHz internal clock')
+    DVDD33      = r(0x000E, 2, 'DVDD 3.3V voltage in mV')
+    DVDD25      = r(0x0010, 2, 'DVDD 2.5V voltage in mV')
+    AVDD33      = r(0x0012, 2, 'AVDD 3.3V voltage in mV')
+    AVDD18      = r(0x0014, 2, 'AVDD 1.8V voltage in mV')
+    CHENABLE1   = r(0x0016, 1, 'Channels 1-8 enabled (1)/disabled (0)',interpreter=r2b([\
+                   b(0,0,'CH8','Channel 8 enabled'), \
+                   b(1,1,'CH7','Channel 7 enabled'), \
+                   b(2,2,'CH6','Channel 6 enabled'), \
+                   b(3,3,'CH5','Channel 5 enabled'), \
+                   b(4,4,'CH4','Channel 4 enabled'), \
+                   b(5,5,'CH3','Channel 3 enabled'), \
+                   b(6,6,'CH2','Channel 2 enabled'), \
+                   b(7,7,'CH1','Channel 1 enabled')]))
+    CHENABLE2   = r(0x0017, 1, 'Channels 9-16 enabled (1)/disabled (0)',interpreter=r2b([\
+                   b(0,0,'CH16','Channel 16 enabled'), \
+                   b(1,1,'CH15','Channel 15 enabled'), \
+                   b(2,2,'CH14','Channel 14 enabled'), \
+                   b(3,3,'CH13','Channel 13 enabled'), \
+                   b(4,4,'CH12','Channel 12 enabled'), \
+                   b(5,5,'CH11','Channel 11 enabled'), \
+                   b(6,6,'CH10','Channel 10 enabled'), \
+                   b(7,7,'CH9','Channel 9 enabled')]))
+    CHENABLE3   = r(0x0018, 1, 'Channels 17-24 enabled (1)/disabled (0)',interpreter=r2b([\
+                   b(0,0,'CH24','Channel 24 enabled'), \
+                   b(1,1,'CH23','Channel 23 enabled'), \
+                   b(2,2,'CH22','Channel 22 enabled'), \
+                   b(3,3,'CH21','Channel 21 enabled'), \
+                   b(4,4,'CH20','Channel 20 enabled'), \
+                   b(5,5,'CH19','Channel 19 enabled'), \
+                   b(6,6,'CH18','Channel 18 enabled'), \
+                   b(7,7,'CH17','Channel 17 enabled')]))
+    CHENABLE4   = r(0x0019, 1, 'Channels 25-32 enabled (1)/disabled (0)',interpreter=r2b([\
+                   b(0,0,'CH32','Channel 32 enabled'), \
+                   b(1,1,'CH31','Channel 31 enabled'), \
+                   b(2,2,'CH30','Channel 30 enabled'), \
+                   b(3,3,'CH29','Channel 29 enabled'), \
+                   b(4,4,'CH28','Channel 28 enabled'), \
+                   b(5,5,'CH27','Channel 27 enabled'), \
+                   b(6,6,'CH26','Channel 26 enabled'), \
+                   b(7,7,'CH25','Channel 25 enabled')]))
+    RINGBUFSIZE = r(0x001A, 2, 'Ring buffer size', interpreter=r2b([b(0,0,'DISABLE','Ring buffer disabled'),b(1,1023,'SIZE','Ring buffer size')]))
+    RESOLUTION = r(0x001C, 1, 'Resolution (number of bits per sample)')
+    BPSCH1     = r(0x001D, 1, 'Bytes per sample of 8-channel block 1')
+    BPSCH2     = r(0x001E, 1, 'Bytes per sample of 8-channel block 2')
+    BPSCH3     = r(0x001F, 1, 'Bytes per sample of 8-channel block 3')
+    BPSCH4     = r(0x0020, 1, 'Bytes per sample of 8-channel block 4')
+    ERRORCODE  = r(0x0024, 1, 'The code of the last error. 0 = no error')
+    RESETFACTORY = r(0x0025, 1, 'Writing 0xCD here causes factory reset')
+    ADTEST     = r(0x0028, 4, 'ADC test mode selector', interpreter=r2b([b(0,2,'C4TM','Chip 4 test mode'), b(8,10,'C3TM','Chip 3 test mode'), b(16,18,'C2TM','Chip 2 test mode'), b(24,26,'C1TM','Chip 1 test mode')]))
+    ANALOGOUT  = r(0x0030,  2*32, 'Analog outputs for offset control', interpreter=r2b([b(0,12,'OFFSET','Offset')],bytePeriod=2))
+    TRIGLEVEL  = r(0x0070,  2*32, 'Internal trigger control for the 32 channels', \
+                   interpreter=r2b([b(0,13,'TRLEV','Trigger level'),b(14,14,'MAX/MIN','Max / min trigger'),b(15,15,'ENABLED','Trigger enabled')],bytePeriod=2))
+    COEFF_01 = r(0x00D0,2,'Filter coefficient 1')
+    COEFF_02 = r(0x00D2,2,'Filter coefficient 2')
+    COEFF_03 = r(0x00D4,2,'Filter coefficient 3')
+    COEFF_04 = r(0x00D6,2,'Filter coefficient 4')
+    COEFF_05 = r(0x00D8,2,'Filter coefficient 5')
+    COEFF_06 = r(0x00DA,2,'Filter coefficient 6')
+    COEFF_07 = r(0x00DC,2,'Filter coefficient 7')
+    COEFF_08_FILTERDIV = r(0x00DE,2,'Filter divide factor (0..11)')
+    #FACTCALTABLE = r(0x0100, 256, 'Factory calibration data space')
+    
 
 class APDCAM10G_codes_v1:
     """
@@ -760,10 +964,14 @@ class APDCAM10G_control:
             self.codes_CC  = APDCAM10G_codes_v1()
             self.codes_ADC = APDCAM10G_ADCcodes_v1()
             self.codes_PC  = APDCAM_PCcodes_v1()
+            self.ADC_register_table = APDCAM10G_adc_register_table_v1()
+            self.CC_settings_table = APDCAM10G_cc_settings_table_v1()
         else:
             self.codes_CC  = APDCAM10G_codes_v2()
             self.codes_ADC = APDCAM10G_ADCcodes_v1()
             self.codes_PC  = APDCAM_PCcodes_v1()
+            self.ADC_register_table = None
+            self.CC_settings_table = None
 
         # Check the available ADC boards
         self.status.ADC_address = []

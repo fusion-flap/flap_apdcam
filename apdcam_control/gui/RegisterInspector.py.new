@@ -11,8 +11,7 @@ Qt = importlib.import_module(QtVersion+".QtCore")
 #from PyQt6.QtCore import Qt
 from .ApdcamUtils import *
 from .GuiMode import *
-from ..APDCAM10G_control import *
-
+from ..APDCAM10G_control import APDCAM10G_adc_register_table_v1
 
 class RegisterInspector(QtWidgets.QWidget):
     def __init__(self,parent,gui):
@@ -94,76 +93,62 @@ class RegisterInspector(QtWidgets.QWidget):
         layout.addLayout(buttons)
         self.showADC1RegistersButton = QtWidgets.QPushButton("ADC1 registers")
         buttons.addWidget(self.showADC1RegistersButton)
-        self.showADC1RegistersButton.clicked.connect(lambda: self.showAdcRegisterTable(1))
+        self.showADC1RegistersButton.clicked.connect(lambda: self.showAdcRegisterTable(0))
         self.showADC2RegistersButton = QtWidgets.QPushButton("ADC2 registers")
         buttons.addWidget(self.showADC2RegistersButton)
-        self.showADC2RegistersButton.clicked.connect(lambda: self.showAdcRegisterTable(2))
+        self.showADC2RegistersButton.clicked.connect(lambda: self.showAdcRegisterTable(1))
         self.showADC3RegistersButton = QtWidgets.QPushButton("ADC3 registers")
         buttons.addWidget(self.showADC3RegistersButton)
-        self.showADC3RegistersButton.clicked.connect(lambda: self.showAdcRegisterTable(3))
+        self.showADC3RegistersButton.clicked.connect(lambda: self.showAdcRegisterTable(2))
         self.showADC4RegistersButton = QtWidgets.QPushButton("ADC4 registers")
         buttons.addWidget(self.showADC4RegistersButton)
-        self.showADC4RegistersButton.clicked.connect(lambda: self.showAdcRegisterTable(4))
-        self.showCCSettingsButton = QtWidgets.QPushButton("CC settings")
-        buttons.addWidget(self.showCCSettingsButton)
-        self.showCCSettingsButton.clicked.connect(self.showCCSettingsTable)
+        self.showADC4RegistersButton.clicked.connect(lambda: self.showAdcRegisterTable(3))
 
         self.registerTable = QtWidgets.QScrollArea()
         layout.addWidget(self.registerTable)
         self.registerTable.setWidgetResizable(True)
-        self.registerTableWidget = QtWidgets.QWidget()
+        self.registerTableWidget = QtWidgets.QTableWidget()
+        self.registerTableWidget.setColumnCount(5)
+        self.registerTableWidget.setHorizontalHeaderLabels(["Symbol","Address","Num. bytes","Description","Value(s)"])
         self.registerTable.setWidget(self.registerTableWidget)
-        self.registerTableLayout = QtWidgets.QGridLayout()
-        self.registerTableLayout.setContentsMargins(0,0,0,0)
-        self.registerTableLayout.setSpacing(0)
-        self.registerTableWidget.setLayout(self.registerTableLayout)
+        #self.registerTableLayout = QtWidgets.QGridLayout()
+        #self.registerTableWidget.setLayout(self.registerTableLayout)
         #layout.addStretch(10)
 
     def showAdcRegisterTable(self,adcNumber):
 
-        adcNumber -= 1
+        #err,d = self.gui.camera.readPDI(self.gui.camera.status.ADC_address[adcNumber],0,numberOfBytes=266,arrayData=True)
+        #register_table = self.gui.camera.ADC_register_table
 
-        err,d = self.gui.camera.readPDI(self.gui.camera.status.ADC_address[adcNumber],0,numberOfBytes=266,arrayData=True)
-        register_table = self.gui.camera.ADC_register_table
-
-        # err = ""
-        # d = bytearray(266)
-        # for i in range(266):
-        #     d[i] = i%256
-        # d = [d]
-        # register_table = APDCAM10G_adc_register_table_v1()
+        err = ""
+        d = bytearray(266)
+        for i in range(266):
+            d[i] = i%256
+        d = [d]
+        register_table = APDCAM10G_adc_register_table_v1()
             
         if err != "":
             self.gui.show_error(err)
         else:
             self.showRegisterTable(register_table,d[0])
 
-    def showCCSettingsTable(self):
-
-        err= self.gui.camera.readCCdata(dataType=0)
-        register_table = self.gui.camera.CC_settings_table
-
-        if err != "":
-            self.gui.show_error(err)
-        else:
-            self.showRegisterTable(register_table,self.gui.camera.status.CC_settings)
-            
-
     def showRegisterTable(self,regtable,data):
         # Clear the regtable layout
-        for i in reversed(range(self.registerTableLayout.count())):
-            self.registerTableLayout.itemAt(i).widget().deleteLater()
-            self.registerTableLayout.itemAt(i).widget().setParent(None)
+#        for i in reversed(range(self.registerTableLayout.count())):
+#            self.registerTableLayout.itemAt(i).widget.deleteLater()
+#            self.registerTableLayout.itemAt(i).widget.setParent(None)
 
-        def addHeader(layout,text,cell):
-            w = QtWidgets.QLabel(text)
-            w.setStyleSheet("font-weight:bold")
-            layout.addWidget(w,0,cell)
-        addHeader(self.registerTableLayout,"Symbol",0)
-        addHeader(self.registerTableLayout,"Address",1)
-        addHeader(self.registerTableLayout,"Num. bytes",2)
-        addHeader(self.registerTableLayout,"Description",3)
-        addHeader(self.registerTableLayout,"Value(s)",4)
+        
+
+       # def addHeader(layout,text,cell):
+       #      w = QtWidgets.QLabel(text)
+       #      w.setStyleSheet("font-weight:bold")
+       #      layout.addWidget(w,0,cell)
+       #  addHeader(self.registerTableLayout,"Symbol",0)
+       #  addHeader(self.registerTableLayout,"Address",1)
+       #  addHeader(self.registerTableLayout,"Num. bytes",2)
+       #  addHeader(self.registerTableLayout,"Description",3)
+       #  addHeader(self.registerTableLayout,"Value(s)",4)
 
         # collect register names (symbols) and their addresses in two parallel arrays for sorting
         # (because 'dir' is in alphabetic order, and we want to list in the order of address)
@@ -176,78 +161,38 @@ class RegisterInspector(QtWidgets.QWidget):
             regnames.append(regname)
             r = getattr(regtable,regname)
             addresses.append(r.startByte)
-            
-        style = """
-        QCheckBox, QLineEdit, QDoubleSpinBox, QSpinBox, QLabel, QFrame {
-        background-color: rgb(242,242,242)
-        }
-        QToolTip {
-        background-color: black;
-        }
-        """
+        
+        self.registerTableWidget.setRowCount(len(regnames))
 
-
-        line = 1
+        line = 0
         for aaa in sorted(zip(addresses,regnames)):
             regname = aaa[1]
 
-            lll = QtWidgets.QLabel(regname)
-            lll.setFrameStyle(QtWidgets.QFrame.Box)
-            lll.setLineWidth(1)
-            if line%2==1:
-                lll.setStyleSheet(style)
-            self.registerTableLayout.addWidget(lll,line,0)
-
+            self.registerTableWidget.setItem(line,0,QtWidgets.QTableWidgetItem(regname))
+#            self.registerTableLayout.addWidget(QtWidgets.QLabel(regname),line,0)
             reg = getattr(regtable,regname)
-
-            lll = QtWidgets.QLabel(str(reg.startByte))
-            lll.setFrameStyle(QtWidgets.QFrame.Box)
-            lll.setLineWidth(1)
-            if line%2==1:
-                lll.setStyleSheet(style)
-            self.registerTableLayout.addWidget(lll,line,1)
-
-            lll = QtWidgets.QLabel(str(reg.numberOfBytes))
-            lll.setFrameStyle(QtWidgets.QFrame.Box)
-            lll.setLineWidth(1)
-            if line%2==1:
-                lll.setStyleSheet(style)
-            self.registerTableLayout.addWidget(lll,line,2)
-
-            lll = QtWidgets.QLabel(str(reg.description))
-            lll.setFrameStyle(QtWidgets.QFrame.Box)
-            lll.setLineWidth(1)
-            if line%2==1:
-                lll.setStyleSheet(style)
-            self.registerTableLayout.addWidget(lll,line,3)
-
-            lll = QtWidgets.QFrame()
-            lll.setFrameStyle(QtWidgets.QFrame.Box)
-            lll.setLineWidth(1)
-            if line%2==1:
-                lll.setStyleSheet(style)
-            values = reg.value(data)
-            lll.setLayout(QtWidgets.QVBoxLayout())
-            self.registerTableLayout.addWidget(lll,line,4)
-            lineindex=0
-            for value_line in values:
-                hhh = QtWidgets.QHBoxLayout()
-                lll.layout().addLayout(hhh)
-                if len(values) > 1:
-                    hhh.addWidget(QtWidgets.QLabel(str(lineindex) + " - "))
-                for v in value_line:
-                    if v[1] != "":
-                        label = QtWidgets.QLabel(v[1] + ":")
-                        if v[2] != "":
-                            label.setToolTip(v[2])
-                        hhh.addWidget(label)
-                    value = QtWidgets.QLabel(str(v[0]))
-                    if v[2] != "":
-                        value.setToolTip(v[2])
-                    hhh.addWidget(value)
-                    hhh.addStretch(1)
-                hhh.addStretch(2)
-                lineindex += 1
+            self.registerTableWidget.setItem(line,1,QtWidgets.QTableWidgetItem(str(reg.startByte)))
+            self.registerTableWidget.setItem(line,2,QtWidgets.QTableWidgetItem(str(reg.numberOfBytes)))
+            self.registerTableWidget.setItem(line,3,QtWidgets.QTableWidgetItem(str(reg.description)))
+#            self.registerTableLayout.addWidget(QtWidgets.QLabel(str(reg.startByte)),line,1)
+#            self.registerTableLayout.addWidget(QtWidgets.QLabel(str(reg.numberOfBytes)),line,2)
+#            self.registerTableLayout.addWidget(QtWidgets.QLabel(reg.description),line,3)
+            
+            # l = QtWidgets.QHBoxLayout()
+            # self.registerTableLayout.addLayout(l,line,4)
+            # values = reg.value(data)
+            # for v in values:
+            #     if v[1] != "":
+            #         label = QtWidgets.QLabel(v[1] + ":")
+            #         if v[2] != "":
+            #             label.setToolTip(v[2])
+            #         l.addWidget(label)
+            #     value = QtWidgets.QLabel(str(v[0]))
+            #     if v[2] != "":
+            #         value.setToolTip(v[2])
+            #     l.addWidget(value)
+            #     l.addStretch(1)
+            # l.addStretch(2)
 
             line += 1
 

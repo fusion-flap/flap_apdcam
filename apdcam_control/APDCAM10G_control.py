@@ -94,12 +94,13 @@ class APDCAM10G_register2bits:
             subresult = []
             v = int.from_bytes(data[i*bytePeriod:(i+1)*bytePeriod],byteorder=self.byteOrder,signed=False)
             for b in reversed(self.bits):
+                label = b.shortName
                 tooltip = b.description
                 if b.firstBit == b.lastBit:
-                    tooltip += " (bit " + str(b.firstBit) + ")"
+                    label += " (" + str(b.firstBit) + ")"
                 else:
-                    tooltip += " (bits " + str(b.firstBit) + str("..") + str(b.lastBit) + ")"
-                subresult.append([b.value(v),b.shortName,tooltip])
+                    label += " (" + str(b.firstBit) + str("..") + str(b.lastBit) + ")"
+                subresult.append([b.value(v),label,tooltip])
             result.append(subresult)
         return result
 
@@ -112,10 +113,25 @@ class APDCAM10G_register2str:
 
 class APDCAM10G_register:
     def __init__(self, startByte, numberOfBytes, description, interpreter=APDCAM10G_register2int(byteOrder='msb',signed=False)):
+        """
+        Constructor of camera register reader. Parameters are self-explanatory, except the last one, which is
+        an interpreter class, or the string 'msb' or 'lsb'
+        An interpreter class is one of APDCAM10G_register2int, APDCAM10G_register2bits, APDCAM10G_register2str
+        which interpret a byte array as integer, a set of bits or group of bits, or a string. See their
+        documentation.
+        If the 4th argument is a string, it must be either 'lsb' or 'msb' meaning an APDCAM10G_register2int
+        interpreter with the given byte order
+        """
         self.startByte = startByte
         self.numberOfBytes = numberOfBytes
         self.description = description
-        self.interpreter = interpreter
+        if type(interpreter) is str: 
+            if interpreter.lower() == 'msb' or interpreter.lower() == 'lsb':
+                self.interpreter = APDCAM10G_register2int(byteOrder=interpreter.lower())
+            else:
+                raise Exception("Wrong argument #4 of APDCAM10G_register.__init__: if string, must be 'msb' or 'lsb'")
+        else:
+            self.interpreter = interpreter
     def value(self,data):
         """
         Parameters:
@@ -157,7 +173,46 @@ class APDCAM10G_cc_settings_table_v1:
     MANAGE_ARP = r(156-7+71-7,1,'Management port ARP (Advertisement Report Period) [s]')
     MANAGE_IGMP = r(157-7+71-7,1,'Management port IGMP report period [s]')
     MANAGE_IPV4_TTL = r(158-7+71-7,1,'Management port IPv4 Time To Live (TTL value in the IPv4 header)')
-#    MANAGE_MAC_DEFAULT =r(
+    MANAGE_MAC_DEFAULT =r(159-7+71-7,164-159+1,'Management port factory default MAC address')
+    STREAM_PORT_MAC = r(183-7+71-7,188-183+1,'Stream port static MAC address')
+    STREAM_PORT_IPV4_ADDRESS = r(189-7+71-7,192-189+1,'Stream port IPv4 address')
+    STREAM_PORT_IPV4_MASK = r(193-7+71-7,196-193+1,'Stream port Ipv4 mask')
+    STREAM_PORT_MAC_MODE = r(197-7+71-7,1,'Stream port MAC mode (0 - factory default, 1 - CW-auto, 2 - static)')
+    STREAM_PORT_IP_MODE = r(198-7+71-7,1,'Stream port IP mode (1 - static, 2 - DHCP)')
+    STREAM_PORT_GW_MODE = r(199-7+71-7,1,'Stream port gateway mode (0 - none, 1 - static, 2 - DHCP)')
+    STREAM_PORT_GW_IPV4_ADDRESS = r(200-7+71-7,203-200+1,'Stream port gateway IPv4 address')
+    STREAM_PORT_ARP = r(204-7+71-7,1,'Stream port ARP Advertisement Report Period (0=off) [s]')
+    STREAM_PORT_IGMP = r(205-7+71-7,1,'Stream port IGMP report period (0=off) [s]')
+    STREAM_PORT_IPV4_TTL = r(206-7+71-7,1,'Stream port IPv4 Time To Live (TTL value in the IPv4 header)')
+    STREAM_PORT_MAC_DEFAULT = r(207-7+71-7,212-207+1,'Stream port factory default MAC address')
+    HTTP_PORT = r(231-7+71-7,2,'HTTP Port','lsb')
+    SMTP_PORT = r(233-7+71-7,2,'SMTP server port','lsb')
+    CLOCK_CONTROL = r(263-7+71-7,1,'Clock control (SETCLOCKCONTROL instruction)',interpreter=r2b([\
+                                b(2,2,'AS','AD clock source (0 - internal, 1 - external)'), \
+                                b(3,3,'AA','External clock mode (0 - normal, 1 - auto)'), \
+                                b(4,4,'SS','Sample source (0 - internal, 1 - external)')]))
+    CLOCK_ENABLE = r(264-7+71-7,1,'Clock enable (SETCLOCKENABLE instruction)', interpreter=r2b([\
+                         b(0,0,'CC','Clock output of the CONTROL connector (0 - disable, 1 - enable)'), \
+                         b(1,1,'EC','Clock output of the EIO connector (0 - disable, 1 - enable)'), \
+                         b(2,2,'CS','Sample output of the CONTROL connector (0 - disable, 1 - enable)'), \
+                         b(3,3,'ES','Sample output of the EIO connector (0 - disable, 1 - enable)')]))
+    BASE_PLL_MULT = r(265-7+71-7,1,'Base PLL multiply value')
+    BASE_PLL_DIV0 = r(266-7+71-7,1,'Base PLL divide value 0')
+    BASE_PLL_DIV_ADC = r(267-7+71-7,1,'Base PLL divide value 1 (going to clock signal F1/ADC)')
+    BASE_PLL_DIV2 = r(268-7+71-7,1,'Base PLL divide value 2')
+    BASE_PLL_DIV3 = r(269-7+71-7,1,'Base PLL divide value 3')
+    EXT_DCM_MULT  = r(270-7+71-7,1,'External DCM multiply value')
+    EXT_DCM_DIV   = r(271-7+71-7,1,'External DCM divide value')
+    SAMPLEDIV   = r(272-7+71-7,2,'Sample divide value')
+    SPAREIO     = r(274-7+71-7,2,'Spare IO control',interpreter=r2b([b(0,3,'OUT','Spare IO output bits')]))  # 4..7: direction in v2
+    XFP = r(275-7+71-7,1,'XFP',interpreter=r2b([b(0,0,'REFCLKENABLE','XFP reference clock enable')]))
+    SAMPLECOUNT = r(276-7+71-7,281-276+1,'Sample count')
+    TRIGSTATE = r(282-7+71-7,1,'Trigger control (SETTRIGGER instruction)',interpreter=r2b([\
+                          b(0,0,'ETR','External trigger rising slope (0 - disabled, 1 - enabled)'), \
+                          b(1,1,'ETF','External trigger falling slope (0 - disabled, 1 - enabled)'), \
+                          b(2,2,'IT','Internal trigger (0 - disabled, 1 - enabled)'), \
+                          b(6,6,'DT','Disable trigger event if streams are disabled')]))
+    TRIGDELAY = r(283-7+71-7, 286-283+1,'Trigger delay')
 
 class APDCAM10G_adc_register_table_v1:
     # typedefs/shorthands

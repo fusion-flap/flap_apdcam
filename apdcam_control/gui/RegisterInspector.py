@@ -107,6 +107,9 @@ class RegisterInspector(QtWidgets.QWidget):
         self.showCCSettingsButton = QtWidgets.QPushButton("CC settings")
         buttons.addWidget(self.showCCSettingsButton)
         self.showCCSettingsButton.clicked.connect(self.showCCSettingsTable)
+        self.showCCVariablesButton = QtWidgets.QPushButton("CC variables")
+        buttons.addWidget(self.showCCVariablesButton)
+        self.showCCVariablesButton.clicked.connect(self.showCCVariablesTable)
 
         self.registerTable = QtWidgets.QScrollArea()
         layout.addWidget(self.registerTable)
@@ -142,6 +145,16 @@ class RegisterInspector(QtWidgets.QWidget):
 
         err= self.gui.camera.readCCdata(dataType=0)
         register_table = self.gui.camera.CC_settings_table
+
+        if err != "":
+            self.gui.show_error(err)
+        else:
+            self.showRegisterTable(register_table,self.gui.camera.status.CC_settings)
+            
+    def showCCVariablesTable(self):
+
+        err= self.gui.camera.readCCdata(dataType=1)
+        register_table = self.gui.camera.CC_variables_table
 
         if err != "":
             self.gui.show_error(err)
@@ -200,7 +213,12 @@ class RegisterInspector(QtWidgets.QWidget):
 
             reg = getattr(regtable,regname)
 
-            lll = QtWidgets.QLabel(str(reg.startByte))
+            tmp = str(reg.startByte)
+            try:
+                tmp = regtable.addressDisplay(reg.startByte)
+            except:
+                pass
+            lll = QtWidgets.QLabel(tmp)
             lll.setFrameStyle(QtWidgets.QFrame.Box)
             lll.setLineWidth(1)
             if line%2==1:

@@ -22,6 +22,7 @@ import numpy as np
 #import sys
 
 
+
 def DAC2ADC_channel_mapping():
     """
     Returns an array, which maps the ADC channel numbers (1...32) to the 32 DAC channel numbers (-1).
@@ -44,13 +45,28 @@ def ADC2DAC_channel_mapping():
 
 
 class APDCAM10G_register_bits:
+    """
+    This class represents a group of bits within a (potentially multi-byte) integer.
+    """
     def __init__(self, firstBit, lastBit, shortName, description):
+        # Starting (least-significant) bit of the bit group
         self.firstBit = firstBit
+
+        # The last (most-significant) bit of the bit group (inclusive)
         self.lastBit  = lastBit
+
+        # Number of bits
         self.nBits = self.lastBit-self.firstBit+1
+
+        # The mask corresponding to nBits bits
         self.mask = 2**self.nBits-1
+
+        # A short name (typically all capital letters) indicating the meaning of this bit group
         self.shortName = shortName
+
+        # A verbose description
         self.description = description
+
     def value(self,data):
         """
         Get the value represented by the specified bits from the integer 'data'
@@ -59,10 +75,44 @@ class APDCAM10G_register_bits:
 
 
 # bytearray converters. They must provide a value(self,data) function, which takes a bytearray (data), and
-# return a list. Each element of this list itself is a 3-element list: 1st element is a value (numerical or string), 2nd element
-# is a short description, 3rd element is a long description
+# return a nested list ('result') as a result.
+# The topmost level of this list corresponds to eventual multi-register handling, i.e. if the user wants to
+# specify for example 32 times 2 bytes (every 2 byte corredponding to a different value) in a single command.
+# A specific example is TRIGLEVEL which is 2 bytes for each channel of the ADC board. result[0] would then
+# correspond to the first 2 bytes, result[1] to the 2nd two bytes, etc. In most cases len(result)==1
+# The second nested level of the list corresponds to eventual multiple settings encoded in the (potentially multi-byte)
+# register, for example when bits 0..3, bits 4, bits 5..7 of the register value contain different settings.
+# The third nested level is [value, shortdescription, tooltip]
+
+class APDCAM10G_register2ip:
+    def value(self, data):
+        result = ""
+        for i in range(len(data)):
+            if i > 0:
+                result += "."
+            result += str(int(data[i]))
+        return [[[result,'','IPv4 address']]]
+
+class APDCAM10G_register2mac:
+    def value(self,data):
+        result = ""
+        for i in range(len(data)):
+            if i > 0:
+                result += ":"
+            result += hex(data[i])[2:]
+        return [[[result,'','MAC address']]]
+
 class APDCAM10G_register2int:
-    def __init__(self, byteOrder=None, signed=False):
+    """
+    A bytearray (register data) to integer converter. 
+    """
+    def __init__(self, byteOrder='msb', signed=False):
+        """
+        Parameters:
+        ^^^^^^^^^^^
+        byteOrder - any of the strings 'msb' (most-significant byte first) or 'lsb' (least-significant byte first)
+        signed    - boolean, indicating whether the conversion is to signed or unsigned integer
+        """
         if byteOrder.lower() == 'msb':
             self.byteOrder = 'big'
         elif byteOrder.lower() == 'lsb':
@@ -70,15 +120,34 @@ class APDCAM10G_register2int:
         else:
             self.byteOrder = byteOrder
         self.signed = signed
+
     def value(self, data):
         v = int.from_bytes(data,byteorder=self.byteOrder,signed=self.signed)
         return [[[v,'','MSB' if self.byteOrder == 'big' else 'LSB']]]
 
 class APDCAM10G_register2bits:    
+    """
+    A bytearra (register data) to multiple bit or group-of-bits converter. It is used when the individual bits
+    or a group of bits of the register's value contains different settings/values.
+    """
+
     def __init__(self, bits, byteOrder='msb', bytePeriod=None):
-        if byteOrder.upper() == 'MSB':
+        """
+        Parameters:
+        ^^^^^^^^^^^
+        bits       - a list of APDCAM10G_register_bits objects (each represents a single bit or a group of bits)
+        byteOrder  - 'msb' (most-significant byte first) or 'lsb' (least-significant byte first). It is only
+                     relevant for multi-byte registers. This is used to convert the multi-byte value of the register
+                     to an integer in the first step (which is then divided into individual bits or group of bits,
+                     according to the first function argument, 'bits')
+        bytePeriod - Number of bytes of a period. If it is provided (i.e. not None), the multi-byte register is
+                     interpreted as a repetition of a sequence of bytes, this sequence having the length of bytePeriod.
+                     Each sequence of bytePeriod bytes is converted to an integer, and is then split into individual
+                     bits, or groups of bits.
+        """
+        if byteOrder.lower() == 'msb':
             self.byteOrder = 'big'
-        elif byteOrder.upper() == 'LSB':
+        elif byteOrder.lower() == 'lsb':
             self.byteOrder = 'little'
         else:
             self.byteOrder = byteOrder
@@ -105,6 +174,9 @@ class APDCAM10G_register2bits:
         return result
 
 class APDCAM10G_register2str:    
+    """
+    Converter class interpreting each byte as a character, returning a string
+    """
     def value(self,data):
         try:
             return [[[data.decode('utf-8'),'','']]]
@@ -145,8 +217,16 @@ class APDCAM10G_cc_settings_table_v1:
     b = APDCAM10G_register_bits
     r = APDCAM10G_register
     r2i  = APDCAM10G_register2int
+    r2ip = APDCAM10G_register2ip
+    r2mac = APDCAM10G_register2mac
     r2b  = APDCAM10G_register2bits
     r2s  = APDCAM10G_register2str
+
+    def addressDisplay(self,a):
+        if a<7-7+71-7:
+            return str(a+7) + "-7"
+        return str(a+7-71+7) + "-7+71-7"
+
     BOARD_VERSION = r(7-7, 10, 'Board type', interpreter=r2s())
     FIRMWARE_GROUP = r(17-7, 30-17+1, 'Firmware group',interpreter=r2s())
     FIRMWARE_GROUP_VERSION = r(31-7,2,'Firmware group version',interpreter=r2b([b(0,7,'VL','Version low'),b(8,15,'VH','Version high')]))
@@ -163,28 +243,28 @@ class APDCAM10G_cc_settings_table_v1:
     HOST_NAME = r(80-7+71-7,12,'Host name',interpreter=r2s())
     CONFIG = r(92-7+71-7,2,'Configuration',interpreter=r2b([b(0,0,'LOCK','Device is locked')]))
     USER_TEXT = r(94-7+71-7,15,'User text',interpreter=r2s())
-    MANAGE_MAC = r(135-7+71-7,140-135+1,'Management port static MAC address')
-    MANAGE_IPV4_ADDRESS = r(141-7+71-7,144-141+1,'Management port IPv4 address')
-    MANAGE_IPV4_MASK    = r(145-7+71-7,148-145+1,'Management port IPv4 network mask')
+    MANAGE_MAC = r(135-7+71-7,140-135+1,'Management port static MAC address',interpreter=r2mac())
+    MANAGE_IP = r(141-7+71-7,144-141+1,'Management port IPv4 address',interpreter=r2ip())
+    MANAGE_IP_MASK    = r(145-7+71-7,148-145+1,'Management port IPv4 network mask',interpreter=r2ip())
     MANAGE_MAC_MODE = r(149-7+71-7,1,'Management port MAC mode (0 - factorydefault, 1 - CW-Auto, 2 - static)')
     MANAGE_IP_MODE = r(150-7+71-7,1,'Management port IP mode (1 - static, 2 - DHCP)')
     MANAGE_GW_MODE = r(151-7+71-7,1,'Management port gateway mode (0 - None, 1 - static, 2 - DHCP)')
-    MANAGE_GW_IPV4_ADDRESS = r(152-7+71-7,155-152+1,'Management port gateway IPv4 address')
+    MANAGE_GW_IP = r(152-7+71-7,155-152+1,'Management port gateway IPv4 address',interpreter=r2ip())
     MANAGE_ARP = r(156-7+71-7,1,'Management port ARP (Advertisement Report Period) [s]')
     MANAGE_IGMP = r(157-7+71-7,1,'Management port IGMP report period [s]')
-    MANAGE_IPV4_TTL = r(158-7+71-7,1,'Management port IPv4 Time To Live (TTL value in the IPv4 header)')
-    MANAGE_MAC_DEFAULT =r(159-7+71-7,164-159+1,'Management port factory default MAC address')
-    STREAM_PORT_MAC = r(183-7+71-7,188-183+1,'Stream port static MAC address')
-    STREAM_PORT_IPV4_ADDRESS = r(189-7+71-7,192-189+1,'Stream port IPv4 address')
-    STREAM_PORT_IPV4_MASK = r(193-7+71-7,196-193+1,'Stream port Ipv4 mask')
+    MANAGE_IP_TTL = r(158-7+71-7,1,'Management port IPv4 Time To Live (TTL value in the IPv4 header)')
+    MANAGE_MAC_DEFAULT =r(159-7+71-7,164-159+1,'Management port factory default MAC address',interpreter=r2mac())
+    STREAM_PORT_MAC = r(183-7+71-7,188-183+1,'Stream port static MAC address',interpreter=r2mac())
+    STREAM_PORT_IP = r(189-7+71-7,192-189+1,'Stream port IPv4 address',interpreter=r2ip())
+    STREAM_PORT_IP_MASK = r(193-7+71-7,196-193+1,'Stream port Ipv4 mask',interpreter=r2ip())
     STREAM_PORT_MAC_MODE = r(197-7+71-7,1,'Stream port MAC mode (0 - factory default, 1 - CW-auto, 2 - static)')
     STREAM_PORT_IP_MODE = r(198-7+71-7,1,'Stream port IP mode (1 - static, 2 - DHCP)')
     STREAM_PORT_GW_MODE = r(199-7+71-7,1,'Stream port gateway mode (0 - none, 1 - static, 2 - DHCP)')
-    STREAM_PORT_GW_IPV4_ADDRESS = r(200-7+71-7,203-200+1,'Stream port gateway IPv4 address')
+    STREAM_PORT_GW_IP = r(200-7+71-7,203-200+1,'Stream port gateway IPv4 address',interpreter=r2ip())
     STREAM_PORT_ARP = r(204-7+71-7,1,'Stream port ARP Advertisement Report Period (0=off) [s]')
     STREAM_PORT_IGMP = r(205-7+71-7,1,'Stream port IGMP report period (0=off) [s]')
-    STREAM_PORT_IPV4_TTL = r(206-7+71-7,1,'Stream port IPv4 Time To Live (TTL value in the IPv4 header)')
-    STREAM_PORT_MAC_DEFAULT = r(207-7+71-7,212-207+1,'Stream port factory default MAC address')
+    STREAM_PORT_IP_TTL = r(206-7+71-7,1,'Stream port IPv4 Time To Live (TTL value in the IPv4 header)')
+    STREAM_PORT_MAC_DEFAULT = r(207-7+71-7,212-207+1,'Stream port factory default MAC address',interpreter=r2mac())
     HTTP_PORT = r(231-7+71-7,2,'HTTP Port','lsb')
     SMTP_PORT = r(233-7+71-7,2,'SMTP server port','lsb')
     CLOCK_CONTROL = r(263-7+71-7,1,'Clock control (SETCLOCKCONTROL instruction)',interpreter=r2b([\
@@ -213,6 +293,96 @@ class APDCAM10G_cc_settings_table_v1:
                           b(2,2,'IT','Internal trigger (0 - disabled, 1 - enabled)'), \
                           b(6,6,'DT','Disable trigger event if streams are disabled')]))
     TRIGDELAY = r(283-7+71-7, 286-283+1,'Trigger delay')
+    SERIAL_PLL_MULT = r(287-7+71-7,1,'Serial PLL multiply value')
+    SERIAL_PLL_DIV = r(288-7+71-7,1,'Serial PLL divide value 0')
+    SATACONTROL = r(292-7+71-7,1,'SATA Control',interpreter=r2b([b(0,0,'DSM','Dual SATA mode (0 - disabled, 1 - enabled)')]))
+    STREAMCONTROL = r(299-7+71-7,1,'Stream control (SETSTREAMCONTROL instruction)',interpreter=r2b([\
+                                 b(0,0,'EN1','Stream 1 disabled (0) or enabled (1)'), \
+                                 b(1,1,'EN2','Stream 2 disabled (0) or enabled (1)'), \
+                                 b(2,2,'EN3','Stream 3 disabled (0) or enabled (1)'), \
+                                 b(3,3,'EN4','Stream 4 disabled (0) or enabled (1)'), \
+                                 b(4,4,'TM1','Test mode of stream 1 disabled (0) or enabled (1)'), \
+                                 b(5,5,'TM2','Test mode of stream 2 disabled (0) or enabled (1)'), \
+                                 b(6,6,'TM3','Test mode of stream 3 disabled (0) or enabled (1)'), \
+                                 b(7,7,'TM4','Test mode of stream 4 disabled (0) or enabled (1)')]))
+    UDPTESTCLOCK_DIV = r(300-7+71-7,303-300+1,'UDP test clock divider value')
+    UDPOCTET1   = r(311-7+71-7,2,'Stream 1 octet')
+    UDPMAC1     = r(313-7+71-7,6,'Stream 1 MAC address',interpreter=r2mac())
+    IP1         = r(319-7+71-7,4,'Stream 1 IPv4 address',interpreter=r2ip())
+    UDPPORT1    = r(323-7+71-7,2,'Stream 1 UDP port')
+    UDPOCTET2   = r(327-7+71-7,2,'Stream 2 octet')
+    UDPMAC2     = r(329-7+71-7,6,'Stream 2 MAC address',interpreter=r2mac())
+    IP2         = r(335-7+71-7,4,'Stream 2 IPv4 address',interpreter=r2ip())
+    UDPPORT2    = r(339-7+71-7,2,'Stream 2 UDP port')
+    UDPOCTET3   = r(343-7+71-7,2,'Stream 3 octet')
+    UDPMAC3     = r(345-7+71-7,6,'Stream 3 MAC address',interpreter=r2mac())
+    IP3         = r(351-7+71-7,4,'Stream 3 IPv4 address',interpreter=r2ip())
+    UDPPORT3    = r(355-7+71-7,2,'Stream 3 UDP port')
+    UDPOCTET4   = r(359-7+71-7,2,'Stream 4 octet')
+    UDPMAC4     = r(361-7+71-7,6,'Stream 4 MAC address',interpreter=r2mac())
+    IP4         = r(367-7+71-7,4,'Stream 4 IPv4 address',interpreter=r2ip())
+    UDPPORT4    = r(371-7+71-7,2,'Stream 4 UDP port')
+    CAMTIMER1DELAY   = r(375-7+71-7,4,'CT timer 1 delay')
+    CAMTIMER1ON      = r(379-7+71-7,2,'CT timer 1 on')
+    CAMTIMER1OFF     = r(381-7+71-7,2,'CT timer 1 off')
+    CAMTIMER1NPULSES = r(383-7+71-7,4,'CT timer 1 number of pulses')
+    CAMTIMER2DELAY   = r(387-7+71-7,4,'CT timer 2 delay')
+    CAMTIMER2ON      = r(391-7+71-7,2,'CT timer 2 on')
+    CAMTIMER2OFF     = r(393-7+71-7,2,'CT timer 2 off')
+    CAMTIMER2NPULSES = r(395-7+71-7,4,'CT timer 2 number of pulses')
+    CAMTIMER3DELAY   = r(399-7+71-7,4,'CT timer 3 delay')
+    CAMTIMER3ON      = r(403-7+71-7,2,'CT timer 3 on')
+    CAMTIMER3OFF     = r(405-7+71-7,2,'CT timer 3 off')
+    CAMTIMER3NPULSES = r(409-7+71-7,4,'CT timer 3 number of pulses')
+    CAMTIMER4DELAY   = r(411-7+71-7,4,'CT timer 4 delay')
+    CAMTIMER4ON      = r(415-7+71-7,2,'CT timer 4 on')
+    CAMTIMER4OFF     = r(417-7+71-7,2,'CT timer 4 off')
+    CAMTIMER4NPULSES = r(419-7+71-7,4,'CT timer 4 number of pulses')
+    CAMTIMER5DELAY   = r(423-7+71-7,4,'CT timer 5 delay')
+    CAMTIMER5ON      = r(427-7+71-7,2,'CT timer 5 on')
+    CAMTIMER5OFF     = r(429-7+71-7,2,'CT timer 5 off')
+    CAMTIMER5NPULSES = r(431-7+71-7,4,'CT timer 5 number of pulses')
+    CAMTIMER6DELAY   = r(435-7+71-7,4,'CT timer 6 delay')
+    CAMTIMER6ON      = r(439-7+71-7,2,'CT timer 6 on')
+    CAMTIMER6OFF     = r(441-7+71-7,2,'CT timer 6 off')
+    CAMTIMER6NPULSES = r(443-7+71-7,4,'CT timer 6 number of pulses')
+    CAMTIMER7DELAY   = r(447-7+71-7,4,'CT timer 7 delay')
+    CAMTIMER7ON      = r(451-7+71-7,2,'CT timer 7 on')
+    CAMTIMER7OFF     = r(453-7+71-7,2,'CT timer 7 off')
+    CAMTIMER7NPULSES = r(455-7+71-7,4,'CT timer 7 number of pulses')
+    CAMTIMER8DELAY   = r(459-7+71-7,4,'CT timer 8 delay')
+    CAMTIMER8ON      = r(463-7+71-7,2,'CT timer 8 on')
+    CAMTIMER8OFF     = r(465-7+71-7,2,'CT timer 8 off')
+    CAMTIMER8NPULSES = r(467-7+71-7,4,'CT timer 8 number of pulses')
+    CAMTIMER9DELAY   = r(471-7+71-7,4,'CT timer 9 delay')
+    CAMTIMER9ON      = r(475-7+71-7,2,'CT timer 9 on')
+    CAMTIMER9OFF     = r(477-7+71-7,2,'CT timer 9 off')
+    CAMTIMER9NPULSES = r(479-7+71-7,4,'CT timer 9 number of pulses')
+    CAMTIMER10DELAY   = r(483-7+71-7,4,'CT timer 10 delay')
+    CAMTIMER10ON      = r(487-7+71-7,2,'CT timer 10 on')
+    CAMTIMER10OFF     = r(489-7+71-7,2,'CT timer 10 off')
+    CAMTIMER10NPULSES = r(491-7+71-7,4,'CT timer 10 number of pulses')
+    CAMCONTROL  = r(495-7+71-7,2,'CAM timer control')
+    CAMCLKDIV   = r(497-7+71-7,2,'CAM timer clock divide value')
+    CAMOUTPUT   = r(499-7+71-7,2,'CAM timer output')
+
+class APDCAM10G_cc_variables_table_v1:
+    # typedefs/shorthands
+    b = APDCAM10G_register_bits
+    r = APDCAM10G_register
+    r2i  = APDCAM10G_register2int
+    r2ip = APDCAM10G_register2ip
+    r2mac = APDCAM10G_register2mac
+    r2b  = APDCAM10G_register2bits
+    r2s  = APDCAM10G_register2str
+
+    def addressDisplay(self,a):
+        return str(a+7) + "-7"
+
+    MANAGE_MAC = r(7-7, 6, 'Management port MAC address', interpreter=r2mac())
+    MANAGE_IP  = r(13-7,4, 'Management port IPv4 address', interpreter=r2ip())
+    
+    
 
 class APDCAM10G_adc_register_table_v1:
     # typedefs/shorthands
@@ -453,7 +623,7 @@ class APDCAM10G_codes_v1:
     CC_DATATYPE_UDPOCTET1 = 0
     CC_REGISTER_UDPMAC1 = 313-7+71-7
     CC_DATATYPE_UDPMAC1 = 0
-    CC_REGISTER_IP1 = 320-7+71-7
+    CC_REGISTER_IP1 = 320-7+71-7  # shouldn't this be 319-7+71-7? BS_10GBCCCard_v104_IM_noflashwrite.pdf page 69
     CC_DATATYPE_IP1 = 0
     CC_REGISTER_UDPPORT1 = 323-7+71-7
     CC_DATATYPE_UDPPORT1 = 0
@@ -1021,12 +1191,14 @@ class APDCAM10G_control:
             self.codes_PC  = APDCAM_PCcodes_v1()
             self.ADC_register_table = APDCAM10G_adc_register_table_v1()
             self.CC_settings_table = APDCAM10G_cc_settings_table_v1()
+            self.CC_variables_table = APDCAM10G_cc_variables_table_v1()
         else:
             self.codes_CC  = APDCAM10G_codes_v2()
             self.codes_ADC = APDCAM10G_ADCcodes_v1()
             self.codes_PC  = APDCAM_PCcodes_v1()
             self.ADC_register_table = None
             self.CC_settings_table = None
+            self.CC_variables_table = None
 
         # Check the available ADC boards
         self.status.ADC_address = []

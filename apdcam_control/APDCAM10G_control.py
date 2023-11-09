@@ -204,6 +204,7 @@ class APDCAM10G_register:
                 raise Exception("Wrong argument #4 of APDCAM10G_register.__init__: if string, must be 'msb' or 'lsb'")
         else:
             self.interpreter = interpreter
+
     def value(self,data):
         """
         Parameters:
@@ -211,6 +212,20 @@ class APDCAM10G_register:
         data - bytearray, the content of the entire register table of the given board
         """
         return self.interpreter.value(data[self.startByte:self.startByte+self.numberOfBytes])
+
+    def get(self,data):
+        """
+        Return the raw values (single byte or a bytearray) from the raw data.
+
+        Parameters:
+        ^^^^^^^^^^^
+        data - The register table dump.
+
+        Returns:
+        ^^^^^^^^
+        A bytearray (even if it contains a single byte) corresponding to the given register
+        """
+        return data[self.startByte:self.startByte+self.numberOfBytes]
 
 class APDCAM10G_cc_settings_table_v1:
     # typedefs/shorthands
@@ -381,8 +396,84 @@ class APDCAM10G_cc_variables_table_v1:
 
     MANAGE_MAC = r(7-7, 6, 'Management port MAC address', interpreter=r2mac())
     MANAGE_IP  = r(13-7,4, 'Management port IPv4 address', interpreter=r2ip())
+    MANAGE_IP_MASK = r(17-7,4,'Management port IPv4 network mask', interpreter=r2ip())
+    MANAGE_LINK_ON = r(21-7,1,'Management port link on')
+    MANAGE_GW_STATE = r(22-7,1,'Management port gateway state (0=none, 1=ok, 2=searching mac, 3=searching IP with DHCP)')
+    MANAGE_IP_STATE = r(23-7,1,'Management port IP state (1=ok, 3=searching IP with DHCP)')
+    MANAGE_DHCP_STATE = r(24-7,1,'Management port DHCP state (0=idle, 1=request, 2=discover)')
+    MANAGE_GW_MAC = r(25-7,6,'Management port gateway MAC address',interpreter=r2mac())
+    MANAGE_GW_IP  = r(31-7,4,'Management port gateway IPv4 address',interpreter=r2ip())
+    MANAGE_DHCP_MAC = r(35-7,6,'Management port DHCP server MAC address',interpreter=r2mac())
+    MANAGE_DHCP_SERVER_IP = r(41-7,4,'Management port DHCP server IPv4 address',interpreter=r2ip())
+    MANAGE_IGMP_MAC = r(45-7,6,'Management port IGMP switch MAC address',interpreter=r2mac())
+    MANAGE_IGMP_IP  = r(51-7,4,'Management port IGMP switch IPv4 address',interpreter=r2ip())
+    MANAGE_DHCP_LT  = r(55-7,4,'Management port DHCP lease time','lsb')
+    MANAGE_ETHRX = r(59-7,4,'Management port ethernet RX frames','lsb')
+    MANAGE_ETHTX = r(63-7,4,'Management port ethernet TX frames','lsb')
+    STREAM_PORT_MAC = r(71-7,6,'Stream port MAC address',interpreter=r2mac())
+    STREAM_PORT_IP  = r(77-7,4,'Stream port IPv4 address',interpreter=r2ip())
+    STREAM_PORT_IP_MASK = r(81-7,4,'Stream port IPv4 network mask')
+    STREAM_PORT_LINK_ON = r(85-7,1,'Stream port link on')
+    STREAM_PORT_GW_STATE = r(86-7,1,'Stream port gateway state (0=none, 1=ok, 2=searching MAC, 3=searching IP with DHCP)')
+    STREAM_PORT_IP_STATE = r(87-7,1,'Stream port IP state (1=ok, 3=searching IP with DHCP)')
+    STREAM_PORT_DHCP_STATE = r(88-7,1,'Stream port DHCP state (0=idle, 1=request, 2=discover)')
+    STREAM_PORT_GW_MAC = r(89-7,6,'Stream port gateway MAC address',interpreter=r2mac())
+    STREAM_PORT_GW_IP = r(95-7,4,'Stream port gateway IPv4 address',interpreter=r2ip())
+    STREAM_PORT_DHCP_MAC = r(99-7,6,'Stream port DHCP server MAC address',interpreter=r2mac())
+    STREAM_PORT_DHCP_IP  = r(105-7,4,'Stream port DHCP server IPv4 address',interpreter=r2ip())
+    STREAM_PORT_IGMP_MAC = r(109-7,6,'Stream port IGMP switch MAC address',interpreter=r2mac())
+    STREAM_PORT_IGMP_IP  = r(115-7,4,'Stream port IGMP switch IPv4 address', interpreter=r2ip())
+    STREAM_PORT_DHCP_LT = r(119-7,4,'Stream port DHCP lease time','lsb')
+    STREAM_PORT_ETHRX = r(123-7,4,'Stream port ethernet RX frames','lsb')
+    STREAM_PORT_ETHTX = r(127-7,4,'Stream port ethernet TX frames','lsb')
+    MANAGE_ETHBUF = r(135-7,1,'Management port ethernet buffers used')
+    MANAGE_ETHBUFMAX = r(136-7,1,'Management port ethernet buffers used max.')
+    MANAGE_ETHDROP = r(139-7,4,'Management port ethernet dropped frames','lsb')
+    MANAGE_TCPRX   = r(143-7,4,'Management port TCP RX packets','lsb')
+    MANAGE_TCPTX   = r(147-7,4,'Management port TCP TX packets','lsb')
+    MANAGE_TCPESTCONN  = r(151-7,4,'Management port TCP established connections','lsb')
+    MANAGE_TCPREJCONN  = r(155-7,4,'Management port TCP rejected connections','lsb')
+    MANAGE_TCPCLOCONN  = r(159-7,4,'Management port TCP closed connections','lsb')
+    MANAGE_TCPACTCONN  = r(163-7,4,'Management port TCP active connections','lsb')
+    MANAGE_TCPKATO     = r(167-7,4,'Management port TCP keep alive timeout','lsb')
+    MANAGE_TCPRETTO    = r(171-7,4,'Management port TCP retransmit timeout','lsb')
+    MANAGE_TCPRETRANS  = r(175-7,4,'Management port TCP retransmissions','lsb')
+    SYSTEMUPTIME = r(183-7,4,'System up time [ms]','lsb')
+    HWERROR = r(187-7,2,'Hardware error',interpreter=r2b([\
+                                         b(0,0,'SDRAM','SDRAM error'), \
+                                         b(1,1,'EEPROM','EEPROM error'), \
+                                         b(2,2,'FPGA','FPGA error'), \
+                                         b(3,3,'FLASH','Internal flash error'), \
+                                         b(4,4,'FLASH1','Flash 1 error (web server flash)'), \
+                                         b(5,5,'FLASH2','Flash 2 error (storage flash)')],byteOrder='lsb'))
+    IICERROR = r(189-7,2,'IIC error', interpreter=r2b([b(0,0,'NOACK','No ACK received'),\
+                                                       b(1,1,'ADDOVF','Address overflow'),\
+                                                       b(2,2,'POLL','Polling error')],byteOrder='lsb'))
+    FPGAVH = r(192-7,1,'FPGA program version high')
+    FPGAVL = r(193-7,1,'FPGA program version low')
+    FPGA_STATUS = r(194-7,1,'FPGA status',interpreter=r2b([b(0,0,'BPLLLCK','Basic PLL locked'),\
+                                                           b(1,1,'SPLLLCK','Serial PLL locked'),\
+                                                           b(2,2,'EPLLLCK','External DCM locked'),\
+                                                           b(3,3,'EXTCLKVAL','External clock valid'),\
+                                                           b(4,5,'CAMTIM','CAM timer state (0=idle, 1=armed, 1=running)'),\
+                                                           b(6,6,'STRADC','Streaming ADC board data'),\
+                                                           b(7,7,'OVLD','Overload')]))
+    STREAM_PORT_ETHSTAT = r(195-7,1,'Stream port ethernet status',\
+                            interpreter=r2b([b(0,0,'XDCMLCK','XGMII RX DCM locked'),\
+                                             b(1,1,'XLNK','XGMII link'),\
+                                             b(2,2,'TXFULL','Reserved for internal use (TX buffer is full)')]))
+    EXTCLKFREQ = r(196-7,2,'External clock frequench [kHz]')
+    DSLVLCK = r(198-7,1,'DSLV lock status')
+    STREAM_PORT_RXERRCNT = r(199-7,2,'Stream port RX error counter')
+    STREAM_PORT_RXOVFCNT = r(201-7,2,'Stream port RX overflow counter')
+    STREAM_PORT_RXPKTCNT = r(203-7,2,'Stream port RX packetk counter')
+    TRIGSTATE = r(205-7,1,'Trigger status')
+    STATUS = r(215-7,4,'Status',interpreter=r2b([b(0,0,'WEBBSY','Web flash is busy (1) or free (0)'),\
+                                                 b(1,1,'STBSY','Storage flash is busy (1) or free (0)')],\
+                                                byteOrder='lsb'))
+    BOARDTEMP = r(276-7,1,'Board temperature [C]')
     
-    
+
 
 class APDCAM10G_adc_register_table_v1:
     # typedefs/shorthands

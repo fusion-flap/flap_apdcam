@@ -1,13 +1,8 @@
 #!/usr/bin/python3
 
-
-class Register:
-    def __init__(self,a,b):
-        self.a = a
-        self.b = b
-
-class A:
-    AAA = Register(1,2)
-    BBB = Register(3,4)
-
-print(A.AAA)    
+V = 30
+Vreg = int(V/0.12)
+print("Value in register: " + str(Vreg))
+mask = 2**12-1
+Vreg2 = (Vreg*256) & mask
+print("hahaha: " + str(Vreg2))

@@ -160,8 +160,8 @@ class Infrastructure(QtWidgets.QWidget):
                ["Analog panel 4","tempAnalog4"],
                ["Baseplate","tempBasePlate"],
                ["12","temp12"],
-               ["13","temp13"],
-               ["PC card heatsink","tempPcCardHeatsink"],
+               ["Diode","temp13"],
+               ["Peltier (detector) heatsink","tempPcCardHeatsink"],
                ["Power panel 1","tempPowerPanel1"],
                ["Power panel 2","tempPowerPanel2"]]
 

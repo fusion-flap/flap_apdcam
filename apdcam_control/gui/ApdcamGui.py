@@ -101,7 +101,6 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.adcControl.updateGui()
         self.controlTiming.updateGui()
         self.cameraTimer.updateGui()
-
     
     def onTabChange(self):
         pass
@@ -157,10 +156,11 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
         exitAction = QAction("&Exit",self)
         fileMenu.addAction(exitAction)
+        exitAction.triggered.connect(lambda: self.exitAAA(0))
 
         restartAction = QAction("&Restart",self)
-        restartAction.triggered.connect(lambda: self.exit(123))
         fileMenu.addAction(restartAction)
+        restartAction.triggered.connect(lambda: self.exitAAA(123))
 
         # Run mode menu ------------------
         modeMenu = menuBar.addMenu("&GUI Mode")
@@ -260,16 +260,14 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
         self.updateGuiThreadStop = True
         self.updateGuiThread = None 
-        exitAction.triggered.connect(self.exit)
         #self.startGuiUpdate()
 
         self.adcControl.addAdc(1,1)
 
+    def exitAAA(self,rc):
+        self.stopGuiUpdate(wait=True)
+        QtWidgets.QApplication.exit(rc)
 
-    def exit(self,rc):
-        self.stopGuiUpdate()
-        sys.exit(rc)
-        
     def startGuiUpdate(self):
         if not self.status.connected:
             self.show_message("Camera is not connected")
@@ -660,10 +658,10 @@ class ApdcamGuiApp(QtWidgets.QApplication):
     def __init__(self):
         super(ApdcamGuiApp,self).__init__(sys.argv)
         self.window = ApdcamGui()
-        self.exec()
+        #self.exec()
 
-    def run(self):
-        self.exec()
+#    def run(self):
+#        self.exec()
 
     
 #if __name__ == '__main__':

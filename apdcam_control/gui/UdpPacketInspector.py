@@ -216,6 +216,8 @@ class UdpPacketInspector(QtWidgets.QWidget):
         origTestPatterns = []
         if useTestPattern:
             error,origTestPatterns = self.gui.camera.getTestPattern('all')
+            print("---------------")
+            print(origTestPatterns)
             self.gui.camera.setTestPattern('all',6)
 
         for i in range(4):
@@ -260,9 +262,9 @@ class UdpPacketInspector(QtWidgets.QWidget):
 
                 s = "#" + str(i_packet)
                 if p.received():
-                    s += "  Serial: " + str(p.serial())
+                    s += "  Serial: " + str(p.header.serial())
                 s += "   @" + str(p.time())
-                if p.udp_test_mode():
+                if p.header.udpTestMode():
                     s += " (UDP test mode!)"
                 print(s)
                 self.packets_display_layout[i_adc].addWidget(QtWidgets.QLabel(s))
@@ -271,7 +273,7 @@ class UdpPacketInspector(QtWidgets.QWidget):
                 print(s)
                 self.packets_display_layout[i_adc].addWidget(QtWidgets.QLabel(s))
                 if p.received():
-                    s = "Sample: " + str(p.firstSampleNumber()) + "(" + ("full" if p.firstSampleFull() else "partial") + ")"
+                    s = "Sample: " + str(p.header.sampleCounter()) + "(" + ("full" if p.header.firstSampleFull() else "partial") + ")"
                     print(s)
                     self.packets_display_layout[i_adc].addWidget(QtWidgets.QLabel(s))
                     receivedPackets += 1

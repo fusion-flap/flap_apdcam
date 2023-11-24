@@ -106,7 +106,7 @@ class ControlTiming(QtWidgets.QWidget):
             self.internal_gate_inverted.setEnabled(False)
             self.camtimer0_gate_enabled.setEnabled(False)
             self.camtimer0_gate_inverted.setEnabled(False)
-            self.clear_gate.setEnabled(False)
+            self.sw_gate.setEnabled(False)
 
 
     def setSerialPll(self):
@@ -115,7 +115,10 @@ class ControlTiming(QtWidgets.QWidget):
     def setSampleDivider(self):
         self.updateSamplingFrequency()
         if self.gui.status.connected:
-            self.gui.camera.setSampleDivider(self.sampleDiv.value())
+            # The GUI value means a divider with respesct to the actual ADC frequency. For Firmware 1.05 and above,
+            # there is an extra divider (builtinAdcFreqDivider=2) after the splitting of the clock signal to SAMPLEDIV,
+            # so SAMPLEDIV (the register value of the camera) must also include this factor
+            self.gui.camera.setSampleDivider(self.gui.camera.builtinAdcFreqDivider*self.sampleDiv.value())
 
     def updateSamplingFrequency(self):
         try:
@@ -139,6 +142,20 @@ class ControlTiming(QtWidgets.QWidget):
                                  autoExternal=self.autoExtClock.isChecked(),
                                  externalSample=self.extSample.isChecked())
 
+    def setEioAdcClockDivider(self):
+        v = self.adc_out_freq_div.value()
+        if v!=1 and v%2!=0:
+            v -= 1
+            self.adc_out_freq_div.blockSignals(True)
+            self.adc_out_freq_div.setValue(v)
+            self.adc_out_freq_div.blockSignal(False)
+        self.gui.camera.setEioAdcClockDivider(v)
+        if v==1:
+            self.adc_out_freq_div.setSingleStep(1)
+        else:
+            # Actually, we should have singlestep(up)=2, singlestep(down)=1, but the latter is
+            # automatically guaranteed by having minimum=1
+            self.adc_out_freq_div.setSingleStep(2)
 
     def updateGui(self):
         T = self.gui.camera.status.CCTemp
@@ -221,7 +238,7 @@ class ControlTiming(QtWidgets.QWidget):
 
         g.addWidget(QtWidgets.QLabel("Ref. freq. [MHz]"),0,1)
         g.addWidget(QtWidgets.QLabel("Multiplier"),0,2)
-        g.addWidget(QtWidgets.QLabel("Divisor"),0,3)
+        g.addWidget(QtWidgets.QLabel("Divider"),0,3)
         g.addWidget(QtWidgets.QLabel("Actual frequency"),0,4)
 
         g.addWidget(QtWidgets.QLabel("Serial (SATA):"),1,0)
@@ -244,7 +261,7 @@ class ControlTiming(QtWidgets.QWidget):
         serialPllDivMax = 10
         self.serialPllDiv = QtWidgets.QSpinBox()
         self.serialPllDiv.guiMode = GuiMode.factory
-        self.serialPllDiv.settingsName = "SATA frequency divisor"
+        self.serialPllDiv.settingsName = "SATA frequency divider"
         self.serialPllDiv.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.serialPllDiv.setToolTip("Set the divider value for the serial PLL. Takes effect when you press Enter")
         self.serialPllDiv.setMinimum(serialPllDivMin)
@@ -283,7 +300,7 @@ class ControlTiming(QtWidgets.QWidget):
         g.addWidget(self.adcPllMult,2,2)
 
         self.adcPllDiv = QtWidgets.QSpinBox()
-        self.adcPllDiv.settingsName = "ADC frequency divisor"
+        self.adcPllDiv.settingsName = "ADC frequency divider"
         self.adcPllDiv.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.adcPllDiv.setToolTip("Divider for the internal clock frequency (20 MHz). Takes effect when you press Enter.")
         self.adcPllDiv.setMinimum(8)
@@ -312,7 +329,7 @@ class ControlTiming(QtWidgets.QWidget):
         self.extClockFreq = QtWidgets.QDoubleSpinBox()
         self.extClockFreq.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         readOnly(self.extClockFreq)
-        self.extClockFreq.setToolTip("The measured frequency [MHz] of the external clock, to be multiplied and divided by the multiplicator and divisor on the right")
+        self.extClockFreq.setToolTip("The measured frequency [MHz] of the external clock, to be multiplied and divided by the multiplicator and divider on the right")
         g.addWidget(self.extClockFreq,3,1)
 
         self.extClockMult = QtWidgets.QSpinBox()
@@ -324,7 +341,7 @@ class ControlTiming(QtWidgets.QWidget):
         g.addWidget(self.extClockMult,3,2)
 
         self.extClockDiv = QtWidgets.QSpinBox()
-        self.extClockDiv.settingsName = "External clock frequency divisor"
+        self.extClockDiv.settingsName = "External clock frequency divider"
         self.extClockDiv.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.extClockDiv.setToolTip("Divider for the external clock frequency. Takes effect when you press Enter.")
         self.extClockDiv.setMinimum(1)
@@ -347,20 +364,20 @@ class ControlTiming(QtWidgets.QWidget):
 
         self.sampleFreqRef = QtWidgets.QDoubleSpinBox()
         self.sampleFreqRef.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
-        self.sampleFreqRef.setToolTip("Reference frequency [MHz] of the sampling: either the ADC of the external clock's frequency (depending on the checkbox 'ADC Clock Ext.'), to be divided by the divisor on the right")
+        self.sampleFreqRef.setToolTip("Reference frequency [MHz] of the sampling: either the ADC of the external clock's frequency (depending on the checkbox 'ADC Clock Ext.'), to be divided by the divider on the right")
         g.addWidget(self.sampleFreqRef,4,1)
         readOnly(self.sampleFreqRef)
         self.sampleFreqRef.setValue(float(self.adcPllFreq.currentText()))
 
         self.sampleDiv = QtWidgets.QSpinBox()
-        self.sampleDiv.settingsName = "Sampling frequency divisor"
+        self.sampleDiv.settingsName = "Sampling frequency divider"
         g.addWidget(self.sampleDiv,4,3)
         g.setRowStretch(g.rowCount(),1)
         self.sampleDiv.setMinimum(2)
         self.sampleDiv.setValue(10)
         self.sampleDiv.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.sampleDiv.lineEdit().returnPressed.connect(self.setSampleDivider)
-        self.sampleDiv.setToolTip("Sample clock divisor (sampling frequency w.r.t. ADC clock frequency, APDCAM User Guide Fig. 6). Takes effect when you press Enter")
+        self.sampleDiv.setToolTip("Sample clock divider (sampling frequency w.r.t. true ADC frequency, APDCAM User Guide Fig. 6). Takes effect when you press Enter")
 
         self.sampleFreq = QtWidgets.QDoubleSpinBox()
         self.sampleFreq.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
@@ -371,12 +388,14 @@ class ControlTiming(QtWidgets.QWidget):
         g.addWidget(QtWidgets.QLabel("ADC out (EIO):"),5,0)
         self.adc_out_freq_div = QtWidgets.QSpinBox()
         g.addWidget(self.adc_out_freq_div,5,3)
-        self.adc_out_freq_div.settingsName = "ADC output (EIO) frequency divisor"
+        self.adc_out_freq_div.settingsName = "ADC output (EIO) frequency divider"
         self.adc_out_freq_div.setMinimum(1)
         self.adc_out_freq_div.setMaximum(254)
-        self.adc_out_freq_div.setToolTip("Divisor for the ADC output frequency going to the EIO connector. Only available from FW version 105. Must be an even number up to 254 or 1!")
-        self.adc_out_freq_div.lineEdit().returnPressed.connect(self.gui.call(lambda: self.gui.camera.set_eio_adc_clock_divider(self.adc_out_freq_div.value())))
-        
+        self.adc_out_freq_div.setSingleStep(1)
+        self.adc_out_freq_div.setToolTip("Divider for the ADC output frequency going to the EIO connector. Only available from FW version 105. Must be an even number up to 254 or 1!")
+        self.adc_out_freq_div.lineEdit().returnPressed.connect(self.setEioAdcClockDivider)
+        self.adc_out_freq_div.valueChanged.connect(self.setEioAdcClockDivider)
+
         l.addStretch(1)
 
         l = QtWidgets.QVBoxLayout()
@@ -522,19 +541,9 @@ class ControlTiming(QtWidgets.QWidget):
         self.camtimer0_gate_inverted.setToolTip("Camera timer #0 gate is inverted")
         self.camtimer0_gate_inverted.settingsName = "Camera timer #0 gate inverted"
 
-        self.clear_gate = QtWidgets.QPushButton("Clear gate")
-        g.addWidget(self.clear_gate)
-        self.clear_gate.setToolTip("Clear the gate signal by software")
-
-        gate_func_clear = self.gui.call(lambda: self.gui.camera.setGate(externalGateEnabled = self.external_gate_nabled.isChecked(), \
-                                                                        externalGateInverted = self.external_gate_inverted.isChecked(), \
-                                                                        internalGateEnabled = self.internal_gate_enabled.isChecked(), \
-                                                                        internalGateInverted = self.internal_gate_inverted.isChecked(), \
-                                                                        camTimer0Enabled = self.camtimer0_gate_enabled.isChecked(), \
-                                                                        camTimer0Inverted = self.camtimer0_gate_inverted.isChecked(),
-                                                                        clear=True))
-        self.clear_gate.clicked.connect(gate_func_clear)
-
+        self.sw_gate = QtWidgets.QCheckBox("Software (manual) gate")
+        self.sw_gate.setToolTip("Manually set the gate (ORed to the other 3 signals)")
+        g.addWidget(self.sw_gate)
 
         gate_func = self.gui.call(lambda: self.gui.camera.setGate(externalGateEnabled = self.external_gate_nabled.isChecked(), \
                                                                   externalGateInverted = self.external_gate_inverted.isChecked(), \
@@ -542,13 +551,14 @@ class ControlTiming(QtWidgets.QWidget):
                                                                   internalGateInverted = self.internal_gate_inverted.isChecked(), \
                                                                   camTimer0Enabled = self.camtimer0_gate_enabled.isChecked(), \
                                                                   camTimer0Inverted = self.camtimer0_gate_inverted.isChecked(),
-                                                                  clear=False))
+                                                                  swGate=self.sw_gate.isChecked()))
         self.external_gate_enabled.stateChanged.connect(gate_func)
         self.external_gate_inverted.stateChanged.connect(gate_func)
         self.internal_gate_enabled.stateChanged.connect(gate_func)
         self.internal_gate_inverted.stateChanged.connect(gate_func)
         self.camtimer0_gate_enabled.stateChanged.connect(gate_func)
         self.camtimer0_gate_inverted.stateChanged.connect(gate_func)
+        self.sw_gate.stateChanged.connect(gate_func)
         
         
 

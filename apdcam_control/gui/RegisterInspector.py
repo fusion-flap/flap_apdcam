@@ -1,5 +1,6 @@
 import sys
 from functools import partial
+import re
 
 import importlib
 from .QtVersion import QtVersion
@@ -15,6 +16,63 @@ from ..APDCAM10G_control import *
 
 
 class RegisterInspector(QtWidgets.QWidget):
+    class RegisterSearch:
+
+        def __init__(self,pattern,regexp=False,name=True,description=True,tooltip=True):
+            """
+            Parameters:
+            ^^^^^^^^^^^
+            pattern       - a regular expression string
+            regexp        - (bool): treat 'pattern' as a regular expression
+            name          - (bool): search in register name
+            descritiption - (bool): search in description
+            tooltip       - (bool): search in tooltip
+            """
+            self.pattern = pattern
+            self.regexp = regexp
+            self.searchRegisterName = name
+            self.searchDescription = description
+            self.searchTooltip = tooltip
+
+        def __call__(self,registerName,register):
+
+            regexp = None
+            if self.regexp:
+                regexp = re.compile(self.pattern)
+
+            if self.searchRegisterName:
+                if self.regexp and regexp.search(registerName) is not None:
+                    return True
+                if not self.regexp and registerName.lower().find(self.pattern.lower()) >= 0:
+                    return True
+
+            if self.searchDescription:
+                if self.regexp and regexp.search(register.description) is not None:
+                    return True
+                if not self.regexp and register.description.lower().find(self.pattern.lower()) >= 0:
+                    return True
+
+            if self.searchTooltip:
+                if self.regexp and regexp.search(register.tooltip) is not None:
+                    return True
+                if not self.regexp and register.tooltip.lower().find(self.pattern.lower()) >= 0:
+                    return True
+
+            if type(register.interpreter) == APDCAM10G_register2bits:
+                for b in register.interpreter.bits:
+                    if self.searchDescription:
+                        if self.regexp and regexp.search(b.shortName) is not None:
+                            return True
+                        if not self.regexp and b.shortName.lower().find(self.pattern.lower()) > 0:
+                            return True
+                    if self.searchTooltip:
+                        if self.regexp and regexp.search(b.description) is not None:
+                            return True
+                        if not self.regexp and b.description.lower().find(self.pattern.lower()) > 0:
+                            return True
+                
+            return False
+
     def __init__(self,parent,gui):
         self.gui = gui
         super(RegisterInspector,self).__init__(parent)
@@ -22,73 +80,35 @@ class RegisterInspector(QtWidgets.QWidget):
         self.setLayout(layout)
         #layout.addStretch(1)
 
-        l1 = QtWidgets.QHBoxLayout()
-        layout.addLayout(l1)
 
-        self.cardSelector = QtWidgets.QComboBox()
-        # if you change these labels, update the function getRegister!
-        self.cardSelector.addItem("Choose card")
-        self.cardSelector.addItem("ADC1")
-        self.cardSelector.addItem("ADC2")
-        self.cardSelector.addItem("ADC3")
-        self.cardSelector.addItem("ADC4")
-        self.cardSelector.addItem("Power and control card (PC)")
-        self.cardSelector.addItem("Communication Card (CC) settings")
-        self.cardSelector.addItem("Communication Card (CC) variables")
-        self.cardSelector.insertSeparator(1)
-        l1.addWidget(self.cardSelector)
+        searchLayout = QtWidgets.QHBoxLayout()
+        layout.addLayout(searchLayout)
 
-        l1.addStretch(1)
-        l1.addWidget(QtWidgets.QLabel("Register:"))
-        self.register = QtWidgets.QLineEdit()
-        self.register.setToolTip("Specify the register address (either decimal or hex format), according to the tables in \"APDCAM-10G user's guide\"!")
-        self.register.returnPressed.connect(self.getRegister)
-        l1.addWidget(self.register)
+        searchLayout.addWidget(QtWidgets.QLabel("Pattern:"))
 
-        l1.addStretch(1)
-        l1.addWidget(QtWidgets.QLabel("Number of bytes:"))
-        self.numberOfBytes = QtWidgets.QSpinBox()
-        self.numberOfBytes.setMinimum(1)
-        self.numberOfBytes.setFixedWidth(150)
-        self.numberOfBytes.lineEdit().returnPressed.connect(self.getRegister)
-        l1.addWidget(self.numberOfBytes)
+        self.searchPattern = QtWidgets.QLineEdit()
+        searchLayout.addWidget(self.searchPattern)
+        self.searchPattern.setToolTip("Search string or regular expression")
+        self.searchPattern.returnPressed.connect(self.showRegisterSearch)
 
-        l1.addStretch(1)
-        self.endian = QtWidgets.QComboBox()
-        self.endian.addItem("LSB")
-        self.endian.addItem("MSB")
-        l1.addWidget(self.endian)
+        self.searchRegexp = QtWidgets.QCheckBox("Regular expression")
+        searchLayout.addWidget(self.searchRegexp)
 
-        l1.addStretch(1)
-        self.getRegisterButton = QtWidgets.QPushButton("Get register")
-        l1.addWidget(self.getRegisterButton)
-        self.getRegisterButton.clicked.connect(self.getRegister)
+        self.searchName = QtWidgets.QCheckBox("Search register names")
+        self.searchName.setChecked(True)
+        searchLayout.addWidget(self.searchName)
 
-        l1.addStretch(20)
+        self.searchDescription = QtWidgets.QCheckBox("Search descriptions")
+        self.searchDescription.setChecked(True)
+        searchLayout.addWidget(self.searchDescription)
 
-        l2 = QtWidgets.QGridLayout()
-        layout.addLayout(l2)
+        self.searchTooltip = QtWidgets.QCheckBox("Search tooltips")
+        self.searchTooltip.setChecked(True)
+        searchLayout.addWidget(self.searchTooltip)
 
-        l2.addWidget(QtWidgets.QLabel("Bytes:"),0,0)
-        self.registerValueBytes = QtWidgets.QLineEdit()
-        readOnly(self.registerValueBytes)
-        l2.addWidget(self.registerValueBytes,0,1)
-
-        l2.addWidget(QtWidgets.QLabel("Bytes (binary):"),1,0)
-        self.registerValueBytesBinary = QtWidgets.QLineEdit()
-        readOnly(self.registerValueBytesBinary)
-        l2.addWidget(self.registerValueBytesBinary,1,1)
-
-        l2.addWidget(QtWidgets.QLabel("Integer value:"),2,0)
-        self.registerValueInt = QtWidgets.QLineEdit()
-        self.registerValueInt.setFixedWidth(150)
-        readOnly(self.registerValueInt)
-        l2.addWidget(self.registerValueInt,2,1)
-
-        l2.addWidget(QtWidgets.QLabel("As string: "),3,0)
-        self.registerValueAsString = QtWidgets.QLineEdit()
-        readOnly(self.registerValueAsString)
-        l2.addWidget(self.registerValueAsString,3,1)
+        self.searchButton = QtWidgets.QPushButton("Search registers")
+        searchLayout.addWidget(self.searchButton)
+        self.searchButton.clicked.connect(self.showRegisterSearch)
 
         buttons = QtWidgets.QHBoxLayout()
         layout.addLayout(buttons)
@@ -104,6 +124,9 @@ class RegisterInspector(QtWidgets.QWidget):
         self.showADC4RegistersButton = QtWidgets.QPushButton("ADC4 registers")
         buttons.addWidget(self.showADC4RegistersButton)
         self.showADC4RegistersButton.clicked.connect(lambda: self.showAdcRegisterTable(4))
+        self.showPCRegistersButton = QtWidgets.QPushButton("PC registers")
+        buttons.addWidget(self.showPCRegistersButton)
+        self.showPCRegistersButton.clicked.connect(self.showPcRegisterTable)
         self.showCCSettingsButton = QtWidgets.QPushButton("CC settings")
         buttons.addWidget(self.showCCSettingsButton)
         self.showCCSettingsButton.clicked.connect(self.showCCSettingsTable)
@@ -120,31 +143,102 @@ class RegisterInspector(QtWidgets.QWidget):
         self.registerTableLayout.setContentsMargins(0,0,0,0)
         self.registerTableLayout.setSpacing(0)
         self.registerTableWidget.setLayout(self.registerTableLayout)
-        #layout.addStretch(10)
+
+    def showRegisterSearch(self):
+        #self.gui.camera.ADC_register_table = APDCAM10G_adc_registers_v1()
+        #self.gui.camera.CC_settings_table  = APDCAM10G_cc_settings_v1()
+        #self.gui.camera.CC_variables_table = APDCAM10G_cc_variables_v1()
+        #self.gui.camera.PC_register_table  = APDCAM10G_pc_registers_v1()
+
+        pattern = self.searchPattern.text()
+        regexp = self.searchRegexp.isChecked()
+        name = self.searchName.isChecked()
+        description = self.searchDescription.isChecked()
+        tooltip = self.searchTooltip.isChecked()
+
+        self.clearRegisterTableDisplay()
+
+        found = False
+
+        register_table = self.gui.camera.ADC_register_table.filter(self.RegisterSearch(pattern=pattern,regexp=regexp,name=name,description=description,tooltip=tooltip))
+        nbytes = register_table.size()
+        if nbytes > 0:
+            found = True
+            for i_adc in range(len(self.gui.camera.status.ADC_address)):
+                adc_address = self.gui.camera.status.ADC_address[i_adc]
+                err,d = self.gui.camera.readPDI(adc_address,0,numberOfBytes=nbytes,arrayData=True)
+                #err = ''
+                #d = [bytearray(nbytes)]
+                if err != "":
+                    self.gui.show_error(err)
+                else:
+                    self.showRegisterTable(register_table,d[0],title='ADC ' + str(i_adc+1) + ' registers',clear=False)
+
+        register_table = self.gui.camera.PC_register_table.filter(self.RegisterSearch(pattern=pattern,regexp=regexp,name=name,description=description,tooltip=tooltip))
+        nbytes = register_table.size()
+        if nbytes > 0:
+            found = True
+            err,d = self.gui.camera.readPDI(self.gui.camera.codes_PC.PC_CARD,0,numberOfBytes=nbytes,arrayData=True)
+            #err = ''
+            #d = [bytearray(nbytes)]
+            if err != "":
+                self.gui.show_error(err)
+            else:
+                self.showRegisterTable(register_table,d[0],title='PC card registers',clear=False)
+
+        register_table = self.gui.camera.CC_settings_table.filter(self.RegisterSearch(pattern=pattern,regexp=regexp,name=name,description=description,tooltip=tooltip))
+        nbytes = register_table.size()
+        if nbytes > 0:
+            found = True
+            err= self.gui.camera.readCCdata(dataType=0)
+            #err = ''
+            if err != "":
+                self.gui.show_error(err)
+            else:
+                self.showRegisterTable(register_table,self.gui.camera.status.CC_settings,title='Communication & Control Card settings',clear=False)
+
+        register_table = self.gui.camera.CC_variables_table.filter(self.RegisterSearch(pattern=pattern,regexp=regexp,name=name,description=description,tooltip=tooltip))
+        nbytes = register_table.size()
+        if nbytes > 0:
+            found = True
+            err= self.gui.camera.readCCdata(dataType=1)
+            #err = ''
+            if err != "":
+                self.gui.show_error(err)
+            else:
+                self.showRegisterTable(register_table,self.gui.camera.status.CC_settings,title='Communication & Control Card variables',clear=False)
+
+        if not found:
+            self.registerTableLayout.addWidget(QtWidgets.QLabel("No matches found"),self.registerTableLayout.rowCount(),0,1,5)
+
 
     def showAdcRegisterTable(self,adcNumber):
 
         adcNumber -= 1
 
-        err,d = self.gui.camera.readPDI(self.gui.camera.status.ADC_address[adcNumber],0,numberOfBytes=266,arrayData=True)
         register_table = self.gui.camera.ADC_register_table
-
-        # err = ""
-        # d = bytearray(266)
-        # for i in range(266):
-        #     d[i] = i%256
-        # d = [d]
-        # register_table = APDCAM10G_adc_register_table_v1()
+        err,d = self.gui.camera.readPDI(self.gui.camera.status.ADC_address[adcNumber],0,numberOfBytes=register_table.size(),arrayData=True)
             
         if err != "":
             self.gui.show_error(err)
         else:
             self.showRegisterTable(register_table,d[0])
 
+    def showPcRegisterTable(self):
+
+        register_table = self.gui.camera.PC_register_table
+        err,d = self.gui.camera.readPDI(self.gui.camera.codes_PC.PC_CARD,0,numberOfBytes=register_table.size(),arrayData=True)
+            
+        if err != "":
+            self.gui.show_error(err)
+        else:
+            self.showRegisterTable(register_table,d[0])
+            
+
     def showCCSettingsTable(self):
 
-        err= self.gui.camera.readCCdata(dataType=0)
         register_table = self.gui.camera.CC_settings_table
+        err= self.gui.camera.readCCdata(dataType=0)
 
         if err != "":
             self.gui.show_error(err)
@@ -161,8 +255,7 @@ class RegisterInspector(QtWidgets.QWidget):
         else:
             self.showRegisterTable(register_table,self.gui.camera.status.CC_settings)
             
-
-    def showRegisterTable(self,regtable,data):
+    def clearRegisterTableDisplay(self):
         # Clear the regtable layout
         for i in reversed(range(self.registerTableLayout.count())):
             self.registerTableLayout.itemAt(i).widget().deleteLater()
@@ -170,25 +263,23 @@ class RegisterInspector(QtWidgets.QWidget):
 
         def addHeader(layout,text,cell):
             w = QtWidgets.QLabel(text)
-            w.setStyleSheet("font-weight:bold")
+            w.setStyleSheet("font-weight:bold; padding-left: 3px; padding-right: 3px; background-color: rgb(180,180,220); ")
+            w.setLineWidth(1)
             layout.addWidget(w,0,cell)
         addHeader(self.registerTableLayout,"Symbol",0)
         addHeader(self.registerTableLayout,"Address",1)
         addHeader(self.registerTableLayout,"Num. bytes",2)
-        addHeader(self.registerTableLayout,"Description",3)
-        addHeader(self.registerTableLayout,"Value(s)",4)
+        addHeader(self.registerTableLayout,"Byte order",3)
+        addHeader(self.registerTableLayout,"Description",4)
+        addHeader(self.registerTableLayout,"Value(s)",5)
 
-        # collect register names (symbols) and their addresses in two parallel arrays for sorting
-        # (because 'dir' is in alphabetic order, and we want to list in the order of address)
-        regnames = []
-        addresses = []
-        for regname in dir(regtable):
-            # skip attributes starting with _ or not being fully uppercase
-            if regname.startswith("_") or regname.upper() != regname:
-                continue
-            regnames.append(regname)
-            r = getattr(regtable,regname)
-            addresses.append(r.startByte)
+    def showRegisterTable(self,regtable,data,title='',clear=True):
+        """
+        Show a register table 'regtable', evaluated on the byte array 'data', in the register table display area of the GUI.
+        """
+
+        if clear:
+            self.clearRegisterTableDisplay()
             
         style = """
         QCheckBox, QLineEdit, QDoubleSpinBox, QSpinBox, QLabel, QFrame {
@@ -199,19 +290,37 @@ class RegisterInspector(QtWidgets.QWidget):
         }
         """
 
+        styleTitle = """
+        QCheckBox, QLineEdit, QDoubleSpinBox, QSpinBox, QLabel, QFrame {
+        background-color: rgb(220,220,240);
+        font-weight: bold;
+        }
+        QToolTip {
+        background-color: black;
+        }
+        """
 
-        line = 1
-        for aaa in sorted(zip(addresses,regnames)):
-            regname = aaa[1]
+        
+        line = self.registerTableLayout.rowCount()
 
-            lll = QtWidgets.QLabel(regname)
+        if title != '':
+            t = QtWidgets.QLabel(title)
+            t.setStyleSheet(styleTitle)
+            t.setLineWidth(1)
+            self.registerTableLayout.addWidget(t,line,0,1,6)
+            line += 1
+
+        registerNames = regtable.registerNames()
+        for registerName in registerNames:
+
+            lll = QtWidgets.QLabel(registerName)
             lll.setFrameStyle(QtWidgets.QFrame.Box)
             lll.setLineWidth(1)
             if line%2==1:
                 lll.setStyleSheet(style)
             self.registerTableLayout.addWidget(lll,line,0)
 
-            reg = getattr(regtable,regname)
+            reg = getattr(regtable,registerName)
 
             tmp = str(reg.startByte)
             try:
@@ -232,12 +341,31 @@ class RegisterInspector(QtWidgets.QWidget):
                 lll.setStyleSheet(style)
             self.registerTableLayout.addWidget(lll,line,2)
 
-            lll = QtWidgets.QLabel(str(reg.description))
+            byteorder = ''
+            if hasattr(reg.interpreter,'byteOrder'):
+                if reg.interpreter.byteOrder == 'big':
+                    byteorder = 'MSB'
+                elif reg.interpreter.byteOrder == 'little':
+                    byteorder = 'LSB'
+                else:
+                    byteorder = reg.interpreter.byteOrder
+            if hasattr(reg.interpreter,'byteOrderNotKnown') and reg.interpreter.byteOrderNotKnown==True:
+                byteorder += " (???)"
+            lll = QtWidgets.QLabel(byteorder)
+            lll.setFrameStyle(QtWidgets.QFrame.Box)
+            lll.setLineWidth(1)
+            if hasattr(reg.interpreter,'byteOrderNotKnown') and reg.interpreter.byteOrderNotKnown==True:
+                lll.setStyleSheet("QLabel { color: red; }")
+            self.registerTableLayout.addWidget(lll,line,3)
+
+            lll = QtWidgets.QLabel(str(reg.description + (' (see tooltip)' if reg.tooltip!='' else '')))
             lll.setFrameStyle(QtWidgets.QFrame.Box)
             lll.setLineWidth(1)
             if line%2==1:
                 lll.setStyleSheet(style)
-            self.registerTableLayout.addWidget(lll,line,3)
+            if reg.tooltip != '':
+                lll.setToolTip(reg.tooltip)
+            self.registerTableLayout.addWidget(lll,line,4)
 
             lll = QtWidgets.QFrame()
             lll.setFrameStyle(QtWidgets.QFrame.Box)
@@ -246,7 +374,7 @@ class RegisterInspector(QtWidgets.QWidget):
                 lll.setStyleSheet(style)
             values = reg.value(data)
             lll.setLayout(QtWidgets.QVBoxLayout())
-            self.registerTableLayout.addWidget(lll,line,4)
+            self.registerTableLayout.addWidget(lll,line,5)
             lineindex=0
             for value_line in values:
                 hhh = QtWidgets.QHBoxLayout()
@@ -269,76 +397,3 @@ class RegisterInspector(QtWidgets.QWidget):
 
             line += 1
 
-    def getRegister(self):
-        reg_address = self.register.text()
-        try:
-            if reg_address.find("0x") == 0:
-                reg_address = int(reg_address,16)
-            else:
-                reg_address = int(reg_address,10)
-        except:
-            self.gui.show_error("Register address can not be interpreted (must be an integer in either hex or dec format)")
-            return
-            
-        n = self.numberOfBytes.value()
-
-        data = None
-        card = self.cardSelector.currentText()
-        if card.find("ADC") == 0 or card == "Power and control card (PC)":
-            card_address = 0
-            if card == "ADC1":
-                card_address = self.gui.camera.status.ADC_address[0]
-            elif card == "ADC2":
-                card_address = self.gui.camera.status.ADC_address[1]
-            elif card == "ADC3":
-                card_address = self.gui.camera.status.ADC_address[2]
-            elif card == "ADC4":
-                card_address = self.gui.camera.status.ADC_address[3]
-            else:
-                card_address = 2
-
-            err,d = self.gui.camera.readPDI(card_address,reg_address,n,arrayData=True)
-            if err != "":
-                self.gui.show_error(err)
-                return
-            data = d[0]
-
-        elif card == "Communication Card (CC) settings":
-            self.gui.camera.readCCdata(dataType=0)
-            data = self.gui.camera.status.CC_settings[reg_address-2:reg_address-2+n] # CC_settings stores the registers starting at offset 2, so we need to subtract i
-        elif card == "Communication Card (CC) variables":
-            self.gui.camera.readCCdata(dataType=1)
-            data = self.gui.camera.status.CC_variables[reg_address:reg_address+n]
-        else:
-            self.gui.show_warning("Please choose a card")
-            return
-            
-
-        t_int = ""
-        t_bin = ""
-        for i in range(self.numberOfBytes.value()):
-            if i>0:
-                t_int += " "
-                t_bin += " "
-            t_int += str(data[i])
-            t_bin += bin(data[i])[2:].zfill(8)
-        self.registerValueBytes.setText(t_int)
-        self.registerValueBytesBinary.setText(t_bin)
-        self.registerValueInt.setText(str(int.from_bytes(data,'little' if self.endian.currentText()=="LSB" else 'big')))
-
-        self.registerValueAsString.setText("")
-        try:
-            self.registerValueAsString.setText(data.decode())
-        except:
-            self.registerValueAsString.setText("-- Failed to convert --")
-
-        # font = QtGui.QFont("", 0)
-        # fm = QtGui.QFontMetrics(font)
-        # pixelsWide = fm.width(self.registerValueBytes.text())
-        # self.registerValueBytes.setFixedWidth(int(pixelsWide*1.1+20))
-        # pixelsWide = fm.width(self.registerValueBytesBinary.text())
-        # self.registerValueBytesBinary.setFixedWidth(int(pixelsWide*1.1+20))
-        # pixelsWide = fm.width(self.registerValueInt.text())
-        # self.registerValueInt.setFixedWidth(int(pixelsWide*1.1+20))
-        # pixelsWide = fm.width(self.registerValueAsString.text())
-        # self.registerValueAsString.setFixedWidth(int(pixelsWide*1.1+20))

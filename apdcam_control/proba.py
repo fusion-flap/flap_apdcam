@@ -1,20 +1,13 @@
-class register_bits:
-    def __init__(self, firstBit, lastBit, shortName, description):
-        self.firstBit = firstBit
-        self.lastBit  = lastBit
-        self.shortName = shortName
-        self.description = description
+class A:
+    def func(self,a):
+        print(a)
 
-class register:
-    def __init__(self,bits):
-        self.bits = bits
+    def __init__(self):
+        self.variable = "variable"
+        self.func = lambda a: print("Overwritten func: " + str(a) + " " + str(self.variable) + str(B().aaa))
 
-class register_table:
-    b = register_bits
-    R1 = register(b(1,2,"short","desc"))
+class B:
+    aaa = "aaa"
 
-regtable = register_table()
-print(regtable.R1.bits.firstBit)
-print(regtable.R1.bits.lastBit)
-print(regtable.R1.bits.shortName)
-print(regtable.R1.bits.description)
+a = A()
+a.func("egy")

@@ -28,6 +28,7 @@ import xml.etree.ElementTree as ET
 import socket
 import os
 import numpy as np
+from datetime import date
 #import struct
 #import sys
 
@@ -5226,6 +5227,116 @@ class APDCAM10G_control:
 
         #return True/False
         return (error,bool(status[0] & 1))
+
+    def loadfup(self,filename,reconnect,logger=None,progress=None):
+        """
+        Load a firmware upgrade (fup) to the camera.
+
+        Parameters:
+        ^^^^^^^^^^^
+        filename  - the firmware upgrade filename
+        reconnect - (bool) if true, connection to the camera is closed and reopened
+        logger    - a function (taking a string argument) to log/display messages. 
+        progress  - a function (taking a floating point argument between 0..1) which is called during the upgrade
+                    to indicate progress
+        """
+
+        log = lambda m: logger(m) if (logger!=None) else 0
+
+        if filename=='':
+            log("No firmware file is chosen")
+            return "No firmware file is chosen"
+        filesize = os.path.getsize(filename)
+        log("Opening '" + filename + "'")
+        try:
+            file = open(filename,'rb') # open in binary mode
+        except:
+            log("File '" + filename + "' could not be opened")
+            return "File '" + filename + "' could not be opened"
+        n = 1024
+        addr = 0
+        data = file.read(n)
+        log("Uploading firmware to the camera")
+        while data:
+            cmdData = addr.to_bytes(length=4,byteorder='big') + data
+            # add a 'loadfup' instruction to the instruction queue, but do not send it yet
+            err1 = self.sendCommand(self.codes_CC.OP_LOADFUP,cmdData,sendImmediately=False)
+            # add a 'sendack' instruction with a code (0x801) to request FUP checksum. It is invalid yet, so we only wait for the
+            # answer before we continue with the next chunk of the file, but ignore the received data
+            err2 = self.sendCommand(self.codes_CC.OP_SENDACK,0x801.to_bytes(length=2,byteorder='big'),sendImmediately=True)
+            if err1!="" or err2!="":
+                log("Failed to load firmware to camera")
+                return "Failed to load firmware to the camera"
+            err3,d = self.getAnswer()
+            if err3!="" or d==None:
+                log("Did not receive answer from camera, failed to load firmware")
+                return "Did not receive answer from camera, failed to load firmware"
+            d = d[22:len(d)] # skip CC header
+            response = int.from_bytes(d[0:2],'big',signed=False)
+            if response != self.codes_CC.AN_ACK:
+                log("Unexpected response from camera, failed to load firmware")
+                return "Unexpected response from camera, failed to load firmware"
+            addr += len(data) # advance the address (data location) within the file
+            data = file.read(n)
+            if progress!=None:
+                progress(addr/filesize)
+            print(addr)
+
+        log("Firmware uploaded.")
+    
+        today = date.today()
+        data = today.year.to_bytes(length=2,byteorder='big') + today.month.to_bytes(length=1) + today.day.to_bytes(length=1)
+        err = self.sendCommand(self.codes_CC.OP_STARTFUP,data,sendImmediately=True)
+        if err!="":
+            log("Error: " + err + ". Firmware not upgraded.")
+            return "Error: " + err + ". Firmware not upgraded."
+        time.sleep(1)
+        err, d = self.getAnswer()
+        if err!="":
+            log("Error getting answer from the camera. Firmware not upgraded.")
+            return "Error getting answer from the camera. Firmware not upgraded."
+        d = d[22:len(d)]
+        response = int.from_bytes(d[0:2],'big',signed=False)
+        if response != self.codes_CC.AN_ACK:
+            log("Did not receive the expected answer from the camera. Firmware not upgraded.")
+            return "Did not receive the expected answer from the camera. Firmware not upgraded."
+        type = int.from_bytes(d[4:6],'big',signed=False)
+        if type != 0x801:
+            log("Answer type is not FUPCHECKSUM. Firmware not upgraded.")
+            return "Answer type is not FUPCHECKSUM. Firmware not upgraded."
+        chksum = int.from_bytes(d[6:10],'big',signed=False)
+        if chksum!=0:
+            log("Incorrect checksum. Firmware not upgraded.")
+            return "Incorrect checksum. Firmware not upgraded."
+        log("Checksum is ok. Upgrade is in progress")
+
+        ok = False
+        for i in range(30):
+            time.sleep(3)
+            log("Querying camera...")
+            err = self.sendCommand(self.codes_CC.OP_SENDACK,0x801.to_bytes(length=2,byteorder='big'),sendImmediately=True)
+            if err!="":
+                log("Failed to send query to camera")
+                return "Failed to send query to camera"
+            # Do not check content, only wait for an answer
+            err,d = self.getAnswer()
+            if err=="" and d!=None:
+                # if 
+                ok = True
+                break
+        if not ok:
+            log("Did not receive a response from the camera, firmware upgrade most probably failed")
+            return "Did not receive a response from the camera, firmware upgrade most probably failed"
+
+        if reconnect:
+            log("Closing connection to the camera")
+            self.close()
+            time.sleep(0.5)
+            log("Reopening connection to the camera")
+            self.connect(self.APDCAM_IP)
+        return ""
+
+    
 
 # end of class controller
 

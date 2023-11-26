@@ -22,7 +22,7 @@ from .Infrastructure import Infrastructure
 from .AdcControl import AdcControl
 from .ControlTiming import ControlTiming
 from .CameraTimer import CameraTimer
-from .FactoryTest import FactoryTest
+from .Factory import Factory
 from .Plot import Plot
 from .SimpleMeasurementControl import SimpleMeasurementControl
 from .GuiMode import *
@@ -195,7 +195,10 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.expertTabs = QtWidgets.QTabWidget(self)
         self.expertTabs.guiMode = GuiMode.expert
         layout.addWidget(self.expertTabs, 1, 0)
-        self.expertTabs.addTab(MainPage(self),"Main")
+
+        self.main = MainPage(self)
+        self.expertTabs.addTab(self.main,"Main")
+        self.main.settingsSection = "Main"
 
         self.infrastructure = Infrastructure(self)
         self.expertTabs.addTab(self.infrastructure,"Infrastructure")
@@ -230,10 +233,11 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.diagnostics.settingsSection = "Diagnostics"
 
 
-        fs = FactoryTest(self)
-        fs.guiMode = GuiMode.factory
-        fs.setEnabled = types.MethodType(setTabEnabled,fs)
-        self.expertTabs.addTab(fs,"Factory test")
+        self.factory = Factory(self)
+        #self.factory.guiMode = GuiMode.factory
+        #self.factory.setEnabled = types.MethodType(setTabEnabled,self.factory)
+        self.expertTabs.addTab(self.factory,"Factory tools")
+        self.factory.settingsSection = "Factory"
 
         self.expertTabs.currentChanged.connect(self.onTabChange)
 

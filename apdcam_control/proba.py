@@ -1,13 +1,10 @@
-class A:
-    def func(self,a):
-        print(a)
 
-    def __init__(self):
-        self.variable = "variable"
-        self.func = lambda a: print("Overwritten func: " + str(a) + " " + str(self.variable) + str(B().aaa))
+def loggerfunc(m):
+    print(m)
 
-class B:
-    aaa = "aaa"
+logger = None
 
-a = A()
-a.func("egy")
+log = lambda m: logger(m) if (logger!=None) else 1
+
+
+log("Hello")

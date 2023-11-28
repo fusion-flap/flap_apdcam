@@ -5302,7 +5302,6 @@ class APDCAM10G_control:
             data = file.read(n)
             if progress!=None:
                 progress(addr/filesize)
-            print(addr)
 
         log("Firmware uploaded.")
     
@@ -5330,7 +5329,8 @@ class APDCAM10G_control:
         if chksum!=0:
             log("Incorrect checksum. Firmware not upgraded.")
             return "Incorrect checksum. Firmware not upgraded."
-        log("Checksum is ok. Upgrade is in progress")
+        log("Checksum is ok. Upgrade is in progress. Please wait")
+        time.sleep(15)
 
         ok = False
         for i in range(30):
@@ -5341,14 +5341,16 @@ class APDCAM10G_control:
                 log("Failed to send query to camera")
                 return "Failed to send query to camera"
             # Do not check content, only wait for an answer
+            time.sleep(1)
             err,d = self.getAnswer()
             if err=="" and d!=None:
-                # if 
                 ok = True
                 break
         if not ok:
             log("Did not receive a response from the camera, firmware upgrade most probably failed")
             return "Did not receive a response from the camera, firmware upgrade most probably failed"
+        else:
+            log("Firmware upgrade completed, you can not restart the camera or the GUI")
 
         if reconnect:
             log("Closing connection to the camera")

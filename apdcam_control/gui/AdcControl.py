@@ -748,7 +748,7 @@ class Adc(QtWidgets.QWidget):
         if err=="":
             i = self.bits.findText(str(bits))
             if i<0:
-                self.show_error("Invalid resolution obtained from camera: " + str(bits))
+                self.gui.show_error("Invalid resolution obtained from camera: " + str(bits))
             else:
                 self.bits.blockSignals(True)
                 self.bits.setCurrentIndex(i)

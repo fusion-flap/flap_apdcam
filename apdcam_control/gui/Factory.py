@@ -85,12 +85,12 @@ class Factory(QtWidgets.QWidget):
         filename = self.fwCCFilename.text()
         print(filename)
         self.gui.camera.loadfup(filename,reconnect=False,\
-                                logger  = lambda m  : [print(m)], \
-                                progress= lambda val: print("Status: " + str(val*100) + "%" ) )
+                                logger  = lambda m  : [print(m),self.gui.show_message(m)], \
+                                progress= lambda val: self.uploadCCFirmwareProgressbar.setValue(int(val*100)) )
         
-        self.gui.main.cameraOff()
-        time.sleep(0.5)
-        self.gui.main.cameraOn()
-        print("Camera restarted")
+#        self.gui.main.cameraOff()
+#        time.sleep(0.5)
+#        self.gui.main.cameraOn()
+#        print("Camera restarted")
         #self.uploadCCFirmwareButton.clicked.connect(self.uploadCCFirmware)
         #self.uploadCCFirmwareButton.setStyleSheet("")

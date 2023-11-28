@@ -1465,12 +1465,8 @@ class APDCAM10G_codes_v1:
     CC_REGISTER_25V = 281-7
     CC_DATATYPE_25V = 1
 
-    # Must be a typo... 1.8 V and not 1.2 V! (corrected by D. Barna)
-#    CC_REGISTER_12VXC = 283-7
-#    CC_DATATYPE_12VXC = 1
     CC_REGISTER_18VXC = 283-7
     CC_DATATYPE_18VXC = 1
-
     CC_REGISTER_12VST = 285-7
     CC_DATATYPE_12VST = 1
     CC_REGISTER_PLLSTAT = 194-7
@@ -1665,6 +1661,32 @@ class APDCAM10G_codes_v2:
     CC_DATATYPE_CAMNROFPULSES = 0
     CC_CAMTIMER_OFFSET = 12
 
+    # These addresses are valid for Variables block 
+    # For the Variables registers the address is calculated from the Variables table as <byte address>   
+    CC_REGISTER_BOARDTEMP = 276-7
+    CC_DATATYPE_BOARDTEMP = 1
+    CC_REGISTER_MAXBOARDTEMP = 302-7
+    CC_DATATYPE_MAXBOARDTEMP = 1
+    CC_REGISTER_33V = 279-7
+    CC_DATATYPE_33V = 1
+    CC_REGISTER_25V = 281-7
+    CC_DATATYPE_25V = 1
+
+    CC_REGISTER_18VXC = 283-7
+    CC_DATATYPE_18VXC = 1
+    CC_REGISTER_12VST = 285-7
+    CC_DATATYPE_12VST = 1
+    CC_REGISTER_PLLSTAT = 194-7
+    CC_DATATYPE_PLLSTAT = 1
+    CC_REGISTER_EXTCLKFREQ = 196-7
+    CC_DATATYPE_EXTCLKFREQ = 1
+    CC_REGISTER_STATUS = 215-7
+    CC_DATATYPE_STATUS = 1
+    CC_REGISTER_STREAM_TX_FRAMES = 127 - 7
+    CC_DATATYPE_STREAM_TX_FRAMES = 1
+    
+    
+    
     
 class APDCAM10G_ADCcodes_v1 :  
     """

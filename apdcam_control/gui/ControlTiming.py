@@ -640,19 +640,23 @@ class ControlTiming(QtWidgets.QWidget):
         self.extSample.blockSignals(False)
 
         # Trigger settings
-        reg = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_TRIGSTATE]
-        self.trigPlus.blockSignals(True)
-        self.trigPlus.setChecked(reg & (1<<0))
-        self.trigPlus.blockSignals(False)
-        self.trigMinus.blockSignals(True)
-        self.trigMinus.setChecked(reg & (1<<1))
-        self.trigMinus.blockSignals(False)
-        self.internalTrig.blockSignals(True)
-        self.internalTrig.setChecked(reg & (1<<2))
-        self.internalTrig.blockSignals(False)
-        self.disableWhileStreamsOff.blockSignals(True)
-        self.disableWhileStreamsOff.setChecked(reg & (1<<6))
-        self.disableWhileStreamsOff.blockSignals(False)
+        if hasattr(self.gui.camera.codes_CC,"CC_REGISTER_TRIGSTATE"):
+            reg = self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_TRIGSTATE]
+            self.trigPlus.blockSignals(True)
+            self.trigPlus.setChecked(reg & (1<<0))
+            self.trigPlus.blockSignals(False)
+            self.trigMinus.blockSignals(True)
+            self.trigMinus.setChecked(reg & (1<<1))
+            self.trigMinus.blockSignals(False)
+            self.internalTrig.blockSignals(True)
+            self.internalTrig.setChecked(reg & (1<<2))
+            self.internalTrig.blockSignals(False)
+            self.disableWhileStreamsOff.blockSignals(True)
+            self.disableWhileStreamsOff.setChecked(reg & (1<<6))
+            self.disableWhileStreamsOff.blockSignals(False)
+        else:
+            self.gui.show_warning("For this firmware I can not query yet the trigger settings")
+
         td = int.from_bytes(self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_TRIGDELAY:self.gui.camera.codes_CC.CC_REGISTER_TRIGDELAY+4],'big',signed=False)
         self.triggerDelay.blockSignals(True)
         self.triggerDelay.setValue(td)

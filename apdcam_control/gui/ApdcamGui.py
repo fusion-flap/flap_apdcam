@@ -68,17 +68,16 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
     def pollCameraStatus(self):
         while True:
+            if self.updateGuiThreadStop:
+                print("Stopping GUI update loop")
+                self.show_message("Stopping GUI update loop")
+                return
 
             # if the camera is disconnected, we break the infinite loop of the update thread
             # and return, terminating the thread
             if not self.status.connected:
                 print("Camera is  disconnected, stopping the GUI update loop")
                 self.show_message("Camera is disconnected, stopping the GUI update loop")
-                return
-
-            if self.updateGuiThreadStop:
-                print("Stopping GUI update loop")
-                self.show_message("Stopping GUI update loop")
                 return
             
             time.sleep(1)
@@ -264,15 +263,16 @@ class ApdcamGui(QtWidgets.QMainWindow):
 
         self.updateGuiThreadStop = True
         self.updateGuiThread = None 
-        #self.startGuiUpdate()
 
         self.adcControl.addAdc(1,1)
+
 
     def exitAAA(self,rc):
         self.stopGuiUpdate(wait=True)
         QtWidgets.QApplication.exit(rc)
 
     def startGuiUpdate(self):
+        return 
         if not self.status.connected:
             self.show_message("Camera is not connected")
             return
@@ -295,7 +295,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
             If True, the function does not return until the periodic gui-update thread stopped
 
         """
-        
+        return
         self.show_message("Signaling the GUI update to stop")
         self.updateGuiThreadStop = True
         self.updateGuiThread = None

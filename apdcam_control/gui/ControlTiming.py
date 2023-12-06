@@ -655,6 +655,11 @@ class ControlTiming(QtWidgets.QWidget):
             self.disableWhileStreamsOff.setChecked(reg & (1<<6))
             self.disableWhileStreamsOff.blockSignals(False)
         else:
+            reg = self.gui.camera.CC_settings.G1TRIGCONTROL
+            data = self.gui.camera.status.CC_settings
+            self.trigPlus.blockSignals(True)
+            self.trigPlus.setChecked(reg.ETR(data))
+            self.trigPlus.blockSignals(False)
             self.gui.show_warning("For this firmware I can not query yet the trigger settings")
 
         td = int.from_bytes(self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_TRIGDELAY:self.gui.camera.codes_CC.CC_REGISTER_TRIGDELAY+4],'big',signed=False)

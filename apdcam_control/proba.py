@@ -1,13 +1,8 @@
 class A:
-    aa = 1
-    def __init__(self):
-        print(self.aa)
-        print(self.bb)
-    bb = 2
+    a = 1
 
 class B(A):
-    cc = 3
+    b = 2
 
-a = A()
-print("---")
 b = B()
+print(isinstance(b,int))

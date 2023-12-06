@@ -18,8 +18,6 @@ TODO:
 
 """
 
-
-
 import threading
 import time
 import copy
@@ -287,9 +285,9 @@ class APDCAM10G_cc_settings_v1(APDCAM10G_register_table):
     BOARD_VERSION  = s(7-7, 10, 'Board type')
     FIRMWARE_GROUP = s(17-7, 30-17+1, 'Firmware group')
     FIRMWARE_GROUP_VERSION = b(31-7,2,'Firmware group version',[['VL',0,7,'Version low'],['VH',8,15,'Version high']],byteOrder='msb')
-    UPGRADEDATE            = b(33-7, 36-33+1,'Upgrade date',[['D',0,7,'Day'],['M',8,15,'Month'],['Y2',16,23,'Year last digit'],['Y1',24,31,'Year 3rd digit']],byteOrder='msb')
+    UPGRADEDATE            = b(33-7, 36-33+1,'Upgrade date',[['D',0,7,'Day'],['M',8,15,'Month'],['Y',16,31,'Year']],byteOrder='msb')
     MAN_FIRMWAREGROUP      = s(37-7,50-37+1,'Manufacturer firmware group')
-    MAN_PROGRAMDATE        = b(51-7,54-51+1,'Manufacturer program date',[['D',0,7,'Day'],['M',8,15,'Month'],['Y2',16,23,'Year 4th digit'],['Y1',24,31,'Year 3rd digit']],byteOrder='msb')
+    MAN_PROGRAMDATE        = b(51-7,54-51+1,'Manufacturer program date',[['D',0,7,'Day'],['M',8,15,'Month'],['Y',16,31,'Year']],byteOrder='msb')
     MAN_SERIAL             = i(55-7,58-55+1,'Manufacturer serial number',byteOrder='msb')
     MAN_TESTRESULT         = i(59-7,62-59+1,'Manufacturer test result',  byteOrder='msb')
     SETTINGS_VERSION       = i(7-7+71-7,1,'Settings version',byteOrder='msb?')
@@ -400,9 +398,9 @@ class APDCAM10G_cc_settings_v2(APDCAM10G_register_table):
     BOARD_VERSION  = s(7-7, 10, 'Board type')
     FIRMWARE_GROUP = s(17-7, 30-17+1, 'Firmware group')
     FIRMWARE_GROUP_VERSION = b(31-7,2,'Firmware group version',[['VL',0,7,'Version low'],['VH',8,15,'Version high']],byteOrder='msb')
-    UPGRADEDATE            = b(33-7, 36-33+1,'Upgrade date',[['D',0,7,'Day'],['M',8,15,'Month'],['Y2',16,23,'Year last digit'],['Y1',24,31,'Year 3rd digit']],byteOrder='msb')
+    UPGRADEDATE            = b(33-7, 36-33+1,'Upgrade date',[['D',0,7,'Day'],['M',8,15,'Month'],['Y',16,31,'Year']],byteOrder='msb')
     MAN_FIRMWAREGROUP      = s(37-7,50-37+1,'Manufacturer firmware group')
-    MAN_PROGRAMDATE        = b(51-7,54-51+1,'Manufacturer program date',[['D',0,7,'Day'],['M',8,15,'Month'],['Y2',16,23,'Year 4th digit'],['Y1',24,31,'Year 3rd digit']],byteOrder='msb')
+    MAN_PROGRAMDATE        = b(51-7,54-51+1,'Manufacturer program date',[['D',0,7,'Day'],['M',8,15,'Month'],['Y',16,31,'Year']],byteOrder='msb')
     MAN_SERIAL             = i(55-7,58-55+1,'Manufacturer serial number',byteOrder='msb')
     MAN_TESTRESULT         = i(59-7,62-59+1,'Manufacturer test result',  byteOrder='msb')
     SETTINGS_VERSION       = i(7-7+71-7,1,'Settings version',byteOrder='msb?')
@@ -649,7 +647,7 @@ class APDCAM10G_cc_variables_v2(APDCAM10G_register_table):
     MANAGE_ETHRX = i(59-7,4,'Management port ethernet RX frames','lsb')
     MANAGE_ETHTX = i(63-7,4,'Management port ethernet TX frames','lsb')
     STREAM_PORT_MAC = mac(71-7,'Stream port MAC address')
-    STREAM_PORT_IP  = ip(77-7,4,'Stream port IPv4 address')
+    STREAM_PORT_IP  = ip(77-7,'Stream port IPv4 address')
     STREAM_PORT_IP_MASK = ip(81-7,'Stream port IPv4 network mask')
     STREAM_PORT_LINK_ON = i(85-7,1,'Stream port link on')
     STREAM_PORT_GW_STATE = i(86-7,1,'Stream port gateway state (0=none, 1=ok, 2=searching MAC, 3=searching IP with DHCP)')
@@ -3514,6 +3512,12 @@ class APDCAM10G_control:
 
         err,adcAddresses = self.adcAddresses(adcBoardNo)
 
+        # Handle the new register table type
+        registerAddress = register
+        if isinstance(register,APDCAM10G_register):
+            registerAddress = register.startByte
+            numberOfBytes = register.numberOfBytes
+
         if type(adcBoardNo) is int:
             (err,data) = self.readPDI(adcAddresses[0],register,numberOfBytes=numberOfBytes,arrayData=False)
             return (err,data[0])
@@ -4390,7 +4394,7 @@ class APDCAM10G_control:
         if hasattr(self.codes_CC,"OP_SETTRIGGER"):
             err = self.sendCommand(self.codes_CC.OP_SETTRIGGER,user_data,sendImmediately=True)
         elif hasattr(self.codes_CC,"OP_SETG1TRIGGERMODULE"):
-            user_data += self.status.CC_settings[self.codes_CC.CC_REGISTER_SAMPLECOUNT,self.codes_CC.CC_REGISTER_SAMPLECOUNT+6]
+            user_data += self.status.CC_settings[self.codes_CC.CC_REGISTER_SAMPLECOUNT:self.codes_CC.CC_REGISTER_SAMPLECOUNT+6]
             err = self.sendCommand(self.codes_CC.OP_SETG1TRIGGERMODULE,user_data,sendImmediately=True)
         if (err != ""):
             error += ("\n" if error != "" else "") + err
@@ -5039,7 +5043,7 @@ class APDCAM10G_control:
             log("Did not receive a response from the camera, firmware upgrade most probably failed")
             return "Did not receive a response from the camera, firmware upgrade most probably failed"
         else:
-            log("Firmware upgrade completed, you can not restart the camera or the GUI")
+            log("Firmware upgrade completed, you can now restart the camera or the GUI")
 
         if reconnect:
             log("Closing connection to the camera")

@@ -18,7 +18,7 @@ from ..APDCAM10G_control import *
 class RegisterInspector(QtWidgets.QWidget):
     class RegisterSearch:
 
-        def __init__(self,pattern,regexp=False,name=True,description=True,tooltip=True):
+        def __init__(self,pattern,regexp=False,name=True,shortDescription=True,longDescription=True):
             """
             Parameters:
             ^^^^^^^^^^^
@@ -31,10 +31,14 @@ class RegisterInspector(QtWidgets.QWidget):
             self.pattern = pattern
             self.regexp = regexp
             self.searchRegisterName = name
-            self.searchDescription = description
-            self.searchTooltip = tooltip
+            self.searchShortDescription = shortDescription
+            self.searchLongDescription = longDescription
 
         def __call__(self,register):
+
+            #print("-----")
+            #print("symbol: " + register.symbol)
+            #print("shortd: " + str(register.shortDescription))
 
             regexp = None
             if self.regexp:
@@ -46,26 +50,26 @@ class RegisterInspector(QtWidgets.QWidget):
                 if not self.regexp and register.symbol.lower().find(self.pattern.lower()) >= 0:
                     return True
 
-            if self.searchDescription:
-                if self.regexp and regexp.search(register.description) is not None:
+            if self.searchShortDescription:
+                if self.regexp and regexp.search(register.shortDescription) is not None:
                     return True
-                if not self.regexp and register.description.lower().find(self.pattern.lower()) >= 0:
-                    return True
-
-            if self.searchTooltip:
-                if self.regexp and regexp.search(register.tooltip) is not None:
-                    return True
-                if not self.regexp and register.tooltip.lower().find(self.pattern.lower()) >= 0:
+                if not self.regexp and register.shortDescription.lower().find(self.pattern.lower()) >= 0:
                     return True
 
-            if type(register.interpreter) == APDCAM10G_register2bits:
-                for b in register.interpreter.bits:
-                    if self.searchDescription:
-                        if self.regexp and regexp.search(b.shortName) is not None:
+            if self.searchLongDescription:
+                if self.regexp and regexp.search(register.longDescription) is not None:
+                    return True
+                if not self.regexp and register.longDescription.lower().find(self.pattern.lower()) >= 0:
+                    return True
+
+            if hasattr(register,"sortedBits"):
+                for b in register.sortedBits:
+                    if self.searchRegisterName:
+                        if self.regexp and regexp.search(b.symbol) is not None:
                             return True
-                        if not self.regexp and b.shortName.lower().find(self.pattern.lower()) > 0:
+                        if not self.regexp and b.symbol.lower().find(self.pattern.lower()) > 0:
                             return True
-                    if self.searchTooltip:
+                    if self.searchLongDescription or self.searchShortDescription:
                         if self.regexp and regexp.search(b.description) is not None:
                             return True
                         if not self.regexp and b.description.lower().find(self.pattern.lower()) > 0:
@@ -98,13 +102,13 @@ class RegisterInspector(QtWidgets.QWidget):
         self.searchName.setChecked(True)
         searchLayout.addWidget(self.searchName)
 
-        self.searchDescription = QtWidgets.QCheckBox("Search descriptions")
-        self.searchDescription.setChecked(True)
-        searchLayout.addWidget(self.searchDescription)
+        self.searchShortDescription = QtWidgets.QCheckBox("Search short descriptions")
+        self.searchShortDescription.setChecked(True)
+        searchLayout.addWidget(self.searchShortDescription)
 
-        self.searchTooltip = QtWidgets.QCheckBox("Search tooltips")
-        self.searchTooltip.setChecked(True)
-        searchLayout.addWidget(self.searchTooltip)
+        self.searchLongDescription = QtWidgets.QCheckBox("Search long descriptions")
+        self.searchLongDescription.setChecked(True)
+        searchLayout.addWidget(self.searchLongDescription)
 
         self.searchButton = QtWidgets.QPushButton("Search registers")
         searchLayout.addWidget(self.searchButton)
@@ -115,8 +119,8 @@ class RegisterInspector(QtWidgets.QWidget):
         
         self.registerVersionSelector = QtWidgets.QComboBox()
         self.registerVersionSelector.addItem("Actual camera")
-        self.registerVersionSelector.addItem("Firmware <=1.03 (zero data)")
-        self.registerVersionSelector.addItem("Firmware >=1.05 (zero data)")
+        self.registerVersionSelector.addItem("Firmware <=1.03")
+        self.registerVersionSelector.addItem("Firmware >=1.05")
         buttons.addWidget(self.registerVersionSelector)
 
         self.showADC1RegistersButton = QtWidgets.QPushButton("ADC1 registers")
@@ -160,14 +164,14 @@ class RegisterInspector(QtWidgets.QWidget):
         pattern = self.searchPattern.text()
         regexp = self.searchRegexp.isChecked()
         name = self.searchName.isChecked()
-        description = self.searchDescription.isChecked()
-        tooltip = self.searchTooltip.isChecked()
+        shortDescription = self.searchShortDescription.isChecked()
+        longDescription = self.searchLongDescription.isChecked()
 
         self.clearRegisterTableDisplay()
 
         found = False
 
-        register_table = self.gui.camera.ADC_register_table.filter(self.RegisterSearch(pattern=pattern,regexp=regexp,name=name,description=description,tooltip=tooltip))
+        register_table = self.gui.camera.ADC_registers.filter(self.RegisterSearch(pattern=pattern,regexp=regexp,name=name,shortDescription=shortDescription,longDescription=longDescription))
         nbytes = register_table.size()
         if nbytes > 0:
             found = True
@@ -181,7 +185,7 @@ class RegisterInspector(QtWidgets.QWidget):
                 else:
                     self.showRegisterTable(register_table,d[0],title='ADC ' + str(i_adc+1) + ' registers',clear=False)
 
-        register_table = self.gui.camera.PC_register_table.filter(self.RegisterSearch(pattern=pattern,regexp=regexp,name=name,description=description,tooltip=tooltip))
+        register_table = self.gui.camera.PC_registers.filter(self.RegisterSearch(pattern=pattern,regexp=regexp,name=name,shortDescription=shortDescription,longDescription=longDescription))
         nbytes = register_table.size()
         if nbytes > 0:
             found = True
@@ -193,7 +197,7 @@ class RegisterInspector(QtWidgets.QWidget):
             else:
                 self.showRegisterTable(register_table,d[0],title='PC card registers',clear=False)
 
-        register_table = self.gui.camera.CC_settings_table.filter(self.RegisterSearch(pattern=pattern,regexp=regexp,name=name,description=description,tooltip=tooltip))
+        register_table = self.gui.camera.CC_settings.filter(self.RegisterSearch(pattern=pattern,regexp=regexp,name=name,shortDescription=shortDescription,longDescription=longDescription))
         nbytes = register_table.size()
         if nbytes > 0:
             found = True
@@ -204,7 +208,7 @@ class RegisterInspector(QtWidgets.QWidget):
             else:
                 self.showRegisterTable(register_table,self.gui.camera.status.CC_settings,title='Communication & Control Card settings',clear=False)
 
-        register_table = self.gui.camera.CC_variables_table.filter(self.RegisterSearch(pattern=pattern,regexp=regexp,name=name,description=description,tooltip=tooltip))
+        register_table = self.gui.camera.CC_variables.filter(self.RegisterSearch(pattern=pattern,regexp=regexp,name=name,shortDescription=shortDescription,longDescription=longDescription))
         nbytes = register_table.size()
         if nbytes > 0:
             found = True
@@ -224,7 +228,7 @@ class RegisterInspector(QtWidgets.QWidget):
         adcNumber -= 1
         v = self.registerVersionSelector.currentText()
         if v=="Actual camera":
-            register_table = self.gui.camera.ADC_register_table
+            register_table = self.gui.camera.ADC_registers
             err,d = self.gui.camera.readPDI(self.gui.camera.status.ADC_address[adcNumber],0,numberOfBytes=register_table.size(),arrayData=True)
             if err != "":
                 self.gui.show_error(err)
@@ -245,7 +249,7 @@ class RegisterInspector(QtWidgets.QWidget):
 
         v = self.registerVersionSelector.currentText()
         if v=="Actual camera":
-            register_table = self.gui.camera.PC_register_table
+            register_table = self.gui.camera.PC_registers
             err,d = self.gui.camera.readPDI(self.gui.camera.codes_PC.PC_CARD,0,numberOfBytes=register_table.size(),arrayData=True)
             if err != "":
                 self.gui.show_error(err)
@@ -267,7 +271,7 @@ class RegisterInspector(QtWidgets.QWidget):
 
         v = self.registerVersionSelector.currentText()
         if v=="Actual camera":
-            register_table = self.gui.camera.CC_settings_table
+            register_table = self.gui.camera.CC_settings
             err= self.gui.camera.readCCdata(dataType=0)
             if err != "":
                 self.gui.show_error(err)
@@ -420,7 +424,6 @@ class RegisterInspector(QtWidgets.QWidget):
 
             # for bit-coded registers, loop over all bit group, and display them one-by-one
             if hasattr(reg,'sortedBits'):
-                counter = 0
                 for b in reg.sortedBits:
                     s = b.symbol + "(" + str(b.firstBit)
                     if b.lastBit > b.firstBit:
@@ -431,10 +434,7 @@ class RegisterInspector(QtWidgets.QWidget):
                     hhh.addWidget(symbol)
 
                     hhh.addWidget(QtWidgets.QLabel(b.display_value(data)))
-
-                    if counter>0:
-                        hhh.addStretch(1)
-                    counter += 1
+                    hhh.addStretch(1)
             else:
                 hhh.addWidget(QtWidgets.QLabel(reg.display_value(data)))
 

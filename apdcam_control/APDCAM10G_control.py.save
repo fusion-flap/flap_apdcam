@@ -54,160 +54,253 @@ def ADC2DAC_channel_mapping():
         data2[data1[i]-1] = i+1
     return data2
 
-class APDCAM10G_register:
-    def __init__(self, startByte, numberOfBytes, shortDescription, byteOrder='msb', signed=False, longDescription=''):
+
+class APDCAM10G_register_bits:
+    """
+    This class represents a group of bits within a (potentially multi-byte) integer.
+    """
+    def __init__(self, firstBit, lastBit, shortName, description):
+        # Starting (least-significant) bit of the bit group
+        self.firstBit = firstBit
+
+        # The last (most-significant) bit of the bit group (inclusive)
+        self.lastBit  = lastBit
+
+        # Number of bits
+        self.nBits = self.lastBit-self.firstBit+1
+
+        # The mask corresponding to nBits bits
+        self.mask = 2**self.nBits-1
+
+        # A short name (typically all capital letters) indicating the meaning of this bit group
+        self.shortName = shortName
+
+        # A verbose description
+        self.description = description
+
+    def value(self,data):
         """
-        This class stores information about the address/length/byte-order/signed etc of (possibly multi-byte)
-        registers of the CC card, PC card or ADC cards, together with short and long descriptions/explanations.
+        Get the value represented by the specified bits from the integer 'data'
+        """
+        return (data>>self.firstBit) & self.mask
 
-        Parameters
-        ^^^^^^^^^^
-        byteOrder  -- 'msb' or equivalently 'big', or 'lsb' or equivalently 'little'
 
+# bytearray converters. They must provide a value(self,data) function, which takes a bytearray (data), and
+# return a nested list ('result') as a result.
+# The topmost level of this list corresponds to eventual multi-register handling, i.e. if the user wants to
+# specify for example 32 times 2 bytes (every 2 byte corredponding to a different value) in a single command.
+# A specific example is TRIGLEVEL which is 2 bytes for each channel of the ADC board. result[0] would then
+# correspond to the first 2 bytes, result[1] to the 2nd two bytes, etc. In most cases len(result)==1
+# The second nested level of the list corresponds to eventual multiple settings encoded in the (potentially multi-byte)
+# register, for example when bits 0..3, bits 4, bits 5..7 of the register value contain different settings.
+# The third nested level is [value, shortdescription, tooltip]
+
+class APDCAM10G_register2ip:
+    """
+    Convert a series of bytes into a string of format xxx.xxx.xxx.xxx
+    No byte order is given, we assume that for all cases it should be displayed
+    in the same order as the bytes themselves
+    """
+    def value(self, data):
+        result = ""
+        for i in range(len(data)):
+            if i > 0:
+                result += "."
+            result += str(int(data[i]))
+        return [[[result,'','IPv4 address']]]
+
+class APDCAM10G_register2mac:
+    """
+    Convert a series of bytes into a string of format xx:xx:xx:xx:xx:xx
+    No byte order is given, we assume that for all cases it should be displayed
+    in the same order as the bytes themselves
+    """
+    def value(self,data):
+        result = ""
+        for i in range(len(data)):
+            if i > 0:
+                result += ":"
+            result += hex(data[i])[2:]
+        return [[[result,'','MAC address']]]
+
+class APDCAM10G_register2int:
+    """
+    A bytearray (register data) to integer converter. 
+    """
+    def __init__(self, byteOrder=None, signed=False, format='dec'):
+        """
+        Parameters:
+        ^^^^^^^^^^^
+        byteOrder - any of the strings 'msb' (most-significant byte first) or 'lsb' (least-significant byte first)
+        signed    - boolean, indicating whether the conversion is to signed or unsigned integer
+        format    - 'dec' (decimal) or 'hex'
+        """
+        if byteOrder is None:
+            self.byteOrder = ''
+        else:
+            if byteOrder.lower() == 'msb' or byteOrder.lower() == 'msb?':
+                self.byteOrder = 'big'
+            elif byteOrder.lower() == 'lsb' or byteOrder.lower() == 'lsb?':
+                self.byteOrder = 'little'
+            else:
+                raise Exception('Invalid byte order: ' + str(byteOrder))
+            if byteOrder.find('?') >= 0:
+                self.byteOrderNotKnown = True
+        self.signed = signed
+
+    def value(self, data):
+        # We may have self.byteOrder==''. Allow this for 1-byte conversion (and default to 'msb', which does not matter...)
+        byteorder=self.byteOrder
+        if byteorder=='' and len(data)==1:
+            byteorder='big'
+
+        v = int.from_bytes(data,byteorder=byteorder,signed=self.signed)
+        if format=='hex':
+            v = hex(v)
+        else:
+            v = str(v)
+        return [[[v,'','MSB' if self.byteOrder == 'big' else 'LSB']]]
+
+class APDCAM10G_register2bits:    
+    """
+    A bytearra (register data) to multiple bit or group-of-bits converter. It is used when the individual bits
+    or a group of bits of the register's value contains different settings/values.
+    """
+
+    def __init__(self, bits, byteOrder=None, bytePeriod=None):
+        """
+        Parameters:
+        ^^^^^^^^^^^
+        bits       - a list of APDCAM10G_register_bits objects (each represents a single bit or a group of bits)
+        byteOrder  - 'msb' (most-significant byte first) or 'lsb' (least-significant byte first). It is only
+                     relevant for multi-byte registers. This is used to convert the multi-byte value of the register
+                     to an integer in the first step (which is then divided into individual bits or group of bits,
+                     according to the first function argument, 'bits')
+        bytePeriod - Number of bytes of a period. If it is provided (i.e. not None), the multi-byte register is
+                     interpreted as a repetition of a sequence of bytes, this sequence having the length of bytePeriod.
+                     Each sequence of bytePeriod bytes is converted to an integer, and is then split into individual
+                     bits, or groups of bits.
+        """
+        if byteOrder is None:
+            self.byteOrder = ''
+        else:
+            if byteOrder.lower() == 'msb' or byteOrder.lower() == 'msb?':
+                self.byteOrder = 'big'
+            elif byteOrder.lower() == 'lsb' or byteOrder.lower() == 'lsb?':
+                self.byteOrder = 'little'
+            if byteOrder.find('?') >= 0:
+                self.byteOrderNotKnown = True
+        self.bits = bits
+        self.bytePeriod = bytePeriod
+    def value(self,data):
+        bytePeriod = self.bytePeriod
+        if self.bytePeriod is None:
+            bytePeriod = len(data)
+        n = len(data)//bytePeriod
+        result = []
+        for i in range(n):
+            subresult = []
+            v = 0
+            if bytePeriod > 1:
+                v = int.from_bytes(data[i*bytePeriod:(i+1)*bytePeriod],byteorder=self.byteOrder,signed=False)
+            else:
+                v = int(data[i*bytePeriod])
+
+            for b in reversed(self.bits):
+                label = b.shortName
+                tooltip = b.description
+                if b.firstBit == b.lastBit:
+                    label += " (" + str(b.firstBit) + ")"
+                else:
+                    label += " (" + str(b.firstBit) + str("..") + str(b.lastBit) + ")"
+                subresult.append([b.value(v),label,tooltip])
+            result.append(subresult)
+        return result
+
+class APDCAM10G_register2str:    
+    """
+    Converter class interpreting each byte as a character, returning a string
+    """
+    def value(self,data):
+        try:
+            return [[[data.decode('utf-8'),'','']]]
+        except:
+            return [[[">>> can not decode string <<<",'','']]]
+
+class APDCAM10G_register:
+    def __init__(self, startByte, numberOfBytes, description, interpreter=None, tooltip=''):
+        """
+        Constructor of camera register reader. Parameters are self-explanatory, except the last one, which is
+        an interpreter class, or the string 'msb' or 'lsb'
+        An interpreter class is one of APDCAM10G_register2int, APDCAM10G_register2bits, APDCAM10G_register2str
+        which interpret a byte array as integer, a set of bits or group of bits, or a string. See their
+        documentation.
+        If the 4th argument is a string, it is interpreted as an option string for a APDCAM10G_register2int converter in the following way.
+        It is split at / characters, and each substring must be either 'msb' or 'lsb', or 'dec' or 'hex'. See the documentation of
+        APDCAM10G_register2int
         """
         self.startByte = startByte
         self.numberOfBytes = numberOfBytes
-        self.shortDescription = shortDescription
-        self.signed = signed
-        self.longDescription = longDescription
-        self.byteOrder = byteOrder.lower()
-        if self.byteOrder == 'msb':
-            self.byteOrder = 'big'
-            self.byteOrderUncertain = False
-        if self.byteOrder == 'msb?' or self.byteOrder == 'big?':
-            self.byteOrder = 'big'
-            self.byteOrderUncertain = True
-        if self.byteOrder == 'lsb':
-            self.byteOrder = 'little'
-            self.byteOrderUncertain = False;
-        if self.byteOrder == 'lsb?' or self.byteOrder == 'little?':
-            self.byteOrder = 'little'
-            self.byteOrderUncertain = True
-    
-    def __call__(self,data):
+        self.description = description
+        self.tooltip = tooltip
+
+        # If this is a single byte (and only then) we accept that no interpreter is spsecified.
+        # It is then defaulted to register2int
+        # If numberOfBytes != 1, then interpreter must be given (and we will require that byteOrder
+        # is specified, see later)
+        if interpreter is None:
+            if numberOfBytes==1:
+                interpreter=APDCAM10G_register2int()
+            else:
+                raise Exception('Interpreter must be specified for multi-byte register')
+            
+        if type(interpreter) is str: 
+            options = interpreter.split('/')
+            format = 'dec'
+            byteOrder = None
+            signed = False
+            for o in options:
+                o = o.lower()
+                if o!='msb' and o !='msb?' and o!='lsb' and o!='lsb?' and o!='dec' and o!='hex' and o!='signed':
+                    raise Exception("Wrong argument #4 of APDCAM10G_register.__init__: if string, must be 'msb' or 'lsb'")
+                if o=='msb' or o=='msb?' or o=='lsb' or o=='lsb?':
+                    byteOrder = o
+                if o=='dec' or o=='hex':
+                    format = o
+                if o=='signed':
+                    signed = True
+            interpreter = APDCAM10G_register2int(byteOrder=byteOrder,format=format,signed=signed)
+
+        # for multi-byte registers check if byteOrder was specified
+        if numberOfBytes>1 and (type(interpreter)==APDCAM10G_register2int or type(interpreter)==APDCAM10G_register2bits):
+            if interpreter.byteOrder == '':
+                raise Exception('byteOrder was not specified for a multi-byte register')
+            
+        self.interpreter = interpreter
+
+    def value(self,data):
         """
-        Return the value of this (possibly multi-byte) register as an integer
-
-        Parameters
-        ^^^^^^^^^^
-        data  -- a byte array holding the contenet of the entire register table
+        Parameters:
+        ^^^^^^^^^^^
+        data - bytearray, the content of the entire register table of the given board
         """
-        return int.from_bytes(data[self.startByte:self.startByte+self.numberOfBytes],signed=self.signed,byteorder=self.byteOrder)
+        return self.interpreter.value(data[self.startByte:self.startByte+self.numberOfBytes])
 
-    def display_value(self,data):
+    def get(self,data):
         """
-        This function must return a string representation of the value, for displaying
+        Return the raw values (single byte or a bytearray) from the raw data.
+
+        Parameters:
+        ^^^^^^^^^^^
+        data - The register table dump.
+
+        Returns:
+        ^^^^^^^^
+        A bytearray (even if it contains a single byte) corresponding to the given register
         """
-        return "APDCAM10G_register.display_value must be overridden!"
-
-class APDCAM10G_register_str(APDCAM10G_register):    
-    def __init__(self, startByte, numberOfBytes, shortDescription, longDescription=''):
-        super().__init__(startByte, numberOfBytes, shortDescription, longDescription=longDescription)
-
-    def display_value(self,data):
-        try:
-            return data[self.startByte:self.startByte+self.numberOfBytes].decode('utf-8')
-        except:
-            return ">>> can not decode string <<<"
-
-class APDCAM10G_register_int(APDCAM10G_register):
-    def __init__(self, startByte, numberOfBytes, shortDescription, byteOrder='msb', signed=False, longDescription='', format='dec'):
-        """
-        Parameters
-        ^^^^^^^^^^
-        format  - string: 'dec' or 'hex'
-        """
-        super().__init__(startByte, numberOfBytes, shortDescription, byteOrder=byteOrder, signed=signed, longDescription=longDescription)
-        self.format = format
-
-    def display_value(self,data):
-        v = self.__call__(data)
-        return (hex(v) if self.format=='hex' else str(v))
-
-class APDCAM10G_register_ip(APDCAM10G_register):
-    def __init__(self, startByte, shortDescription, longDescription=''):
-        super().__init__(startByte, 4, shortDescription, byteOrder='msb', signed=False, longDescription=longDescription)
-
-    def display_value(self,data):
-        result = ""
-        for i in range(4):
-            if i>0:
-                result += "."
-            result += str(int.from_bytes(data[self.startByte+i:self.startByte+i+1]))
-        return result
-        
-class APDCAM10G_register_mac(APDCAM10G_register):
-    def __init__(self, startByte, shortDescription, longDescription=''):
-        super().__init__(startByte, 6, shortDescription, byteOrder='msb', signed=False, longDescription=longDescription)
-
-    def display_value(self,data):
-        result = ""
-        for i in range(6):
-            if i>0:
-                result += ":"
-            result += hex(data[self.startByte+i])[2:]
-        return result
-
-class APDCAM10G_register_bits(APDCAM10G_register):
-    class Bits:
-        def __init__(self, parent, symbol, firstBit, lastBit, description='',format='dec'):
-            self.parent = parent
-            self.symbol = symbol
-            self.firstBit = firstBit
-            self.lastBit = lastBit
-            self.description = description
-            self.nBits = lastBit-firstBit+1
-            self.mask = 2**self.nBits-1
-            self.format = format
-
-        def __call__(self, data):
-            i = int.from_bytes(data[self.parent.startByte:self.parent.startByte+self.parent.numberOfBytes],signed=False,byteorder=self.parent.byteOrder)
-            return (i>>self.firstBit)&self.mask
-
-        def display_value(self,data):
-            v = self.__call__(data)
-            return (hex(v) if format=='hex' else str(v))
-
-
-    def __init__(self, startByte, numberOfBytes, shortDescription, bits, byteOrder='msb', longDescription=''):
-        """
-        Parameters
-        ^^^^^^^^^^
-        startByte        - starting byte address in the register table
-        numberOfBytes    - self-explanatory...
-        shortDescription - self-explanatory...
-        bits             - a list of lists. Each list element must have 3 or 4 elements: [symbol, firstBit(least-significant), lastBit(most-significant, inclusive, optional), description(optional)]
-        """
-        super().__init__(startByte, numberOfBytes, shortDescription, byteOrder=byteOrder, signed=False, longDescription=longDescription)
-        firstBits = []
-        unsortedBits = []
-        for b in bits:
-            symbol = b[0]
-            firstBit = b[1]
-            lastBit = (b[2] if len(b)>2 else b[1])
-            desc = (b[3] if len(b)>3 else '')
-            # propagate down a lot of info to the bits, so that they can do the same conversion (minor code duplication)
-            bb = self.Bits(self, symbol, firstBit, lastBit, desc)
-            firstBits.append(firstBit)
-            unsortedBits.append(bb)
-            # make this decoder as a symbolic attribute within the register
-            setattr(self,symbol,bb)
-
-        # a sorted array containing the bits ordered by their bit position (and not by their symbols, as
-        # it would be achievable by iterating through the attributes of this object)
-        self.sortedBits = [x[1] for x in sorted(zip(firstBits,unsortedBits))]
-        
-    def display_value(self,data):
-        return "Please use the display_value function of all sub-bits"
+        return data[self.startByte:self.startByte+self.numberOfBytes]
 
 class APDCAM10G_register_table:
-    def __init__(self):
-        # add an attribute 'symbol' to each register 
-        for regname in dir(self):
-            if regname.startswith("_") or regname.upper()!=regname:
-                continue
-            setattr(getattr(self,regname),'symbol',regname)
-
     def registerNames(self):
         """
         Returns a list of register names stored in this table, sorted by address
@@ -263,251 +356,352 @@ class APDCAM10G_register_table:
         registerNames = self.registerNames()
         for registerName in registerNames:
             register = getattr(self,registerName)
-            if filter(register) == True:
+            if filter(registerName,register) == True:
                 setattr(result,registerName,register)
         return result
 
 class APDCAM10G_cc_settings_v1(APDCAM10G_register_table):
     """
-    Settings of the CC card up to firmware version 1.03
+    Settings of the CC card up to firmware version 1.04
     """
 
     # typedefs/shorthands
     b = APDCAM10G_register_bits
-    i = APDCAM10G_register_int
-    s = APDCAM10G_register_str
-    ip = APDCAM10G_register_ip
-    mac = APDCAM10G_register_mac
+    r = APDCAM10G_register
+    r2i  = APDCAM10G_register2int
+    r2ip = APDCAM10G_register2ip
+    r2mac = APDCAM10G_register2mac
+    r2b  = APDCAM10G_register2bits
+    r2s  = APDCAM10G_register2str
 
     def addressDisplay(self,a):
         if a<7-7+71-7:
             return str(a+7) + "-7"
         return str(a+7-71+7) + "-7+71-7"
 
-    BOARD_VERSION  = s(7-7, 10, 'Board type')
-    FIRMWARE_GROUP = s(17-7, 30-17+1, 'Firmware group')
-    FIRMWARE_GROUP_VERSION = b(31-7,2,'Firmware group version',[['VL',0,7,'Version low'],['VH',8,15,'Version high']],byteOrder='msb')
-    UPGRADEDATE            = b(33-7, 36-33+1,'Upgrade date',[['D',0,7,'Day'],['M',8,15,'Month'],['Y2',16,23,'Year last digit'],['Y1',24,31,'Year 3rd digit']],byteOrder='msb')
-    MAN_FIRMWAREGROUP      = s(37-7,50-37+1,'Manufacturer firmware group')
-    MAN_PROGRAMDATE        = b(51-7,54-51+1,'Manufacturer program date',[['D',0,7,'Day'],['M',8,15,'Month'],['Y2',16,23,'Year 4th digit'],['Y1',24,31,'Year 3rd digit']],byteOrder='msb')
-    MAN_SERIAL             = i(55-7,58-55+1,'Manufacturer serial number',byteOrder='msb')
-    MAN_TESTRESULT         = i(59-7,62-59+1,'Manufacturer test result',  byteOrder='msb')
-    SETTINGS_VERSION       = i(7-7+71-7,1,'Settings version',byteOrder='msb?')
-    DEV_NAME   = s(8-7+71-7,55-8+1,'Device name')
-    DEV_TYPE   = i(56-7+71-7,2,'Device type',byteOrder='msb')
-    DEV_SERIAL = i(58-7+71-7,4,'Device serial number',byteOrder='msb')
-    COMPANY    = s(62-7+71-7,18,'Company name')
-    HOST_NAME  = s(80-7+71-7,12,'Host name')
-    CONFIG     = b(92-7+71-7,2,'Configuration',[['LOCK',0,0,'Device is locked']],'msb')
-    USER_TEXT  = s(94-7+71-7,15,'User text')
-    MANAGE_MAC = mac(135-7+71-7,'Management port static MAC address')
-    MANAGE_IP  = ip(141-7+71-7,'Management port IPv4 address')
-    MANAGE_IP_MASK  = ip(145-7+71-7,'Management port IPv4 network mask')
-    MANAGE_MAC_MODE = i(149-7+71-7,1,'Management port MAC mode (0 - factorydefault, 1 - CW-Auto, 2 - static)')
-    MANAGE_IP_MODE  = i(150-7+71-7,1,'Management port IP mode (1 - static, 2 - DHCP)')
-    MANAGE_GW_MODE  = i(151-7+71-7,1,'Management port gateway mode (0 - None, 1 - static, 2 - DHCP)')
-    MANAGE_GW_IP    = ip(152-7+71-7,'Management port gateway IPv4 address')
-    MANAGE_ARP      = i(156-7+71-7,1,'Management port ARP (Advertisement Report Period) [s]')
-    MANAGE_IGMP     = i(157-7+71-7,1,'Management port IGMP report period [s]')
-    MANAGE_IP_TTL   = i(158-7+71-7,1,'Management port IPv4 Time To Live (TTL value in the IPv4 header)')
-    MANAGE_MAC_DEFAULT = mac(159-7+71-7,'Management port factory default MAC address')
-    STREAM_PORT_MAC    = mac(183-7+71-7,'Stream port static MAC address')
-    STREAM_PORT_IP     = ip(189-7+71-7,'Stream port IPv4 address')
-    STREAM_PORT_IP_MASK  = ip(193-7+71-7,'Stream port Ipv4 mask')
-    STREAM_PORT_MAC_MODE = i(197-7+71-7,1,'Stream port MAC mode (0 - factory default, 1 - CW-auto, 2 - static)')
-    STREAM_PORT_IP_MODE  = i(198-7+71-7,1,'Stream port IP mode (1 - static, 2 - DHCP)')
-    STREAM_PORT_GW_MODE  = i(199-7+71-7,1,'Stream port gateway mode (0 - none, 1 - static, 2 - DHCP)')
-    STREAM_PORT_GW_IP    = ip(200-7+71-7,'Stream port gateway IPv4 address')
-    STREAM_PORT_ARP      = i(204-7+71-7,1,'Stream port ARP Advertisement Report Period (0=off) [s]')
-    STREAM_PORT_IGMP     = i(205-7+71-7,1,'Stream port IGMP report period (0=off) [s]')
-    STREAM_PORT_IP_TTL   = i(206-7+71-7,1,'Stream port IPv4 Time To Live (TTL value in the IPv4 header)')
-    STREAM_PORT_MAC_DEFAULT = mac(207-7+71-7,'Stream port factory default MAC address')
-    HTTP_PORT     = i(231-7+71-7,2,'HTTP Port','lsb')
-    SMTP_PORT     = i(233-7+71-7,2,'SMTP server port','lsb')
-    CLOCK_CONTROL = b(263-7+71-7,1,'Clock control (SETCLOCKCONTROL instruction)',[ ['AS',2,2,'AD clock source (0 - internal, 1 - external)'], \
-                                                                                   ['AA',3,3,'External clock mode (0 - normal, 1 - auto)'], \
-                                                                                   ['SS',4,4,'Sample source (0 - internal, 1 - external)'] ], byteOrder='msb' )
-    CLOCK_ENABLE  = b(264-7+71-7,1,'Clock enable (SETCLOCKENABLE instruction)', [ ['CC',0,0,'Clock output of the CONTROL connector (0 - disable, 1 - enable)'], \
-                                                                                  ['EC',1,1,'Clock output of the EIO connector (0 - disable, 1 - enable)'], \
-                                                                                  ['CS',2,2,'Sample output of the CONTROL connector (0 - disable, 1 - enable)'], \
-                                                                                  ['ES',3,3,'Sample output of the EIO connector (0 - disable, 1 - enable)'] ], byteOrder='msb' ) 
-    BASE_PLL_MULT    = i(265-7+71-7,1,'Base PLL multiply value',byteOrder='msb')
-    BASE_PLL_DIV0    = i(266-7+71-7,1,'Base PLL divide value 0',byteOrder='msb')
-    BASE_PLL_DIV_ADC = i(267-7+71-7,1,'Base PLL divide value 1 (going to clock signal F1/ADC)',byteOrder='msb')
-    BASE_PLL_DIV2    = i(268-7+71-7,1,'Base PLL divide value 2')
-    BASE_PLL_DIV3    = i(269-7+71-7,1,'Base PLL divide value 3')
-    EXT_DCM_MULT     = i(270-7+71-7,1,'External DCM multiply value')
-    EXT_DCM_DIV      = i(271-7+71-7,1,'External DCM divide value')
-    SAMPLEDIV        = i(272-7+71-7,2,'Sample divide value','msb')
-    SPAREIO          = b(274-7+71-7,1,'Spare IO control',[ ['OUTVAL0',0,0,'Spare IO pin 0 output value'],\
-                                                           ['OUTVAL1',1,1,'Spare IO pin 1 output value'],\
-                                                           ['OUTVAL2',2,2,'Spare IO pin 2 output value'],\
-                                                           ['OUTVAL3',3,3,'Spare IO pin 3 output value'] ], byteOrder='msb' )  # 4..7: direction in v2
-    XFP         = b(275-7+71-7,1,'XFP',[ ['REFCLKENABLE',0,0,'XFP reference clock enable'] ] )
-    SAMPLECOUNT = i(276-7+71-7,281-276+1,'Sample count','msb')
-    TRIGSTATE   = b(282-7+71-7,1,'Trigger control (SETTRIGGER instruction)',[ ['ETR',0,0,'External trigger rising slope (0 - disabled, 1 - enabled)'], \
-                                                                              ['ETF',1,1,'External trigger falling slope (0 - disabled, 1 - enabled)'], \
-                                                                              ['IT', 2,2,'Internal trigger (0 - disabled, 1 - enabled)' ], \
-                                                                              ['DT', 6,6,'Disable trigger event if streams are disabled'] ], byteOrder='msb' )
-    TRIGDELAY       = i(283-7+71-7, 286-283+1,'Trigger delay',byteOrder='msb')
-    SERIAL_PLL_MULT = i(287-7+71-7,1,'Serial PLL multiply value')
-    SERIAL_PLL_DIV  = i(288-7+71-7,1,'Serial PLL divide value 0')
-    SATACONTROL     = b(292-7+71-7,1,'SATA Control',[ ['DSM',0,0,'Dual SATA mode (0 - disabled, 1 - enabled)'] ] )
-    STREAMCONTROL   = b(299-7+71-7,1,'Stream control (SETSTREAMCONTROL instruction)',[ ['EN1',0,0,'Stream 1 disabled (0) or enabled (1)'], \
-                                                                                       ['EN2',1,1,'Stream 2 disabled (0) or enabled (1)'], \
-                                                                                       ['EN3',2,2,'Stream 3 disabled (0) or enabled (1)'], \
-                                                                                       ['EN4',3,3,'Stream 4 disabled (0) or enabled (1)'], \
-                                                                                       ['TM1',4,4,'Test mode of stream 1 disabled (0) or enabled (1)'], \
-                                                                                       ['TM2',5,5,'Test mode of stream 2 disabled (0) or enabled (1)'], \
-                                                                                       ['TM3',6,6,'Test mode of stream 3 disabled (0) or enabled (1)'], \
-                                                                                       ['TM4',7,7,'Test mode of stream 4 disabled (0) or enabled (1)'] ] )
-    UDPTESTCLOCK_DIV = i(300-7+71-7,303-300+1,'UDP test clock divider value','msb')
-
-    for j in range(4):
-        locals()['UDPOCTET' + str(j+1)]   = i  (311-7+71-7+j*16,2,'Stream '+str(j+1)+' octet','msb')
-        locals()['UDPMAC'   + str(j+1)]   = mac(313-7+71-7+j*16,'Stream '+str(j+1)+' MAC address')
-        locals()['IP'       + str(j+1)]   = ip (319-7+71-7+j*16,'Stream '+str(j+1)+' IPv4 address')
-        locals()['UDPPORT'  + str(j+1)]   = i  (323-7+71-7+j*16,2,'Stream '+str(j+1)+' UDP port','msb')
-
-    for j in range(10):
-        locals()['CAMTIMER' + str(j+1) + 'DELAY']   = i(375+j*(4+2+2+4)-7+71-7,4,'CT timer '+str(j+1)+' delay','msb')
-        locals()['CAMTIMER' + str(j+1) + 'ON']      = i(379+j*(4+2+2+4)-7+71-7,2,'CT timer '+str(j+1)+' on','msb')
-        locals()['CAMTIMER' + str(j+1) + 'OFF']     = i(381+j*(4+2+2+4)-7+71-7,2,'CT timer '+str(j+1)+' off','msb')
-        locals()['CAMTIMER' + str(j+1) + 'NPULSES'] = i(383+j*(4+2+2+4)-7+71-7,4,'CT timer '+str(j+1)+' number of pulses','msb')
-
-    CAMCONTROL  = i(495-7+71-7,2,'CAM timer control','msb')
-    CAMCLKDIV   = i(497-7+71-7,2,'CAM timer clock divide value','msb')
-    CAMOUTPUT   = i(499-7+71-7,2,'CAM timer output','msb')
-
+    BOARD_VERSION = r(7-7, 10, 'Board type',r2s())
+    FIRMWARE_GROUP = r(17-7, 30-17+1, 'Firmware group',r2s())
+    FIRMWARE_GROUP_VERSION = r(31-7,2,'Firmware group version',r2b([b(0,7,'VL','Version low'),b(8,15,'VH','Version high')],'msb'))
+    UPGRADEDATE = r(33-7, 36-33+1,'Upgrade date',r2b([b(0,7,'D','Day'),b(8,15,'M','Month'),b(16,23,'Y2','Year last digit'),b(24,31,'Y1','Year 3rd digit')],'msb'))
+    MAN_FIRMWAREGROUP = r(37-7,50-37+1,'Manufacturer firmware group',r2s())
+    MAN_PROGRAMDATE = r(51-7,54-51+1,'Manufacturer program date',r2b([b(0,7,'D','Day'),b(8,15,'M','Month'),b(16,23,'Y2','Year 4th digit'),b(24,31,'Y1','Year 3rd digit')],'msb'))
+    MAN_SERIAL = r(55-7,58-55+1,'Manufacturer serial number','msb')
+    MAN_TESTRESULT = r(59-7,62-59+1,'Manufacturer test result','msb')
+    SETTINGS_VERSION = r(7-7+71-7,1,'Settings version')
+    DEV_NAME = r(8-7+71-7,55-8+1,'Device name',r2s())
+    DEV_TYPE = r(56-7+71-7,2,'Device type','msb')
+    DEV_SERIAL = r(58-7+71-7,4,'Device serial number','msb')
+    COMPANY = r(62-7+71-7,18,'Company name',r2s())
+    HOST_NAME = r(80-7+71-7,12,'Host name',r2s())
+    CONFIG = r(92-7+71-7,2,'Configuration',r2b([b(0,0,'LOCK','Device is locked')],'msb'))
+    USER_TEXT = r(94-7+71-7,15,'User text',r2s())
+    MANAGE_MAC = r(135-7+71-7,140-135+1,'Management port static MAC address',r2mac())
+    MANAGE_IP = r(141-7+71-7,144-141+1,'Management port IPv4 address',r2ip())
+    MANAGE_IP_MASK    = r(145-7+71-7,148-145+1,'Management port IPv4 network mask',r2ip())
+    MANAGE_MAC_MODE = r(149-7+71-7,1,'Management port MAC mode (0 - factorydefault, 1 - CW-Auto, 2 - static)')
+    MANAGE_IP_MODE = r(150-7+71-7,1,'Management port IP mode (1 - static, 2 - DHCP)')
+    MANAGE_GW_MODE = r(151-7+71-7,1,'Management port gateway mode (0 - None, 1 - static, 2 - DHCP)')
+    MANAGE_GW_IP = r(152-7+71-7,155-152+1,'Management port gateway IPv4 address',r2ip())
+    MANAGE_ARP = r(156-7+71-7,1,'Management port ARP (Advertisement Report Period) [s]')
+    MANAGE_IGMP = r(157-7+71-7,1,'Management port IGMP report period [s]')
+    MANAGE_IP_TTL = r(158-7+71-7,1,'Management port IPv4 Time To Live (TTL value in the IPv4 header)')
+    MANAGE_MAC_DEFAULT =r(159-7+71-7,164-159+1,'Management port factory default MAC address',r2mac())
+    STREAM_PORT_MAC = r(183-7+71-7,188-183+1,'Stream port static MAC address',r2mac())
+    STREAM_PORT_IP = r(189-7+71-7,192-189+1,'Stream port IPv4 address',r2ip())
+    STREAM_PORT_IP_MASK = r(193-7+71-7,196-193+1,'Stream port Ipv4 mask',r2ip())
+    STREAM_PORT_MAC_MODE = r(197-7+71-7,1,'Stream port MAC mode (0 - factory default, 1 - CW-auto, 2 - static)')
+    STREAM_PORT_IP_MODE = r(198-7+71-7,1,'Stream port IP mode (1 - static, 2 - DHCP)')
+    STREAM_PORT_GW_MODE = r(199-7+71-7,1,'Stream port gateway mode (0 - none, 1 - static, 2 - DHCP)')
+    STREAM_PORT_GW_IP = r(200-7+71-7,203-200+1,'Stream port gateway IPv4 address',r2ip())
+    STREAM_PORT_ARP = r(204-7+71-7,1,'Stream port ARP Advertisement Report Period (0=off) [s]')
+    STREAM_PORT_IGMP = r(205-7+71-7,1,'Stream port IGMP report period (0=off) [s]')
+    STREAM_PORT_IP_TTL = r(206-7+71-7,1,'Stream port IPv4 Time To Live (TTL value in the IPv4 header)')
+    STREAM_PORT_MAC_DEFAULT = r(207-7+71-7,212-207+1,'Stream port factory default MAC address',r2mac())
+    HTTP_PORT = r(231-7+71-7,2,'HTTP Port','lsb')
+    SMTP_PORT = r(233-7+71-7,2,'SMTP server port','lsb')
+    CLOCK_CONTROL = r(263-7+71-7,1,'Clock control (SETCLOCKCONTROL instruction)',r2b([\
+                                b(2,2,'AS','AD clock source (0 - internal, 1 - external)'), \
+                                b(3,3,'AA','External clock mode (0 - normal, 1 - auto)'), \
+                                b(4,4,'SS','Sample source (0 - internal, 1 - external)')]))
+    CLOCK_ENABLE = r(264-7+71-7,1,'Clock enable (SETCLOCKENABLE instruction)', interpreter=r2b([\
+                         b(0,0,'CC','Clock output of the CONTROL connector (0 - disable, 1 - enable)'), \
+                         b(1,1,'EC','Clock output of the EIO connector (0 - disable, 1 - enable)'), \
+                         b(2,2,'CS','Sample output of the CONTROL connector (0 - disable, 1 - enable)'), \
+                         b(3,3,'ES','Sample output of the EIO connector (0 - disable, 1 - enable)')]))
+    BASE_PLL_MULT = r(265-7+71-7,1,'Base PLL multiply value')
+    BASE_PLL_DIV0 = r(266-7+71-7,1,'Base PLL divide value 0')
+    BASE_PLL_DIV_ADC = r(267-7+71-7,1,'Base PLL divide value 1 (going to clock signal F1/ADC)')
+    BASE_PLL_DIV2 = r(268-7+71-7,1,'Base PLL divide value 2')
+    BASE_PLL_DIV3 = r(269-7+71-7,1,'Base PLL divide value 3')
+    EXT_DCM_MULT  = r(270-7+71-7,1,'External DCM multiply value')
+    EXT_DCM_DIV   = r(271-7+71-7,1,'External DCM divide value')
+    SAMPLEDIV   = r(272-7+71-7,2,'Sample divide value','msb')
+    SPAREIO     = r(274-7+71-7,1,'Spare IO control',r2b([b(0,0,'OUTVAL0','Spare IO pin 0 output value'),\
+                                                         b(1,1,'OUTVAL1','Spare IO pin 1 output value'),\
+                                                         b(2,2,'OUTVAL2','Spare IO pin 2 output value'),\
+                                                         b(3,3,'OUTVAL3','Spare IO pin 3 output value')]))  # 4..7: direction in v2
+    XFP = r(275-7+71-7,1,'XFP',interpreter=r2b([b(0,0,'REFCLKENABLE','XFP reference clock enable')]))
+    SAMPLECOUNT = r(276-7+71-7,281-276+1,'Sample count','msb')
+    TRIGSTATE = r(282-7+71-7,1,'Trigger control (SETTRIGGER instruction)',interpreter=r2b([\
+                          b(0,0,'ETR','External trigger rising slope (0 - disabled, 1 - enabled)'), \
+                          b(1,1,'ETF','External trigger falling slope (0 - disabled, 1 - enabled)'), \
+                          b(2,2,'IT','Internal trigger (0 - disabled, 1 - enabled)'), \
+                          b(6,6,'DT','Disable trigger event if streams are disabled')]))
+    TRIGDELAY = r(283-7+71-7, 286-283+1,'Trigger delay','msb')
+    SERIAL_PLL_MULT = r(287-7+71-7,1,'Serial PLL multiply value')
+    SERIAL_PLL_DIV = r(288-7+71-7,1,'Serial PLL divide value 0')
+    SATACONTROL = r(292-7+71-7,1,'SATA Control',interpreter=r2b([b(0,0,'DSM','Dual SATA mode (0 - disabled, 1 - enabled)')]))
+    STREAMCONTROL = r(299-7+71-7,1,'Stream control (SETSTREAMCONTROL instruction)',interpreter=r2b([\
+                                 b(0,0,'EN1','Stream 1 disabled (0) or enabled (1)'), \
+                                 b(1,1,'EN2','Stream 2 disabled (0) or enabled (1)'), \
+                                 b(2,2,'EN3','Stream 3 disabled (0) or enabled (1)'), \
+                                 b(3,3,'EN4','Stream 4 disabled (0) or enabled (1)'), \
+                                 b(4,4,'TM1','Test mode of stream 1 disabled (0) or enabled (1)'), \
+                                 b(5,5,'TM2','Test mode of stream 2 disabled (0) or enabled (1)'), \
+                                 b(6,6,'TM3','Test mode of stream 3 disabled (0) or enabled (1)'), \
+                                 b(7,7,'TM4','Test mode of stream 4 disabled (0) or enabled (1)')]))
+    UDPTESTCLOCK_DIV = r(300-7+71-7,303-300+1,'UDP test clock divider value','msb')
+    UDPOCTET1   = r(311-7+71-7,2,'Stream 1 octet','msb')
+    UDPMAC1     = r(313-7+71-7,6,'Stream 1 MAC address',r2mac())
+    IP1         = r(319-7+71-7,4,'Stream 1 IPv4 address',r2ip())
+    UDPPORT1    = r(323-7+71-7,2,'Stream 1 UDP port','msb')
+    UDPOCTET2   = r(327-7+71-7,2,'Stream 2 octet','msb')
+    UDPMAC2     = r(329-7+71-7,6,'Stream 2 MAC address',r2mac())
+    IP2         = r(335-7+71-7,4,'Stream 2 IPv4 address',r2ip())
+    UDPPORT2    = r(339-7+71-7,2,'Stream 2 UDP port','msb')
+    UDPOCTET3   = r(343-7+71-7,2,'Stream 3 octet','msb')
+    UDPMAC3     = r(345-7+71-7,6,'Stream 3 MAC address',r2mac())
+    IP3         = r(351-7+71-7,4,'Stream 3 IPv4 address',r2ip())
+    UDPPORT3    = r(355-7+71-7,2,'Stream 3 UDP port','msb')
+    UDPOCTET4   = r(359-7+71-7,2,'Stream 4 octet','msb')
+    UDPMAC4     = r(361-7+71-7,6,'Stream 4 MAC address',r2mac())
+    IP4         = r(367-7+71-7,4,'Stream 4 IPv4 address',r2ip())
+    UDPPORT4    = r(371-7+71-7,2,'Stream 4 UDP port','msb')
+    CAMTIMER1DELAY   = r(375-7+71-7,4,'CT timer 1 delay','msb')
+    CAMTIMER1ON      = r(379-7+71-7,2,'CT timer 1 on','msb')
+    CAMTIMER1OFF     = r(381-7+71-7,2,'CT timer 1 off','msb')
+    CAMTIMER1NPULSES = r(383-7+71-7,4,'CT timer 1 number of pulses','msb')
+    CAMTIMER2DELAY   = r(387-7+71-7,4,'CT timer 2 delay','msb')
+    CAMTIMER2ON      = r(391-7+71-7,2,'CT timer 2 on','msb')
+    CAMTIMER2OFF     = r(393-7+71-7,2,'CT timer 2 off','msb')
+    CAMTIMER2NPULSES = r(395-7+71-7,4,'CT timer 2 number of pulses','msb')
+    CAMTIMER3DELAY   = r(399-7+71-7,4,'CT timer 3 delay','msb')
+    CAMTIMER3ON      = r(403-7+71-7,2,'CT timer 3 on','msb')
+    CAMTIMER3OFF     = r(405-7+71-7,2,'CT timer 3 off','msb')
+    CAMTIMER3NPULSES = r(409-7+71-7,4,'CT timer 3 number of pulses','msb')
+    CAMTIMER4DELAY   = r(411-7+71-7,4,'CT timer 4 delay','msb')
+    CAMTIMER4ON      = r(415-7+71-7,2,'CT timer 4 on','msb')
+    CAMTIMER4OFF     = r(417-7+71-7,2,'CT timer 4 off','msb')
+    CAMTIMER4NPULSES = r(419-7+71-7,4,'CT timer 4 number of pulses','msb')
+    CAMTIMER5DELAY   = r(423-7+71-7,4,'CT timer 5 delay','msb')
+    CAMTIMER5ON      = r(427-7+71-7,2,'CT timer 5 on','msb')
+    CAMTIMER5OFF     = r(429-7+71-7,2,'CT timer 5 off','msb')
+    CAMTIMER5NPULSES = r(431-7+71-7,4,'CT timer 5 number of pulses','msb')
+    CAMTIMER6DELAY   = r(435-7+71-7,4,'CT timer 6 delay','msb')
+    CAMTIMER6ON      = r(439-7+71-7,2,'CT timer 6 on','msb')
+    CAMTIMER6OFF     = r(441-7+71-7,2,'CT timer 6 off','msb')
+    CAMTIMER6NPULSES = r(443-7+71-7,4,'CT timer 6 number of pulses','msb')
+    CAMTIMER7DELAY   = r(447-7+71-7,4,'CT timer 7 delay','msb')
+    CAMTIMER7ON      = r(451-7+71-7,2,'CT timer 7 on','msb')
+    CAMTIMER7OFF     = r(453-7+71-7,2,'CT timer 7 off','msb')
+    CAMTIMER7NPULSES = r(455-7+71-7,4,'CT timer 7 number of pulses','msb')
+    CAMTIMER8DELAY   = r(459-7+71-7,4,'CT timer 8 delay','msb')
+    CAMTIMER8ON      = r(463-7+71-7,2,'CT timer 8 on','msb')
+    CAMTIMER8OFF     = r(465-7+71-7,2,'CT timer 8 off','msb')
+    CAMTIMER8NPULSES = r(467-7+71-7,4,'CT timer 8 number of pulses','msb')
+    CAMTIMER9DELAY   = r(471-7+71-7,4,'CT timer 9 delay','msb')
+    CAMTIMER9ON      = r(475-7+71-7,2,'CT timer 9 on','msb')
+    CAMTIMER9OFF     = r(477-7+71-7,2,'CT timer 9 off','msb')
+    CAMTIMER9NPULSES = r(479-7+71-7,4,'CT timer 9 number of pulses','msb')
+    CAMTIMER10DELAY   = r(483-7+71-7,4,'CT timer 10 delay','msb')
+    CAMTIMER10ON      = r(487-7+71-7,2,'CT timer 10 on','msb')
+    CAMTIMER10OFF     = r(489-7+71-7,2,'CT timer 10 off','msb')
+    CAMTIMER10NPULSES = r(491-7+71-7,4,'CT timer 10 number of pulses','msb')
+    CAMCONTROL  = r(495-7+71-7,2,'CAM timer control','msb')
+    CAMCLKDIV   = r(497-7+71-7,2,'CAM timer clock divide value','msb')
+    CAMOUTPUT   = r(499-7+71-7,2,'CAM timer output','msb')
 
 class APDCAM10G_cc_settings_v2(APDCAM10G_register_table):
     """
-    Settings of the CC card up to firmware version 1.05
+    Settings of the CC card from firmware version 1.05
     """
 
     # typedefs/shorthands
     b = APDCAM10G_register_bits
-    i = APDCAM10G_register_int
-    s = APDCAM10G_register_str
-    ip = APDCAM10G_register_ip
-    mac = APDCAM10G_register_mac
+    r = APDCAM10G_register
+    r2i  = APDCAM10G_register2int
+    r2ip = APDCAM10G_register2ip
+    r2mac = APDCAM10G_register2mac
+    r2b  = APDCAM10G_register2bits
+    r2s  = APDCAM10G_register2str
 
     def addressDisplay(self,a):
         if a<7-7+71-7:
             return str(a+7) + "-7"
         return str(a+7-71+7) + "-7+71-7"
 
-    BOARD_VERSION  = s(7-7, 10, 'Board type')
-    FIRMWARE_GROUP = s(17-7, 30-17+1, 'Firmware group')
-    FIRMWARE_GROUP_VERSION = b(31-7,2,'Firmware group version',[['VL',0,7,'Version low'],['VH',8,15,'Version high']],byteOrder='msb')
-    UPGRADEDATE            = b(33-7, 36-33+1,'Upgrade date',[['D',0,7,'Day'],['M',8,15,'Month'],['Y2',16,23,'Year last digit'],['Y1',24,31,'Year 3rd digit']],byteOrder='msb')
-    MAN_FIRMWAREGROUP      = s(37-7,50-37+1,'Manufacturer firmware group')
-    MAN_PROGRAMDATE        = b(51-7,54-51+1,'Manufacturer program date',[['D',0,7,'Day'],['M',8,15,'Month'],['Y2',16,23,'Year 4th digit'],['Y1',24,31,'Year 3rd digit']],byteOrder='msb')
-    MAN_SERIAL             = i(55-7,58-55+1,'Manufacturer serial number',byteOrder='msb')
-    MAN_TESTRESULT         = i(59-7,62-59+1,'Manufacturer test result',  byteOrder='msb')
-    SETTINGS_VERSION       = i(7-7+71-7,1,'Settings version',byteOrder='msb?')
-    DEV_NAME   = s(8-7+71-7,55-8+1,'Device name')
-    DEV_TYPE   = i(56-7+71-7,2,'Device type',byteOrder='msb')
-    DEV_SERIAL = i(58-7+71-7,4,'Device serial number',byteOrder='msb')
-    COMPANY    = s(62-7+71-7,18,'Company name')
-    HOST_NAME  = s(80-7+71-7,12,'Host name')
-    CONFIG     = b(92-7+71-7,2,'Configuration',[['LOCK',0,0,'Device is locked']],'msb')
-    USER_TEXT  = s(94-7+71-7,15,'User text')
-    MANAGE_MAC = mac(135-7+71-7,'Management port static MAC address')
-    MANAGE_IP  = ip(141-7+71-7,'Management port IPv4 address')
-    MANAGE_IP_MASK  = ip(145-7+71-7,'Management port IPv4 network mask')
-    MANAGE_MAC_MODE = i(149-7+71-7,1,'Management port MAC mode (0 - factorydefault, 1 - CW-Auto, 2 - static)')
-    MANAGE_IP_MODE  = i(150-7+71-7,1,'Management port IP mode (1 - static, 2 - DHCP)')
-    MANAGE_GW_MODE  = i(151-7+71-7,1,'Management port gateway mode (0 - None, 1 - static, 2 - DHCP)')
-    MANAGE_GW_IP    = ip(152-7+71-7,'Management port gateway IPv4 address')
-    MANAGE_ARP      = i(156-7+71-7,1,'Management port ARP (Advertisement Report Period) [s]')
-    MANAGE_IGMP     = i(157-7+71-7,1,'Management port IGMP report period [s]')
-    MANAGE_IP_TTL   = i(158-7+71-7,1,'Management port IPv4 Time To Live (TTL value in the IPv4 header)')
-    MANAGE_MAC_DEFAULT = mac(159-7+71-7,'Management port factory default MAC address')
-    STREAM_PORT_MAC    = mac(183-7+71-7,'Stream port static MAC address')
-    STREAM_PORT_IP     = ip(189-7+71-7,'Stream port IPv4 address')
-    STREAM_PORT_IP_MASK  = ip(193-7+71-7,'Stream port Ipv4 mask')
-    STREAM_PORT_MAC_MODE = i(197-7+71-7,1,'Stream port MAC mode (0 - factory default, 1 - CW-auto, 2 - static)')
-    STREAM_PORT_IP_MODE  = i(198-7+71-7,1,'Stream port IP mode (1 - static, 2 - DHCP)')
-    STREAM_PORT_GW_MODE  = i(199-7+71-7,1,'Stream port gateway mode (0 - none, 1 - static, 2 - DHCP)')
-    STREAM_PORT_GW_IP    = ip(200-7+71-7,'Stream port gateway IPv4 address')
-    STREAM_PORT_ARP      = i(204-7+71-7,1,'Stream port ARP Advertisement Report Period (0=off) [s]')
-    STREAM_PORT_IGMP     = i(205-7+71-7,1,'Stream port IGMP report period (0=off) [s]')
-    STREAM_PORT_IP_TTL   = i(206-7+71-7,1,'Stream port IPv4 Time To Live (TTL value in the IPv4 header)')
-    STREAM_PORT_MAC_DEFAULT = mac(207-7+71-7,'Stream port factory default MAC address')
-    HTTP_PORT     = i(231-7+71-7,2,'HTTP Port','lsb')
-    SMTP_PORT     = i(233-7+71-7,2,'SMTP server port','lsb')
-    CLOCK_CONTROL = b(263-7+71-7,1,'Clock control (SETCLOCKCONTROL instruction)',[ ['AS',2,2,'AD clock source (0 - internal, 1 - external)'], \
-                                                                                   ['AA',3,3,'External clock mode (0 - normal, 1 - auto)'], \
-                                                                                   ['SS',4,4,'Sample source (0 - internal, 1 - external)'] ], byteOrder='msb' )
-    CLOCK_ENABLE  = b(264-7+71-7,1,'Clock enable (SETCLOCKENABLE instruction)', [ ['CC',0,0,'Clock output of the CONTROL connector (0 - disable, 1 - enable)'], \
-                                                                                  ['EC',1,1,'Clock output of the EIO connector (0 - disable, 1 - enable)'], \
-                                                                                  ['CS',2,2,'Sample output of the CONTROL connector (0 - disable, 1 - enable)'], \
-                                                                                  ['ES',3,3,'Sample output of the EIO connector (0 - disable, 1 - enable)'] ], byteOrder='msb' ) 
-    BASE_PLL_MULT    = i(265-7+71-7,1,'Base PLL multiply value',byteOrder='msb')
-    BASE_PLL_DIV0    = i(266-7+71-7,1,'Base PLL divide value 0',byteOrder='msb')
-    BASE_PLL_DIV_ADC = i(267-7+71-7,1,'Base PLL divide value 1 (going to clock signal F1/ADC)',byteOrder='msb')
-    BASE_PLL_DIV2    = i(268-7+71-7,1,'Base PLL divide value 2')
-    BASE_PLL_DIV3    = i(269-7+71-7,1,'Base PLL divide value 3')
-    EXT_DCM_MULT     = i(270-7+71-7,1,'External DCM multiply value')
-    EXT_DCM_DIV      = i(271-7+71-7,1,'External DCM divide value')
-    SAMPLEDIV        = i(272-7+71-7,2,'Sample divide value','msb')
-    SPAREIO          = b(274-7+71-7,1,'Spare IO control',[ ['OUTVAL0',0,0,'Spare IO pin 0 output value'],\
-                                                           ['OUTVAL1',1,1,'Spare IO pin 1 output value'],\
-                                                           ['OUTVAL2',2,2,'Spare IO pin 2 output value'],\
-                                                           ['OUTVAL3',3,3,'Spare IO pin 3 output value'],\
-                                                           ['DIR0',4,4,'Direction (0-input, 1-output)'],\
-                                                           ['DIR1',5,5,'Direction (0-input, 1-output)'],\
-                                                           ['DIR2',6,6,'Direction (0-input, 1-output)'],\
-                                                           ['DIR3',7,7,'Direction (0-input, 1-output)'] ], byteOrder='msb' )  # 4..7: direction in v2
-    XFP         = b(275-7+71-7,1,'XFP',[ ['REFCLKENABLE',0,0,'XFP reference clock enable'] ] )
-    SAMPLECOUNT = i(276-7+71-7,281-276+1,'Sample count','msb')
-    EIO_ADC_CLK_DIV = i(282-7+71-7,1,'EIO ADC clock divider value')
-    TRIGDELAY       = i(283-7+71-7, 286-283+1,'Trigger delay',byteOrder='msb')
-    SERIAL_PLL_MULT = i(287-7+71-7,1,'Serial PLL multiply value')
-    SERIAL_PLL_DIV  = i(288-7+71-7,1,'Serial PLL divide value 0')
-    SATACONTROL     = b(292-7+71-7,1,'SATA Control',[ ['DSM',0,0,'Dual SATA mode (0 - disabled, 1 - enabled)'] ] )
-    G1TRIGCONTROL   = b(293-7+71-7,1,'G1 trigger control (SETG1TRIGGERMODULE instruction)', [ ['ETR',0,0,'External trigger rising slope (0=disabled, 1=enabled)'], \
-                                                                                              ['ETF',1,1,'External trigger falling slope (0=disabled, 1=enabled)'], \
-                                                                                              ['IT', 2,2,'IT','Internal trigger (0=disabled, 1=enabled)'], \
-                                                                                              ['CTR',3,3,'CAM timer 0 rising slope trigger (0=disabled, 1=enabled)'], \
-                                                                                              ['CTF',4,4,'CAM timer 0 rising slope trigger (0=disabled, 1=enabled)'], \
-                                                                                              ['SWT',5,5,'Generate software trigger'],\
-                                                                                              ['SWC',6,6,'Clear the output by software'],\
-                                                                                              ['CTS',7,7,'Clear trigger status'] ] )
-    G2GATECONTROL = b(294-7+71-7,1,'G2 gate control (SETG2GATEMODULE instruction)', [ ['EGP' ,0,0,'External gate polarity (0=normal, 1=inverted)'], \
-                                                                                      ['ETE' ,1,1,'External gate (0=disabled, 1=enabled)'], \
-                                                                                      ['IGP' ,2,2,'Internal gate polarity (0=normal, 1=inverted)'], \
-                                                                                      ['IGE' ,3,3,'Internal gate (0=disabled, 1=enabled)'], \
-                                                                                      ['CTGP',4,4,'CAM timer 0 gate polarity (0=normal, 1=inverted)'], \
-                                                                                      ['CTGE',5,5,'CAM timer 0 gate (0=diabled, 1=enabled)'],\
-                                                                                      ['SWG' ,7,7,'SWG','Software gate (0=cleared, 1=set - THIS IS WRITTEN VICE VERSA IN THE DOC!)'] ] )
+    BOARD_VERSION = r(7-7, 10, 'Board type',r2s())
+    FIRMWARE_GROUP = r(17-7, 30-17+1, 'Firmware group',r2s())
+    FIRMWARE_GROUP_VERSION = r(31-7,2,'Firmware group version',r2b([b(0,7,'VL','Version low'),b(8,15,'VH','Version high')],'msb'))
+    UPGRADEDATE = r(33-7, 36-33+1,'Upgrade date',r2b([b(0,7,'D','Day'),b(8,15,'M','Month'),b(16,23,'Y2','Year last digit'),b(24,31,'Y1','Year 3rd digit')],'msb'))
+    MAN_FIRMWAREGROUP = r(37-7,50-37+1,'Manufacturer firmware group',r2s())
+    MAN_PROGRAMDATE = r(51-7,54-51+1,'Manufacturer program date',r2b([b(0,7,'D','Day'),b(8,15,'M','Month'),b(16,23,'Y2','Year 4th digit'),b(24,31,'Y1','Year 3rd digit')],'msb'))
+    MAN_SERIAL = r(55-7,58-55+1,'Manufacturer serial number','msb')
+    MAN_TESTRESULT = r(59-7,62-59+1,'Manufacturer test result','msb')
+    SETTINGS_VERSION = r(7-7+71-7,1,'Settings version')
+    DEV_NAME = r(8-7+71-7,55-8+1,'Device name',r2s())
+    DEV_TYPE = r(56-7+71-7,2,'Device type','msb')
+    DEV_SERIAL = r(58-7+71-7,4,'Device serial number','msb')
+    COMPANY = r(62-7+71-7,18,'Company name',r2s())
+    HOST_NAME = r(80-7+71-7,12,'Host name',r2s())
+    CONFIG = r(92-7+71-7,2,'Configuration',r2b([b(0,0,'LOCK','Device is locked')],'msb'))
+    USER_TEXT = r(94-7+71-7,15,'User text',r2s())
+    MANAGE_MAC = r(135-7+71-7,140-135+1,'Management port static MAC address',r2mac())
+    MANAGE_IP = r(141-7+71-7,144-141+1,'Management port IPv4 address',r2ip())
+    MANAGE_IP_MASK    = r(145-7+71-7,148-145+1,'Management port IPv4 network mask',r2ip())
+    MANAGE_MAC_MODE = r(149-7+71-7,1,'Management port MAC mode (0 - factorydefault, 1 - CW-Auto, 2 - static)')
+    MANAGE_IP_MODE = r(150-7+71-7,1,'Management port IP mode (1 - static, 2 - DHCP)')
+    MANAGE_GW_MODE = r(151-7+71-7,1,'Management port gateway mode (0 - None, 1 - static, 2 - DHCP)')
+    MANAGE_GW_IP = r(152-7+71-7,155-152+1,'Management port gateway IPv4 address',r2ip())
+    MANAGE_ARP = r(156-7+71-7,1,'Management port ARP (Advertisement Report Period) [s]')
+    MANAGE_IGMP = r(157-7+71-7,1,'Management port IGMP report period [s]')
+    MANAGE_IP_TTL = r(158-7+71-7,1,'Management port IPv4 Time To Live (TTL value in the IPv4 header)')
+    MANAGE_MAC_DEFAULT =r(159-7+71-7,164-159+1,'Management port factory default MAC address',r2mac())
+    STREAM_PORT_MAC = r(183-7+71-7,188-183+1,'Stream port static MAC address',r2mac())
+    STREAM_PORT_IP = r(189-7+71-7,192-189+1,'Stream port IPv4 address',r2ip())
+    STREAM_PORT_IP_MASK = r(193-7+71-7,196-193+1,'Stream port Ipv4 mask',r2ip())
+    STREAM_PORT_MAC_MODE = r(197-7+71-7,1,'Stream port MAC mode (0 - factory default, 1 - CW-auto, 2 - static)')
+    STREAM_PORT_IP_MODE = r(198-7+71-7,1,'Stream port IP mode (1 - static, 2 - DHCP)')
+    STREAM_PORT_GW_MODE = r(199-7+71-7,1,'Stream port gateway mode (0 - none, 1 - static, 2 - DHCP)')
+    STREAM_PORT_GW_IP = r(200-7+71-7,203-200+1,'Stream port gateway IPv4 address',r2ip())
+    STREAM_PORT_ARP = r(204-7+71-7,1,'Stream port ARP Advertisement Report Period (0=off) [s]')
+    STREAM_PORT_IGMP = r(205-7+71-7,1,'Stream port IGMP report period (0=off) [s]')
+    STREAM_PORT_IP_TTL = r(206-7+71-7,1,'Stream port IPv4 Time To Live (TTL value in the IPv4 header)')
+    STREAM_PORT_MAC_DEFAULT = r(207-7+71-7,212-207+1,'Stream port factory default MAC address',r2mac())
+    HTTP_PORT = r(231-7+71-7,2,'HTTP Port','lsb')
+    SMTP_PORT = r(233-7+71-7,2,'SMTP server port','lsb')
+    CLOCK_CONTROL = r(263-7+71-7,1,'Clock control (SETCLOCKCONTROL instruction)',r2b([\
+                                b(2,2,'AS','AD clock source (0 - internal, 1 - external)'), \
+                                b(3,3,'AA','External clock mode (0 - normal, 1 - auto)'), \
+                                b(4,4,'SS','Sample source (0 - internal, 1 - external)')]))
+    CLOCK_ENABLE = r(264-7+71-7,1,'Clock enable (SETCLOCKENABLE instruction)', interpreter=r2b([\
+                         b(0,0,'CC','Clock output of the CONTROL connector (0 - disable, 1 - enable)'), \
+                         b(1,1,'EC','Clock output of the EIO connector (0 - disable, 1 - enable)'), \
+                         b(2,2,'CS','Sample output of the CONTROL connector (0 - disable, 1 - enable)'), \
+                         b(3,3,'ES','Sample output of the EIO connector (0 - disable, 1 - enable)')]))
+    BASE_PLL_MULT = r(265-7+71-7,1,'Base PLL multiply value')
+    BASE_PLL_DIV0 = r(266-7+71-7,1,'Base PLL divide value 0')
+    BASE_PLL_DIV_ADC = r(267-7+71-7,1,'Base PLL divide value 1 (going to clock signal F1/ADC)')
+    BASE_PLL_DIV2 = r(268-7+71-7,1,'Base PLL divide value 2')
+    BASE_PLL_DIV3 = r(269-7+71-7,1,'Base PLL divide value 3')
+    EXT_DCM_MULT  = r(270-7+71-7,1,'External DCM multiply value')
+    EXT_DCM_DIV   = r(271-7+71-7,1,'External DCM divide value')
+    SAMPLEDIV   = r(272-7+71-7,2,'Sample divide value','msb')
+    SPAREIO     = r(274-7+71-7,1,'Spare IO control',r2b([b(0,0,'OUTVAL0','Spare IO pin 0 output value'),\
+                                                         b(1,1,'OUTVAL1','Spare IO pin 1 output value'),\
+                                                         b(2,2,'OUTVAL2','Spare IO pin 2 output value'),\
+                                                         b(3,3,'OUTVAL3','Spare IO pin 3 output value'),\
+                                                         b(4,4,'DIR0','Spare IO pin 0 direction (0=output, 1=input)'),\
+                                                         b(5,5,'DIR1','Spare IO pin 1 direction (0=output, 1=input)'),\
+                                                         b(6,6,'DIR2','Spare IO pin 2 direction (0=output, 1=input)'),\
+                                                         b(7,7,'DIR3','Spare IO pin 3 direction (0=output, 1=input)')]))
+    XFP = r(275-7+71-7,1,'XFP',interpreter=r2b([b(0,0,'REFCLKENABLE','XFP reference clock enable')]))
+    SAMPLECOUNT = r(276-7+71-7,281-276+1,'Sample count','msb')
+    EIO_ADC_CLK_DIV = r(282-7+71-7,1,'EIO ADC clock divider value')
 
-    STREAMCONTROL   = b(299-7+71-7,1,'Stream control (SETSTREAMCONTROL instruction)',[ ['EN1',0,0,'Stream 1 disabled (0) or enabled (1)'], \
-                                                                                       ['EN2',1,1,'Stream 2 disabled (0) or enabled (1)'], \
-                                                                                       ['EN3',2,2,'Stream 3 disabled (0) or enabled (1)'], \
-                                                                                       ['EN4',3,3,'Stream 4 disabled (0) or enabled (1)'], \
-                                                                                       ['TM1',4,4,'Test mode of stream 1 disabled (0) or enabled (1)'], \
-                                                                                       ['TM2',5,5,'Test mode of stream 2 disabled (0) or enabled (1)'], \
-                                                                                       ['TM3',6,6,'Test mode of stream 3 disabled (0) or enabled (1)'], \
-                                                                                       ['TM4',7,7,'Test mode of stream 4 disabled (0) or enabled (1)'] ] )
-    UDPTESTCLOCK_DIV = i(300-7+71-7,303-300+1,'UDP test clock divider value','msb')
+    TRIGDELAY = r(283-7+71-7, 286-283+1,'Trigger delay','msb')
+    SERIAL_PLL_MULT = r(287-7+71-7,1,'Serial PLL multiply value')
+    SERIAL_PLL_DIV = r(288-7+71-7,1,'Serial PLL divide value 0')
+    SATACONTROL = r(292-7+71-7,1,'SATA Control',interpreter=r2b([b(0,0,'DSM','Dual SATA mode (0 - disabled, 1 - enabled)')]))
 
-    for j in range(4):
-        locals()['UDPOCTET' + str(j+1)]   = i  (311-7+71-7+j*16,2,'Stream '+str(j+1)+' octet','msb')
-        locals()['UDPMAC'   + str(j+1)]   = mac(313-7+71-7+j*16,'Stream '+str(j+1)+' MAC address')
-        locals()['IP'       + str(j+1)]   = ip (319-7+71-7+j*16,'Stream '+str(j+1)+' IPv4 address')
-        locals()['UDPPORT'  + str(j+1)]   = i  (323-7+71-7+j*16,2,'Stream '+str(j+1)+' UDP port','msb')
+    G1TRIGCONTROL = r(293-7+71-7,1,'G1 trigger control (SETG1TRIGGERMODULE instruction)',interpreter=r2b([\
+                          b(0,0,'ETR','External trigger rising slope (0=disabled, 1=enabled)'), \
+                          b(1,1,'ETF','External trigger falling slope (0=disabled, 1=enabled)'), \
+                          b(2,2,'IT','Internal trigger (0=disabled, 1=enabled)'), \
+                          b(3,3,'CTR','CAM timer 0 rising slope trigger (0=disabled, 1=enabled)'), \
+                          b(4,4,'CTF','CAM timer 0 rising slope trigger (0=disabled, 1=enabled)'), \
+                          b(5,5,'SWT','Generate software trigger'),\
+                          b(6,6,'SWC','Clear the output by software'),\
+                          b(7,7,'CTS','Clear trigger status')]))
+    G2GATECONTROL = r(294-7+71-7,1,'G2 gate control (SETG2GATEMODULE instruction)',interpreter=r2b([\
+                          b(0,0,'EGP','External gate polarity (0=normal, 1=inverted)'), \
+                          b(1,1,'ETE','External gate (0=disabled, 1=enabled)'), \
+                          b(2,2,'IGP','Internal gate polarity (0=normal, 1=inverted)'), \
+                          b(3,3,'IGE','Internal gate (0=disabled, 1=enabled)'), \
+                          b(4,4,'CTGP','CAM timer 0 gate polarity (0=normal, 1=inverted)'), \
+                          b(5,5,'CTGE','CAM timer 0 gate (0=diabled, 1=enabled)'),\
+                          b(7,7,'SWG','Software gate (0=cleared, 1=set - THIS IS WRITTEN VICE VERSA IN THE DOC!)')]))
+    
 
-    for j in range(10):
-        locals()['CAMTIMER' + str(j+1) + 'DELAY']   = i(375+j*16-7+71-7,4,'CT timer '+str(j+1)+' delay','msb')
-        locals()['CAMTIMER' + str(j+1) + 'ON']      = i(379+j*16-7+71-7,4,'CT timer '+str(j+1)+' on','msb')
-        locals()['CAMTIMER' + str(j+1) + 'OFF']     = i(383+j*16-7+71-7,4,'CT timer '+str(j+1)+' off','msb')
-        locals()['CAMTIMER' + str(j+1) + 'NPULSES'] = i(387+j*16-7+71-7,4,'CT timer '+str(j+1)+' number of pulses','msb')
-
-    CAMCONTROL  = i(495-7+71-7,2,'CAM timer control','msb')
-    CAMCLKDIV   = i(497-7+71-7,2,'CAM timer clock divide value','msb')
-    CAMOUTPUT   = i(499-7+71-7,2,'CAM timer output','msb')
+    STREAMCONTROL = r(299-7+71-7,1,'Stream control (SETSTREAMCONTROL instruction)',interpreter=r2b([\
+                                 b(0,0,'EN1','Stream 1 disabled (0) or enabled (1)'), \
+                                 b(1,1,'EN2','Stream 2 disabled (0) or enabled (1)'), \
+                                 b(2,2,'EN3','Stream 3 disabled (0) or enabled (1)'), \
+                                 b(3,3,'EN4','Stream 4 disabled (0) or enabled (1)'), \
+                                 b(4,4,'TM1','Test mode of stream 1 disabled (0) or enabled (1)'), \
+                                 b(5,5,'TM2','Test mode of stream 2 disabled (0) or enabled (1)'), \
+                                 b(6,6,'TM3','Test mode of stream 3 disabled (0) or enabled (1)'), \
+                                 b(7,7,'TM4','Test mode of stream 4 disabled (0) or enabled (1)')]))
+    UDPTESTCLOCK_DIV = r(300-7+71-7,303-300+1,'UDP test clock divider value','msb')
+    UDPOCTET1   = r(311-7+71-7,2,'Stream 1 octet','msb')
+    UDPMAC1     = r(313-7+71-7,6,'Stream 1 MAC address',r2mac())
+    IP1         = r(319-7+71-7,4,'Stream 1 IPv4 address',r2ip())
+    UDPPORT1    = r(323-7+71-7,2,'Stream 1 UDP port','msb')
+    UDPOCTET2   = r(327-7+71-7,2,'Stream 2 octet','msb')
+    UDPMAC2     = r(329-7+71-7,6,'Stream 2 MAC address',r2mac())
+    IP2         = r(335-7+71-7,4,'Stream 2 IPv4 address',r2ip())
+    UDPPORT2    = r(339-7+71-7,2,'Stream 2 UDP port','msb')
+    UDPOCTET3   = r(343-7+71-7,2,'Stream 3 octet','msb')
+    UDPMAC3     = r(345-7+71-7,6,'Stream 3 MAC address',r2mac())
+    IP3         = r(351-7+71-7,4,'Stream 3 IPv4 address',r2ip())
+    UDPPORT3    = r(355-7+71-7,2,'Stream 3 UDP port','msb')
+    UDPOCTET4   = r(359-7+71-7,2,'Stream 4 octet','msb')
+    UDPMAC4     = r(361-7+71-7,6,'Stream 4 MAC address',r2mac())
+    IP4         = r(367-7+71-7,4,'Stream 4 IPv4 address',r2ip())
+    UDPPORT4    = r(371-7+71-7,2,'Stream 4 UDP port','msb')
+    CAMTIMER1DELAY   = r(375-7+71-7,4,'CT timer 1 delay','msb')
+    CAMTIMER1ON      = r(379-7+71-7,4,'CT timer 1 on','msb')
+    CAMTIMER1OFF     = r(383-7+71-7,4,'CT timer 1 off','msb')
+    CAMTIMER1NPULSES = r(387-7+71-7,4,'CT timer 1 number of pulses','msb')
+    CAMTIMER2DELAY   = r(391-7+71-7,4,'CT timer 2 delay','msb')
+    CAMTIMER2ON      = r(395-7+71-7,4,'CT timer 2 on','msb')
+    CAMTIMER2OFF     = r(399-7+71-7,4,'CT timer 2 off','msb')
+    CAMTIMER2NPULSES = r(403-7+71-7,4,'CT timer 2 number of pulses','msb')
+    CAMTIMER3DELAY   = r(407-7+71-7,4,'CT timer 3 delay','msb')
+    CAMTIMER3ON      = r(411-7+71-7,4,'CT timer 3 on','msb')
+    CAMTIMER3OFF     = r(415-7+71-7,4,'CT timer 3 off','msb')
+    CAMTIMER3NPULSES = r(419-7+71-7,4,'CT timer 3 number of pulses','msb')
+    CAMTIMER4DELAY   = r(423-7+71-7,4,'CT timer 4 delay','msb')
+    CAMTIMER4ON      = r(427-7+71-7,4,'CT timer 4 on','msb')
+    CAMTIMER4OFF     = r(431-7+71-7,4,'CT timer 4 off','msb')
+    CAMTIMER4NPULSES = r(435-7+71-7,4,'CT timer 4 number of pulses','msb')
+    CAMTIMER5DELAY   = r(439-7+71-7,4,'CT timer 5 delay','msb')
+    CAMTIMER5ON      = r(443-7+71-7,4,'CT timer 5 on','msb')
+    CAMTIMER5OFF     = r(447-7+71-7,4,'CT timer 5 off','msb')
+    CAMTIMER5NPULSES = r(451-7+71-7,4,'CT timer 5 number of pulses','msb')
+    CAMTIMER6DELAY   = r(455-7+71-7,4,'CT timer 6 delay','msb')
+    CAMTIMER6ON      = r(459-7+71-7,4,'CT timer 6 on','msb')
+    CAMTIMER6OFF     = r(463-7+71-7,4,'CT timer 6 off','msb')
+    CAMTIMER6NPULSES = r(467-7+71-7,4,'CT timer 6 number of pulses','msb')
+    CAMTIMER7DELAY   = r(471-7+71-7,4,'CT timer 7 delay','msb')
+    CAMTIMER7ON      = r(475-7+71-7,4,'CT timer 7 on','msb')
+    CAMTIMER7OFF     = r(479-7+71-7,4,'CT timer 7 off','msb')
+    CAMTIMER7NPULSES = r(483-7+71-7,4,'CT timer 7 number of pulses','msb')
+    CAMTIMER8DELAY   = r(487-7+71-7,4,'CT timer 8 delay','msb')
+    CAMTIMER8ON      = r(491-7+71-7,4,'CT timer 8 on','msb')
+    CAMTIMER8OFF     = r(495-7+71-7,4,'CT timer 8 off','msb')
+    CAMTIMER8NPULSES = r(499-7+71-7,4,'CT timer 8 number of pulses','msb')
+    CAMTIMER9DELAY   = r(503-7+71-7,4,'CT timer 9 delay','msb')
+    CAMTIMER9ON      = r(507-7+71-7,4,'CT timer 9 on','msb')
+    CAMTIMER9OFF     = r(511-7+71-7,4,'CT timer 9 off','msb')
+    CAMTIMER9NPULSES = r(515-7+71-7,4,'CT timer 9 number of pulses','msb')
+    CAMTIMER10DELAY   = r(519-7+71-7,4,'CT timer 10 delay','msb')
+    CAMTIMER10ON      = r(523-7+71-7,4,'CT timer 10 on','msb')
+    CAMTIMER10OFF     = r(527-7+71-7,4,'CT timer 10 off','msb')
+    CAMTIMER10NPULSES = r(531-7+71-7,4,'CT timer 10 number of pulses','msb')
+    CAMCONTROL  = r(535-7+71-7,2,'CAM timer control','msb')
+    CAMCLKDIV   = r(537-7+71-7,2,'CAM timer clock divide value','msb')
+    CAMOUTPUT   = r(539-7+71-7,2,'CAM timer output','msb')
 
     
 class APDCAM10G_cc_variables_v1(APDCAM10G_register_table):
@@ -517,456 +711,731 @@ class APDCAM10G_cc_variables_v1(APDCAM10G_register_table):
 
     # typedefs/shorthands
     b = APDCAM10G_register_bits
-    i = APDCAM10G_register_int
-    s = APDCAM10G_register_str
-    ip = APDCAM10G_register_ip
-    mac = APDCAM10G_register_mac
+    r = APDCAM10G_register
+    r2i  = APDCAM10G_register2int
+    r2ip = APDCAM10G_register2ip
+    r2mac = APDCAM10G_register2mac
+    r2b  = APDCAM10G_register2bits
+    r2s  = APDCAM10G_register2str
 
     def addressDisplay(self,a):
         return str(a+7) + "-7"
 
-    MANAGE_MAC      = mac(7-7, 'Management port MAC address')
-    MANAGE_IP       = ip(13-7, 'Management port IPv4 address')
-    MANAGE_IP_MASK  = ip(17-7,'Management port IPv4 network mask')
-    MANAGE_LINK_ON  = i(21-7,1,'Management port link on')
-    MANAGE_GW_STATE = i(22-7,1,'Management port gateway state (0=none, 1=ok, 2=searching mac, 3=searching IP with DHCP)')
-    MANAGE_IP_STATE = i(23-7,1,'Management port IP state (1=ok, 3=searching IP with DHCP)')
-    MANAGE_DHCP_STATE = i(24-7,1,'Management port DHCP state (0=idle, 1=request, 2=discover)')
-    MANAGE_GW_MAC   = mac(25-7,'Management port gateway MAC address')
-    MANAGE_GW_IP    = ip(31-7,'Management port gateway IPv4 address')
-    MANAGE_DHCP_MAC = mac(35-7,'Management port DHCP server MAC address')
-    MANAGE_DHCP_SERVER_IP = ip(41-7,'Management port DHCP server IPv4 address')
-    MANAGE_IGMP_MAC = mac(45-7,'Management port IGMP switch MAC address')
-    MANAGE_IGMP_IP  = ip(51-7,'Management port IGMP switch IPv4 address')
-    MANAGE_DHCP_LT  = i(55-7,4,'Management port DHCP lease time','lsb')
-    MANAGE_ETHRX = i(59-7,4,'Management port ethernet RX frames','lsb')
-    MANAGE_ETHTX = i(63-7,4,'Management port ethernet TX frames','lsb')
-    STREAM_PORT_MAC = mac(71-7,'Stream port MAC address')
-    STREAM_PORT_IP  = ip(77-7,'Stream port IPv4 address')
-    STREAM_PORT_IP_MASK = ip(81-7,'Stream port IPv4 network mask')
-    STREAM_PORT_LINK_ON = i(85-7,1,'Stream port link on')
-    STREAM_PORT_GW_STATE = i(86-7,1,'Stream port gateway state (0=none, 1=ok, 2=searching MAC, 3=searching IP with DHCP)')
-    STREAM_PORT_IP_STATE = i(87-7,1,'Stream port IP state (1=ok, 3=searching IP with DHCP)')
-    STREAM_PORT_DHCP_STATE = i(88-7,1,'Stream port DHCP state (0=idle, 1=request, 2=discover)')
-    STREAM_PORT_GW_MAC = mac(89-7,'Stream port gateway MAC address')
-    STREAM_PORT_GW_IP = ip(95-7,'Stream port gateway IPv4 address')
-    STREAM_PORT_DHCP_MAC = mac(99-7,'Stream port DHCP server MAC address')
-    STREAM_PORT_DHCP_IP  = ip(105-7,'Stream port DHCP server IPv4 address')
-    STREAM_PORT_IGMP_MAC = mac(109-7,'Stream port IGMP switch MAC address')
-    STREAM_PORT_IGMP_IP  = ip(115-7,'Stream port IGMP switch IPv4 address')
-    STREAM_PORT_DHCP_LT = i(119-7,4,'Stream port DHCP lease time','lsb')
-    STREAM_PORT_ETHRX = i(123-7,4,'Stream port ethernet RX frames','lsb')
-    STREAM_PORT_ETHTX = i(127-7,4,'Stream port ethernet TX frames','lsb')
-    MANAGE_ETHBUF = i(135-7,1,'Management port ethernet buffers used')
-    MANAGE_ETHBUFMAX = i(136-7,1,'Management port ethernet buffers used max.')
-    MANAGE_ETHDROP = i(139-7,4,'Management port ethernet dropped frames','lsb')
-    MANAGE_TCPRX   = i(143-7,4,'Management port TCP RX packets','lsb')
-    MANAGE_TCPTX   = i(147-7,4,'Management port TCP TX packets','lsb')
-    MANAGE_TCPESTCONN  = i(151-7,4,'Management port TCP established connections','lsb')
-    MANAGE_TCPREJCONN  = i(155-7,4,'Management port TCP rejected connections','lsb')
-    MANAGE_TCPCLOCONN  = i(159-7,4,'Management port TCP closed connections','lsb')
-    MANAGE_TCPACTCONN  = i(163-7,4,'Management port TCP active connections','lsb')
-    MANAGE_TCPKATO     = i(167-7,4,'Management port TCP keep alive timeout','lsb')
-    MANAGE_TCPRETTO    = i(171-7,4,'Management port TCP retransmit timeout','lsb')
-    MANAGE_TCPRETRANS  = i(175-7,4,'Management port TCP retransmissions','lsb')
-    SYSTEMUPTIME = i(183-7,4,'System up time [ms]','lsb')
-    HWERROR = b(187-7,2,'Hardware error',[ ['SDRAM', 0,0,'SDRAM error'], \
-                                           ['EEPROM',1,1,'EEPROM error'], \
-                                           ['FPGA',  2,2,'FPGA error'], \
-                                           ['FLASH',3,3,'Internal flash error'], \
-                                           ['FLASH1',4,4,'Flash 1 error (web server flash)'], \
-                                           ['FLASH2',5,5,'Flash 2 error (storage flash)'] ],'lsb')
-    IICERROR = b(189-7,2,'IIC error', [ ['NOACK',0,0,'No ACK received'],\
-                                        ['ADDOVG',1,1,'ADDOVF','Address overflow'],\
-                                        ['POLL',2,2,'Polling error'] ],'lsb')
-    FPGAVH = i(192-7,1,'FPGA program version high')
-    FPGAVL = i(193-7,1,'FPGA program version low')
-    FPGA_STATUS = b(194-7,1,'FPGA status',[ ['BPLLLCK',0,0,'Basic PLL locked'],\
-                                            ['SPLLLCK',1,1,'Serial PLL locked'],\
-                                            ['EPLLLCK',2,2,'External DCM locked'],\
-                                            ['EXTCLKVAL',3,3,'External clock valid'],\
-                                            ['CAMTIM',4,5,'CAM timer state (0=idle, 1=armed, 1=running)'],\
-                                            ['STRADC',6,6,'Streaming ADC board data'],\
-                                            ['OVLD',7,7,'Overload'] ] )
-    STREAM_PORT_ETHSTAT = b(195-7,1,'Stream port ethernet status', [ ['XDCMLCK',0,0,'XGMII RX DCM locked'],\
-                                                                     ['XLNK',1,1,'XGMII link'],\
-                                                                     ['TXFULL',2,2,'Reserved for internal use (TX buffer is full)'] ] )
-    EXTCLKFREQ = i(196-7,2,'External clock frequench [kHz]','msb')
-    DSLVLCK = i(198-7,1,'DSLV lock status')
-    STREAM_PORT_RXERRCNT = i(199-7,2,'Stream port RX error counter','msb')
-    STREAM_PORT_RXOVFCNT = i(201-7,2,'Stream port RX overflow counter','msb')
-    STREAM_PORT_RXPKTCNT = i(203-7,2,'Stream port RX packetk counter','msb')
-    TRIGSTATE = i(205-7,1,'Trigger status')
-    STATUS = b(215-7,4,'Status',[ ['WEBBSY',0,0,'Web flash is busy (1) or free (0)'],\
-                                  ['STBSY',1,1,'Storage flash is busy (1) or free (0)'] ], byteOrder='lsb')
-    FUPCHKSUM = i(271-7,4,'FUP checksum','msb?')
-    FUPPROGR = i(275-7,1,'FUP in process')
-    BOARDTEMP = i(276-7,1,'Board temperature [C]')
-    VDD33 = i(279-7, 2, 'VDD 3.3V voltage [mV] (main power supply)',byteOrder='lsb')
-    VDD25 = i(281-7, 2, 'VDD 2.5V voltage [mV]',byteOrder='lsb')
-    VDD18 = i(283-7, 2, 'VDD 1.8V XC voltage [mV] (Xilinx FPGA)',byteOrder='lsb')
-    VDD12 = i(285-7, 2, 'VDD 1.2V ST voltage [mV] (core voltage of Stellaris Microcontroll.)',byteOrder='lsb')
-    SCBVER = i(287-7,2,'SCB controller version',byteOrder='msb?') 
-    MARVELLBC = i(289-7,2,'Marvell boot counter (for internal use)',byteOrder='msb')
-    MARVELL30x8127 = i(289-7,2,'Marvell register 3.0x8127 (for internal use)',byteOrder='msb')
-    DEBUGSTATE = i(299-7,2,'Debug state (for internal use)',byteOrder='msb')
-    MAXBOARDTEMP = i(302-7,1,'Maximum board temperature')
-    MAXVDD33 = i(303-7,2,'Maximum VDD 3.3V','lsb?')
-    SAMPLECOUNT1 = i(305-7,6,'Actual value ofo the stream #1 sample counter','msb?')
-    SAMPLECOUNT1 = i(311-7,6,'Actual value ofo the stream #2 sample counter','msb?')
-    SAMPLECOUNT1 = i(317-7,6,'Actual value ofo the stream #3 sample counter','msb?')
-    SAMPLECOUNT1 = i(323-7,6,'Actual value ofo the stream #4 sample counter','msb?')
+    MANAGE_MAC = r(7-7, 6, 'Management port MAC address', r2mac())
+    MANAGE_IP  = r(13-7,4, 'Management port IPv4 address', r2ip())
+    MANAGE_IP_MASK = r(17-7,4,'Management port IPv4 network mask', r2ip())
+    MANAGE_LINK_ON = r(21-7,1,'Management port link on')
+    MANAGE_GW_STATE = r(22-7,1,'Management port gateway state (0=none, 1=ok, 2=searching mac, 3=searching IP with DHCP)')
+    MANAGE_IP_STATE = r(23-7,1,'Management port IP state (1=ok, 3=searching IP with DHCP)')
+    MANAGE_DHCP_STATE = r(24-7,1,'Management port DHCP state (0=idle, 1=request, 2=discover)')
+    MANAGE_GW_MAC = r(25-7,6,'Management port gateway MAC address',r2mac())
+    MANAGE_GW_IP  = r(31-7,4,'Management port gateway IPv4 address',r2ip())
+    MANAGE_DHCP_MAC = r(35-7,6,'Management port DHCP server MAC address',r2mac())
+    MANAGE_DHCP_SERVER_IP = r(41-7,4,'Management port DHCP server IPv4 address',r2ip())
+    MANAGE_IGMP_MAC = r(45-7,6,'Management port IGMP switch MAC address',r2mac())
+    MANAGE_IGMP_IP  = r(51-7,4,'Management port IGMP switch IPv4 address',r2ip())
+    MANAGE_DHCP_LT  = r(55-7,4,'Management port DHCP lease time','lsb')
+    MANAGE_ETHRX = r(59-7,4,'Management port ethernet RX frames','lsb')
+    MANAGE_ETHTX = r(63-7,4,'Management port ethernet TX frames','lsb')
+    STREAM_PORT_MAC = r(71-7,6,'Stream port MAC address',r2mac())
+    STREAM_PORT_IP  = r(77-7,4,'Stream port IPv4 address',r2ip())
+    STREAM_PORT_IP_MASK = r(81-7,4,'Stream port IPv4 network mask',r2ip())
+    STREAM_PORT_LINK_ON = r(85-7,1,'Stream port link on')
+    STREAM_PORT_GW_STATE = r(86-7,1,'Stream port gateway state (0=none, 1=ok, 2=searching MAC, 3=searching IP with DHCP)')
+    STREAM_PORT_IP_STATE = r(87-7,1,'Stream port IP state (1=ok, 3=searching IP with DHCP)')
+    STREAM_PORT_DHCP_STATE = r(88-7,1,'Stream port DHCP state (0=idle, 1=request, 2=discover)')
+    STREAM_PORT_GW_MAC = r(89-7,6,'Stream port gateway MAC address',r2mac())
+    STREAM_PORT_GW_IP = r(95-7,4,'Stream port gateway IPv4 address',r2ip())
+    STREAM_PORT_DHCP_MAC = r(99-7,6,'Stream port DHCP server MAC address',r2mac())
+    STREAM_PORT_DHCP_IP  = r(105-7,4,'Stream port DHCP server IPv4 address',r2ip())
+    STREAM_PORT_IGMP_MAC = r(109-7,6,'Stream port IGMP switch MAC address',r2mac())
+    STREAM_PORT_IGMP_IP  = r(115-7,4,'Stream port IGMP switch IPv4 address', r2ip())
+    STREAM_PORT_DHCP_LT = r(119-7,4,'Stream port DHCP lease time','lsb')
+    STREAM_PORT_ETHRX = r(123-7,4,'Stream port ethernet RX frames','lsb')
+    STREAM_PORT_ETHTX = r(127-7,4,'Stream port ethernet TX frames','lsb')
+    MANAGE_ETHBUF = r(135-7,1,'Management port ethernet buffers used')
+    MANAGE_ETHBUFMAX = r(136-7,1,'Management port ethernet buffers used max.')
+    MANAGE_ETHDROP = r(139-7,4,'Management port ethernet dropped frames','lsb')
+    MANAGE_TCPRX   = r(143-7,4,'Management port TCP RX packets','lsb')
+    MANAGE_TCPTX   = r(147-7,4,'Management port TCP TX packets','lsb')
+    MANAGE_TCPESTCONN  = r(151-7,4,'Management port TCP established connections','lsb')
+    MANAGE_TCPREJCONN  = r(155-7,4,'Management port TCP rejected connections','lsb')
+    MANAGE_TCPCLOCONN  = r(159-7,4,'Management port TCP closed connections','lsb')
+    MANAGE_TCPACTCONN  = r(163-7,4,'Management port TCP active connections','lsb')
+    MANAGE_TCPKATO     = r(167-7,4,'Management port TCP keep alive timeout','lsb')
+    MANAGE_TCPRETTO    = r(171-7,4,'Management port TCP retransmit timeout','lsb')
+    MANAGE_TCPRETRANS  = r(175-7,4,'Management port TCP retransmissions','lsb')
+    SYSTEMUPTIME = r(183-7,4,'System up time [ms]','lsb')
+    HWERROR = r(187-7,2,'Hardware error',interpreter=r2b([\
+                                         b(0,0,'SDRAM','SDRAM error'), \
+                                         b(1,1,'EEPROM','EEPROM error'), \
+                                         b(2,2,'FPGA','FPGA error'), \
+                                         b(3,3,'FLASH','Internal flash error'), \
+                                         b(4,4,'FLASH1','Flash 1 error (web server flash)'), \
+                                         b(5,5,'FLASH2','Flash 2 error (storage flash)')],'lsb'))
+    IICERROR = r(189-7,2,'IIC error', interpreter=r2b([b(0,0,'NOACK','No ACK received'),\
+                                                       b(1,1,'ADDOVF','Address overflow'),\
+                                                       b(2,2,'POLL','Polling error')],'lsb'))
+    FPGAVH = r(192-7,1,'FPGA program version high')
+    FPGAVL = r(193-7,1,'FPGA program version low')
+    FPGA_STATUS = r(194-7,1,'FPGA status',interpreter=r2b([b(0,0,'BPLLLCK','Basic PLL locked'),\
+                                                           b(1,1,'SPLLLCK','Serial PLL locked'),\
+                                                           b(2,2,'EPLLLCK','External DCM locked'),\
+                                                           b(3,3,'EXTCLKVAL','External clock valid'),\
+                                                           b(4,5,'CAMTIM','CAM timer state (0=idle, 1=armed, 1=running)'),\
+                                                           b(6,6,'STRADC','Streaming ADC board data'),\
+                                                           b(7,7,'OVLD','Overload')]))
+    STREAM_PORT_ETHSTAT = r(195-7,1,'Stream port ethernet status',\
+                            interpreter=r2b([b(0,0,'XDCMLCK','XGMII RX DCM locked'),\
+                                             b(1,1,'XLNK','XGMII link'),\
+                                             b(2,2,'TXFULL','Reserved for internal use (TX buffer is full)')]))
+    EXTCLKFREQ = r(196-7,2,'External clock frequench [kHz]','msb')
+    DSLVLCK = r(198-7,1,'DSLV lock status')
+    STREAM_PORT_RXERRCNT = r(199-7,2,'Stream port RX error counter','msb')
+    STREAM_PORT_RXOVFCNT = r(201-7,2,'Stream port RX overflow counter','msb')
+    STREAM_PORT_RXPKTCNT = r(203-7,2,'Stream port RX packetk counter','msb')
+    TRIGSTATE = r(205-7,1,'Trigger status')
+    STATUS = r(215-7,4,'Status',interpreter=r2b([b(0,0,'WEBBSY','Web flash is busy (1) or free (0)'),\
+                                                 b(1,1,'STBSY','Storage flash is busy (1) or free (0)')],\
+                                                'lsb'))
+    FUPCHKSUM = r(271-7,4,'FUP checksum','msb?')
+    FUPPROGR = r(275-7,1,'FUP in process')
+    BOARDTEMP = r(276-7,1,'Board temperature [C]')
+    VDD33 = r(279-7, 2, 'VDD 3.3V voltage [mV] (main power supply)','lsb')
+    VDD25 = r(281-7, 2, 'VDD 2.5V voltage [mV]','lsb')
+    VDD18 = r(283-7, 2, 'VDD 1.8V XC voltage [mV] (Xilinx FPGA)','lsb')
+    VDD12 = r(285-7, 2, 'VDD 1.2V ST voltage [mV] (core voltage of Stellaris Microcontroll.)','lsb')
+    SCBVER = r(287-7,2,'SCB controller version','msb?') 
+    MARVELLBC = r(289-7,2,'Marvell boot counter (for internal use)','msb')
+    MARVELL30x8127 = r(289-7,2,'Marvell register 3.0x8127 (for internal use)','msb')
+    DEBUGSTATE = r(299-7,2,'Debug state (for internal use)','msb')
+    MAXBOARDTEMP = r(302-7,1,'Maximum board temperature')
+    MAXVDD33 = r(303-7,2,'Maximum VDD 3.3V','lsb?')
+    SAMPLECOUNT1 = r(305-7,6,'Actual value ofo the stream #1 sample counter','msb?')
+    SAMPLECOUNT1 = r(311-7,6,'Actual value ofo the stream #2 sample counter','msb?')
+    SAMPLECOUNT1 = r(317-7,6,'Actual value ofo the stream #3 sample counter','msb?')
+    SAMPLECOUNT1 = r(323-7,6,'Actual value ofo the stream #4 sample counter','msb?')
 
 class APDCAM10G_cc_variables_v2(APDCAM10G_register_table):
     """
-    Variables of the CC card up to firmware version 1.04
+    Variables of the CC card from firmware version 1.05
     """
 
     # typedefs/shorthands
     b = APDCAM10G_register_bits
-    i = APDCAM10G_register_int
-    s = APDCAM10G_register_str
-    ip = APDCAM10G_register_ip
-    mac = APDCAM10G_register_mac
+    r = APDCAM10G_register
+    r2i  = APDCAM10G_register2int
+    r2ip = APDCAM10G_register2ip
+    r2mac = APDCAM10G_register2mac
+    r2b  = APDCAM10G_register2bits
+    r2s  = APDCAM10G_register2str
 
     def addressDisplay(self,a):
         return str(a+7) + "-7"
 
-    MANAGE_MAC      = mac(7-7,  'Management port MAC address')
-    MANAGE_IP       = ip(13-7, 'Management port IPv4 address')
-    MANAGE_IP_MASK  = ip(17-7,'Management port IPv4 network mask')
-    MANAGE_LINK_ON  = i(21-7,1,'Management port link on')
-    MANAGE_GW_STATE = i(22-7,1,'Management port gateway state (0=none, 1=ok, 2=searching mac, 3=searching IP with DHCP)')
-    MANAGE_IP_STATE = i(23-7,1,'Management port IP state (1=ok, 3=searching IP with DHCP)')
-    MANAGE_DHCP_STATE = i(24-7,1,'Management port DHCP state (0=idle, 1=request, 2=discover)')
-    MANAGE_GW_MAC   = mac(25-7,'Management port gateway MAC address')
-    MANAGE_GW_IP    = ip(31-7,'Management port gateway IPv4 address')
-    MANAGE_DHCP_MAC = mac(35-7,'Management port DHCP server MAC address')
-    MANAGE_DHCP_SERVER_IP = ip(41-7,'Management port DHCP server IPv4 address')
-    MANAGE_IGMP_MAC = mac(45-7,'Management port IGMP switch MAC address')
-    MANAGE_IGMP_IP  = ip(51-7,'Management port IGMP switch IPv4 address')
-    MANAGE_DHCP_LT  = i(55-7,4,'Management port DHCP lease time','lsb')
-    MANAGE_ETHRX = i(59-7,4,'Management port ethernet RX frames','lsb')
-    MANAGE_ETHTX = i(63-7,4,'Management port ethernet TX frames','lsb')
-    STREAM_PORT_MAC = mac(71-7,'Stream port MAC address')
-    STREAM_PORT_IP  = ip(77-7,4,'Stream port IPv4 address')
-    STREAM_PORT_IP_MASK = ip(81-7,'Stream port IPv4 network mask')
-    STREAM_PORT_LINK_ON = i(85-7,1,'Stream port link on')
-    STREAM_PORT_GW_STATE = i(86-7,1,'Stream port gateway state (0=none, 1=ok, 2=searching MAC, 3=searching IP with DHCP)')
-    STREAM_PORT_IP_STATE = i(87-7,1,'Stream port IP state (1=ok, 3=searching IP with DHCP)')
-    STREAM_PORT_DHCP_STATE = i(88-7,1,'Stream port DHCP state (0=idle, 1=request, 2=discover)')
-    STREAM_PORT_GW_MAC = mac(89-7,'Stream port gateway MAC address')
-    STREAM_PORT_GW_IP = ip(95-7,'Stream port gateway IPv4 address')
-    STREAM_PORT_DHCP_MAC = mac(99-7,'Stream port DHCP server MAC address')
-    STREAM_PORT_DHCP_IP  = ip(105-7,'Stream port DHCP server IPv4 address')
-    STREAM_PORT_IGMP_MAC = mac(109-7,'Stream port IGMP switch MAC address')
-    STREAM_PORT_IGMP_IP  = ip(115-7,'Stream port IGMP switch IPv4 address')
-    STREAM_PORT_DHCP_LT = i(119-7,4,'Stream port DHCP lease time','lsb')
-    STREAM_PORT_ETHRX = i(123-7,4,'Stream port ethernet RX frames','lsb')
-    STREAM_PORT_ETHTX = i(127-7,4,'Stream port ethernet TX frames','lsb')
-    MANAGE_ETHBUF = i(135-7,1,'Management port ethernet buffers used')
-    MANAGE_ETHBUFMAX = i(136-7,1,'Management port ethernet buffers used max.')
-    MANAGE_ETHDROP = i(139-7,4,'Management port ethernet dropped frames','lsb')
-    MANAGE_TCPRX   = i(143-7,4,'Management port TCP RX packets','lsb')
-    MANAGE_TCPTX   = i(147-7,4,'Management port TCP TX packets','lsb')
-    MANAGE_TCPESTCONN  = i(151-7,4,'Management port TCP established connections','lsb')
-    MANAGE_TCPREJCONN  = i(155-7,4,'Management port TCP rejected connections','lsb')
-    MANAGE_TCPCLOCONN  = i(159-7,4,'Management port TCP closed connections','lsb')
-    MANAGE_TCPACTCONN  = i(163-7,4,'Management port TCP active connections','lsb')
-    MANAGE_TCPKATO     = i(167-7,4,'Management port TCP keep alive timeout','lsb')
-    MANAGE_TCPRETTO    = i(171-7,4,'Management port TCP retransmit timeout','lsb')
-    MANAGE_TCPRETRANS  = i(175-7,4,'Management port TCP retransmissions','lsb')
-    SYSTEMUPTIME = i(183-7,4,'System up time [ms]','lsb')
-    HWERROR = b(187-7,2,'Hardware error',[ ['SDRAM', 0,0,'SDRAM error'], \
-                                           ['EEPROM',1,1,'EEPROM error'], \
-                                           ['FPGA',  2,2,'FPGA error'], \
-                                           ['FLASH',3,3,'Internal flash error'], \
-                                           ['FLASH1',4,4,'Flash 1 error (web server flash)'], \
-                                           ['FLASH2',5,5,'Flash 2 error (storage flash)'] ],'lsb')
-    IICERROR = b(189-7,2,'IIC error', [ ['NOACK',0,0,'No ACK received'],\
-                                        ['ADDOVG',1,1,'ADDOVF','Address overflow'],\
-                                        ['POLL',2,2,'Polling error'] ],'lsb')
-    FPGAVH = i(192-7,1,'FPGA program version high')
-    FPGAVL = i(193-7,1,'FPGA program version low')
-    FPGA_STATUS = b(194-7,1,'FPGA status',[ ['BPLLLCK',0,0,'Basic PLL locked'],\
-                                            ['SPLLLCK',1,1,'Serial PLL locked'],\
-                                            ['EPLLLCK',2,2,'External DCM locked'],\
-                                            ['EXTCLKVAL',3,3,'External clock valid'],\
-                                            ['CAMTIM',4,5,'CAM timer state (0=idle, 1=armed, 1=running)'],\
-                                            ['STRADC',6,6,'Streaming ADC board data'],\
-                                            ['OVLD',7,7,'Overload'] ] )
-    STREAM_PORT_ETHSTAT = b(195-7,1,'Stream port ethernet status', [ ['XDCMLCK',0,0,'XGMII RX DCM locked'],\
-                                                                     ['XLNK',1,1,'XGMII link'],\
-                                                                     ['TXFULL',2,2,'Reserved for internal use (TX buffer is full)'] ] )
-    EXTCLKFREQ = i(196-7,2,'External clock frequench [kHz]','msb')
-    DSLVLCK = i(198-7,1,'DSLV lock status')
-    STREAM_PORT_RXERRCNT = i(199-7,2,'Stream port RX error counter','msb')
-    STREAM_PORT_RXOVFCNT = i(201-7,2,'Stream port RX overflow counter','msb')
-    STREAM_PORT_RXPKTCNT = i(203-7,2,'Stream port RX packetk counter','msb')
-    TRIGSTATE = b(205-7,1,'Trigger status',[ ['ETR',0,0,'External trigger rising slope'],\
-                                             ['ETF',1,1,'External trigger falling slope'],\
-                                             ['IT', 2,2,'Internal trigger'],\
-                                             ['CTR',3,3,'CAM timer 0 rising slope'],\
-                                             ['CTF',4,4,'CAM timer 0 falling slope'],\
-                                             ['SWT',5,5,'Software trigger'],\
-                                             ['G1',6,6,'Output of the G1 trigger module'],\
-                                             ['G2',7,7,'Output of the G2 gate'] ] )
-    SPAREIOIN = b(206-7,1,'Spare IO input',[ ['INVAL0',0,0,'Spare IO pin 0 input value'],\
-                                             ['INVAL1',1,1,'Spare IO pin 1 input value'],\
-                                             ['INVAL2',2,2,'Spare IO pin 2 input value'],\
-                                             ['INVAL3',3,3,'Spare IO pin 3 input value'] ] )
-    STATUS = b(215-7,4,'Status',[ ['WEBBSY',0,0,'Web flash is busy (1) or free (0)'],\
-                                  ['STBSY',1,1,'Storage flash is busy (1) or free (0)'] ], byteOrder='lsb')
-    FUPCHKSUM = i(271-7,4,'FUP checksum','msb?')
-    FUPPROGR = i(275-7,1,'FUP in process')
-    BOARDTEMP = i(276-7,1,'Board temperature [C]')
-    VDD33 = i(279-7, 2, 'VDD 3.3V voltage [mV] (main power supply)',byteOrder='lsb')
-    VDD25 = i(281-7, 2, 'VDD 2.5V voltage [mV]',byteOrder='lsb')
-    VDD18 = i(283-7, 2, 'VDD 1.8V XC voltage [mV] (Xilinx FPGA)',byteOrder='lsb')
-    VDD12 = i(285-7, 2, 'VDD 1.2V ST voltage [mV] (core voltage of Stellaris Microcontroll.)',byteOrder='lsb')
-    SCBVER = i(287-7,2,'SCB controller version',byteOrder='msb?') 
-    MARVELLBC = i(289-7,2,'Marvell boot counter (for internal use)',byteOrder='msb')
-    MARVELL30x8127 = i(289-7,2,'Marvell register 3.0x8127 (for internal use)',byteOrder='msb')
-    DEBUGSTATE = i(299-7,2,'Debug state (for internal use)',byteOrder='msb')
-    MAXBOARDTEMP = i(302-7,1,'Maximum board temperature')
-    MAXVDD33 = i(303-7,2,'Maximum VDD 3.3V','lsb?')
-    SAMPLECOUNT1 = i(305-7,6,'Actual value ofo the stream #1 sample counter','msb?')
-    SAMPLECOUNT1 = i(311-7,6,'Actual value ofo the stream #2 sample counter','msb?')
-    SAMPLECOUNT1 = i(317-7,6,'Actual value ofo the stream #3 sample counter','msb?')
-    SAMPLECOUNT1 = i(323-7,6,'Actual value ofo the stream #4 sample counter','msb?')
+    MANAGE_MAC = r(7-7, 6, 'Management port MAC address', r2mac())
+    MANAGE_IP  = r(13-7,4, 'Management port IPv4 address', r2ip())
+    MANAGE_IP_MASK = r(17-7,4,'Management port IPv4 network mask', r2ip())
+    MANAGE_LINK_ON = r(21-7,1,'Management port link on')
+    MANAGE_GW_STATE = r(22-7,1,'Management port gateway state (0=none, 1=ok, 2=searching mac, 3=searching IP with DHCP)')
+    MANAGE_IP_STATE = r(23-7,1,'Management port IP state (1=ok, 3=searching IP with DHCP)')
+    MANAGE_DHCP_STATE = r(24-7,1,'Management port DHCP state (0=idle, 1=request, 2=discover)')
+    MANAGE_GW_MAC = r(25-7,6,'Management port gateway MAC address',r2mac())
+    MANAGE_GW_IP  = r(31-7,4,'Management port gateway IPv4 address',r2ip())
+    MANAGE_DHCP_MAC = r(35-7,6,'Management port DHCP server MAC address',r2mac())
+    MANAGE_DHCP_SERVER_IP = r(41-7,4,'Management port DHCP server IPv4 address',r2ip())
+    MANAGE_IGMP_MAC = r(45-7,6,'Management port IGMP switch MAC address',r2mac())
+    MANAGE_IGMP_IP  = r(51-7,4,'Management port IGMP switch IPv4 address',r2ip())
+    MANAGE_DHCP_LT  = r(55-7,4,'Management port DHCP lease time','lsb')
+    MANAGE_ETHRX = r(59-7,4,'Management port ethernet RX frames','lsb')
+    MANAGE_ETHTX = r(63-7,4,'Management port ethernet TX frames','lsb')
+    STREAM_PORT_MAC = r(71-7,6,'Stream port MAC address',r2mac())
+    STREAM_PORT_IP  = r(77-7,4,'Stream port IPv4 address',r2ip())
+    STREAM_PORT_IP_MASK = r(81-7,4,'Stream port IPv4 network mask',r2ip())
+    STREAM_PORT_LINK_ON = r(85-7,1,'Stream port link on')
+    STREAM_PORT_GW_STATE = r(86-7,1,'Stream port gateway state (0=none, 1=ok, 2=searching MAC, 3=searching IP with DHCP)')
+    STREAM_PORT_IP_STATE = r(87-7,1,'Stream port IP state (1=ok, 3=searching IP with DHCP)')
+    STREAM_PORT_DHCP_STATE = r(88-7,1,'Stream port DHCP state (0=idle, 1=request, 2=discover)')
+    STREAM_PORT_GW_MAC = r(89-7,6,'Stream port gateway MAC address',r2mac())
+    STREAM_PORT_GW_IP = r(95-7,4,'Stream port gateway IPv4 address',r2ip())
+    STREAM_PORT_DHCP_MAC = r(99-7,6,'Stream port DHCP server MAC address',r2mac())
+    STREAM_PORT_DHCP_IP  = r(105-7,4,'Stream port DHCP server IPv4 address',r2ip())
+    STREAM_PORT_IGMP_MAC = r(109-7,6,'Stream port IGMP switch MAC address',r2mac())
+    STREAM_PORT_IGMP_IP  = r(115-7,4,'Stream port IGMP switch IPv4 address', r2ip())
+    STREAM_PORT_DHCP_LT = r(119-7,4,'Stream port DHCP lease time','lsb')
+    STREAM_PORT_ETHRX = r(123-7,4,'Stream port ethernet RX frames','lsb')
+    STREAM_PORT_ETHTX = r(127-7,4,'Stream port ethernet TX frames','lsb')
+    MANAGE_ETHBUF = r(135-7,1,'Management port ethernet buffers used')
+    MANAGE_ETHBUFMAX = r(136-7,1,'Management port ethernet buffers used max.')
+    MANAGE_ETHDROP = r(139-7,4,'Management port ethernet dropped frames','lsb')
+    MANAGE_TCPRX   = r(143-7,4,'Management port TCP RX packets','lsb')
+    MANAGE_TCPTX   = r(147-7,4,'Management port TCP TX packets','lsb')
+    MANAGE_TCPESTCONN  = r(151-7,4,'Management port TCP established connections','lsb')
+    MANAGE_TCPREJCONN  = r(155-7,4,'Management port TCP rejected connections','lsb')
+    MANAGE_TCPCLOCONN  = r(159-7,4,'Management port TCP closed connections','lsb')
+    MANAGE_TCPACTCONN  = r(163-7,4,'Management port TCP active connections','lsb')
+    MANAGE_TCPKATO     = r(167-7,4,'Management port TCP keep alive timeout','lsb')
+    MANAGE_TCPRETTO    = r(171-7,4,'Management port TCP retransmit timeout','lsb')
+    MANAGE_TCPRETRANS  = r(175-7,4,'Management port TCP retransmissions','lsb')
+    SYSTEMUPTIME = r(183-7,4,'System up time [ms]','lsb')
+    HWERROR = r(187-7,2,'Hardware error',interpreter=r2b([\
+                                         b(0,0,'SDRAM','SDRAM error'), \
+                                         b(1,1,'EEPROM','EEPROM error'), \
+                                         b(2,2,'FPGA','FPGA error'), \
+                                         b(3,3,'FLASH','Internal flash error'), \
+                                         b(4,4,'FLASH1','Flash 1 error (web server flash)'), \
+                                         b(5,5,'FLASH2','Flash 2 error (storage flash)')],'lsb'))
+    IICERROR = r(189-7,2,'IIC error', interpreter=r2b([b(0,0,'NOACK','No ACK received'),\
+                                                       b(1,1,'ADDOVF','Address overflow'),\
+                                                       b(2,2,'POLL','Polling error')],'lsb'))
+    FPGAVH = r(192-7,1,'FPGA program version high')
+    FPGAVL = r(193-7,1,'FPGA program version low')
+    FPGA_STATUS = r(194-7,1,'FPGA status',interpreter=r2b([b(0,0,'BPLLLCK','Basic PLL locked'),\
+                                                           b(1,1,'SPLLLCK','Serial PLL locked'),\
+                                                           b(2,2,'EPLLLCK','External DCM locked'),\
+                                                           b(3,3,'EXTCLKVAL','External clock valid'),\
+                                                           b(4,5,'CAMTIM','CAM timer state (0=idle, 1=armed, 1=running)'),\
+                                                           b(6,6,'STRADC','Streaming ADC board data'),\
+                                                           b(7,7,'OVLD','Overload')]))
+    STREAM_PORT_ETHSTAT = r(195-7,1,'Stream port ethernet status',\
+                            interpreter=r2b([b(0,0,'XDCMLCK','XGMII RX DCM locked'),\
+                                             b(1,1,'XLNK','XGMII link'),\
+                                             b(2,2,'TXFULL','Reserved for internal use (TX buffer is full)')]))
+    EXTCLKFREQ = r(196-7,2,'External clock frequench [kHz]','msb')
+    DSLVLCK = r(198-7,1,'DSLV lock status')
+    STREAM_PORT_RXERRCNT = r(199-7,2,'Stream port RX error counter','msb')
+    STREAM_PORT_RXOVFCNT = r(201-7,2,'Stream port RX overflow counter','msb')
+    STREAM_PORT_RXPKTCNT = r(203-7,2,'Stream port RX packetk counter','msb')
+    TRIGSTATE = r(205-7,1,'Trigger status',r2b([b(0,0,'ETR','External trigger rising slope'),\
+                                                b(1,1,'ETF','External trigger falling slope'),\
+                                                b(2,2,'IT','Internal trigger'),\
+                                                b(3,3,'CTR','CAM timer 0 rising slope'),\
+                                                b(4,4,'CTF','CAM timer 0 falling slope'),\
+                                                b(5,5,'SWT','Software trigger'),\
+                                                b(6,6,'G1','Output of the G1 trigger module'),\
+                                                b(7,7,'G2','Output of the G2 gate')]))
+    SPAREIOIN = r(206-7,1,'Spare IO input',r2b([b(0,0,'INVAL0','Spare IO pin 0 input value'),\
+                                                b(1,1,'INVAL1','Spare IO pin 1 input value'),\
+                                                b(2,2,'INVAL2','Spare IO pin 2 input value'),\
+                                                b(3,3,'INVAL3','Spare IO pin 3 input value')]))
+    STATUS = r(215-7,4,'Status',interpreter=r2b([b(0,0,'WEBBSY','Web flash is busy (1) or free (0)'),\
+                                                 b(1,1,'STBSY','Storage flash is busy (1) or free (0)')],\
+                                                'lsb'))
+    FUPCHKSUM = r(271-7,4,'FUP checksum','msb?')
+    FUPPROGR = r(275-7,1,'FUP in process')
+    BOARDTEMP = r(276-7,1,'Board temperature [C]')
+    VDD33 = r(279-7, 2, 'VDD 3.3V voltage [mV] (main power supply)','lsb')
+    VDD25 = r(281-7, 2, 'VDD 2.5V voltage [mV]','lsb')
+    VDD18 = r(283-7, 2, 'VDD 1.8V XC voltage [mV] (Xilinx FPGA)','lsb')
+    VDD12 = r(285-7, 2, 'VDD 1.2V ST voltage [mV] (core voltage of Stellaris Microcontroll.)','lsb')
+    SCBVER = r(287-7,2,'SCB controller version','msb?') 
+    MARVELLBC = r(289-7,2,'Marvell boot counter (for internal use)','msb')
+    MARVELL30x8127 = r(289-7,2,'Marvell register 3.0x8127 (for internal use)','msb')
+    DEBUGSTATE = r(299-7,2,'Debug state (for internal use)','msb')
+    MAXBOARDTEMP = r(302-7,1,'Maximum board temperature')
+    MAXVDD33 = r(303-7,2,'Maximum VDD 3.3V','lsb?')
+    SAMPLECOUNT1 = r(305-7,6,'Actual value ofo the stream #1 sample counter','msb?')
+    SAMPLECOUNT1 = r(311-7,6,'Actual value ofo the stream #2 sample counter','msb?')
+    SAMPLECOUNT1 = r(317-7,6,'Actual value ofo the stream #3 sample counter','msb?')
+    SAMPLECOUNT1 = r(323-7,6,'Actual value ofo the stream #4 sample counter','msb?')
+
     
 class APDCAM10G_pc_registers_v1(APDCAM10G_register_table):
     """
     This class is a representation of the PC card's registers
     """
-
     # typedefs/shorthands
     b = APDCAM10G_register_bits
-    i = APDCAM10G_register_int
-    s = APDCAM10G_register_str
-    ip = APDCAM10G_register_ip
-    mac = APDCAM10G_register_mac
-    
+    r = APDCAM10G_register
+    r2i  = APDCAM10G_register2int
+    r2b  = APDCAM10G_register2bits
+    r2s  = APDCAM10G_register2str
+
     def addressDisplay(self,a):
         return hex(self.startByte)
     
-    BOARD_VERSION = i(0x0000, 1, 'Board version code')
-    FW_VERSION    = i(0X0002, 2, 'Firmware version code (x100)','lsb')
+    BOARD_VERSION = r(0x0000, 1, 'Board version code')
+    FW_VERSION    = r(0X0002, 2, 'Firmware version code (x100)','lsb')
+    HV1MON        = r(0x04, 2, 'Monitor output of HV generator 1 (/0.12)',interpreter=r2b([b(0,11,'HV1','Monitor of HV1 voltage')],byteOrder='lsb'))
+    HV2MON        = r(0x06, 2, 'Monitor output of HV generator 2 (/0.12)',interpreter=r2b([b(0,11,'HV2','Monitor of HV2 voltage')],byteOrder='lsb'))
+    HV3MON        = r(0x08, 2, 'Monitor output of HV generator 3 (/0.12)',interpreter=r2b([b(0,11,'HV3','Monitor of HV3 voltage')],byteOrder='lsb'))
+    HV4MON        = r(0x0A, 2, 'Monitor output of HV generator 4 (/0.12)',interpreter=r2b([b(0,11,'HV4','Monitor of HV4 voltage')],byteOrder='lsb'))
+    TEMP_SENSOR_1 = r(0x0C, 2, 'Temperature sensor 1 reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_2 = r(0x0E, 2, 'Temperature sensor 2 reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_3 = r(0x10, 2, 'Temperature sensor 3 reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_4 = r(0x12, 2, 'Temperature sensor 4 reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_5 = r(0x14, 2, 'Temperature sensor (detector 1) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_6 = r(0x16, 2, 'Temperature sensor (analog amplifier 1) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_7 = r(0x18, 2, 'Temperature sensor (analog amplifier 2) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_8 = r(0x1A, 2, 'Temperature sensor (detector 2) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_9 = r(0x1C, 2, 'Temperature sensor (analog amplifier 3) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_10 = r(0x1E, 2, 'Temperature sensor (analog amplifier 4) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_11 = r(0x20, 2, 'Temperature sensor (baseplate) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_12 = r(0x22, 2, 'Temperature sensor 12 reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_13 = r(0x24, 2, 'Temperature sensor (diode) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_14 = r(0x26, 2, 'Temperature sensor (Peltier heat sink) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_15 = r(0x28, 2, 'Temperature sensor (power panel) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_16 = r(0x2A, 2, 'Temperature sensor (power panel heat sink) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    PELT_CTRL   = r(0x2C, 2, 'Actual Peltier controller output voltage(current?) [-4000..4000]. Negative means heating',r2i(byteOrder='lsb?',signed=True))
+    PELT_MANUAL = r(0x4E, 2, 'Manual Peltier controller output voltage(current?) [-4000..4000] enabled by bit#3 of ANALOG_POWER. Negative means heating','lsb?/signed') # for FW >= 1.43
+    P_GAIN = r(0x50, 2, 'Peltier controller P gain value (x100)','lsb?')
+    I_GAIN = r(0x52, 2, 'Peltier controller I gain value (x100)','lsb?')
+    D_GAIN = r(0x54, 2, 'Peltier controller D gain value (x100)','lsb?')
+    HV1SET = r(0x56, 2, 'Set value of high voltage generator 1 (/0.12)',interpreter=r2b([b(0,11,'HV1','')],byteOrder='lsb'))
+    HV2SET = r(0x58, 2, 'Set value of high voltage generator 2 (/0.12)',interpreter=r2b([b(0,11,'HV2','')],byteOrder='lsb'))
+    HV3SET = r(0x5A, 2, 'Set value of high voltage generator 3 (/0.12)',interpreter=r2b([b(0,11,'HV3','')],byteOrder='lsb'))
+    HV4SET = r(0x5C, 2, 'Set value of high voltage generator 4 (/0.12)',interpreter=r2b([b(0,11,'HV4','')],byteOrder='lsb'))
+    HVON = r(0x5E, 1, 'High voltages on/off',interpreter=r2b([b(0,0,'HV1ON','HV1 is on'), \
+                                                                b(1,1,'HV2ON','HV2 is on'), \
+                                                                b(2,2,'HV3ON','HV3 is on'), \
+                                                                b(3,3,'HV4ON','HV4 is on')]))
+    HVENABLE = r(0x60, 1, 'HV enabled (a value of 171 enables globally, otherwise disabled)')
+    IRQ_ENABLE_HV = r(0x62, 1, 'Generate interrupt if HVMON differs from HVSET by more than HV_IRQ_LEVEL', interpreter=r2b([b(0,0,'HV1','Generate interrupt if HV1 has wrong value'), \
+                                                                                                                            b(1,1,'HV2','Generate interrupt if HV2 has wrong value'), \
+                                                                                                                            b(2,2,'HV3','Generate interrupt if HV3 has wrong value'), \
+                                                                                                                            b(3,3,'HV4','Generate interrupt if HV4 has wrong value')]))
+    IRQ_POWER_PID_ENABLE = r(0x64, 1, 'Enable temperature alarm interrupt, analog +/-5V supplies, PID control',interpreter=r2b([b(0,0,'TEMPALRM','Enable interrupt on temperature alarm'), \
+                                                                                                                                b(1,1,'ANALOG5V','Enable analog +/-5V supplies'), \
+                                                                                                                                b(2,2,'PIDDISABLE','Disable PID control')]))
+    HV_IRQ_LEVEL = r(0x66,2,'Maximum difference allowed between the set and monitor voltages before interrupt is generated [mV?]',interpreter=r2b([b(0,11,'LEVEL','The threshold difference value')],byteOrder='lsb?'))
+    HV_FAILURE = r(0x68, 1, 'Latched bits for HV failure (must be cleared explicitely)',interpreter=r2b([b(0,0,'HV1FAIL','HV1 has failed'), \
+                                                                                                         b(1,1,'HV2FAIL','HV2 has failed'), \
+                                                                                                         b(2,2,'HV3FAIL','HV3 has failed'), \
+                                                                                                         b(3,3,'HV4FAIL','HV4 has failed')]))
+    DETECTOR_TEMP_SET = r(0x6A, 2, 'Reference temperature to which the detector temperature is controlled (x10)', interpreter=r2b([b(0,11,'TEMP','The reference temperature value')],byteOrder='lsb?'))
+    FAN1_SPEED = r(0x6C, 1, 'Speed of fan 1 if fan is in manual mode')
+    FAN2_SPEED = r(0x6E, 1, 'Speed of fan 2 if fan is in manual mode')
+    FAN3_SPEED = r(0x70, 1, 'Speed of fan 3 if fan is in manual mode')
+    FAN1_TEMP_SET = r(0x72, 2, 'Required temperature for fan1 control (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    FAN1_TEMP_DIFF = r(0x74, 2, 'Temp. diff. to start the fan (both + and -) (x10)', interpreter=r2b([b(0,11,'TDIFF','')],'lsb?'))
+    FAN2_TEMP_LIMIT = r(0x76, 2, 'Fan2 will switch in gradually when temp. reaches this value (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    FAN3_TEMP_LIMIT = r(0x78, 2, 'Fan3 will switch in gradually when temp. reaches this value (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    CALLIGHT = r(0x7A, 2, 'Calibration LED current. Zero value ensures complete darkneww',interpreter=r2b([b(0,11,'CURRENT','')],'lsb?'))
+    CALUPDATE = r(0x7C, 2, 'LED update period [us]. 0 disables periodic LED update','lsb?')
+    IRQ_STATUS = r(0x7E, 1, 'Status of various interrupt requests. Can be cleared by writing 0.', interpreter=r2b([b(0,0,'HV','Interrupt due to HV'),\
+                                                                                                                  b(1,1,'TEMP','Tempertaure alarm'),\
+                                                                                                                  b(2,2,'CALLIGHT','Calibration update (failure?)')]))
+    SHMODE  = r(0x80, 1, 'Shutter operation mode. (0 - manual [by writing to SHSTATE], 1 - external [by shutter control input])')
+    SHSTATE = r(0x82, 1, 'Shutter state (0 - closed, 1 - open)')
+    RESET_FACTORY = r(0x84, 1, 'Writing hex 0xCD here causes factory reset')
+    ERRORCODE = r(0x86, 1, 'Code of the last error',tooltip='0x41-HV1SET>HV1MAX, 0x42-HV2SET>HV1MAX, 0x43-HV3SET>HV3MAX, 0x44-HV4SET>HV4MAX, 0x50-write attempt of read-only or non-existent register, 0xF6-shutter sense is opened/closed in same time, 0x7C-Peltier controller has no valid weight values or temp sensor error')
+    FACTORY_WRITE = r(0x88,2,'Writing a hex 0x?? value enables writing FACTORY_CAL_TABLE','lsb?')
+    FIRMWARE_UPGR_ERROR_CODE = r(0x8E, 1, 'Error code for checking the integrity of uploaded firmware (0x11=OK, 0x12=checksum error)','hex')
+    START_FIRMWARE_UPGR = r(0x90, 1, 'Writing 0x28 triggers checking uploaded FW, 0xC4 triggers checking and installing FW')
+    FIRMWARE_NEXT_CHAR = r(0x92,1,'Actual firmware data byte')
+    FIRMWARE_NEXT_LINE = r(0x94,0xFF-0x94+1,'Will be the new communication method to write complete HEX line for faster FW upgrade',r2s())
+    BOARD_SERIAL = r(0x100, 2, 'Board unique serial number','lsb?')
+    HV1MAX = r(0x102, 2, 'Maximum allowed value for HV1',interpreter=r2b([b(0,11,'MAX','')],byteOrder='lsb'))
+    HV2MAX = r(0x104, 2, 'Maximum allowed value for HV2',interpreter=r2b([b(0,11,'MAX','')],byteOrder='lsb'))
+    HV3MAX = r(0x106, 2, 'Maximum allowed value for HV3',interpreter=r2b([b(0,11,'MAX','')],byteOrder='lsb'))
+    HV4MAX = r(0x108, 2, 'Maximum allowed value for HV4',interpreter=r2b([b(0,11,'MAX','')],byteOrder='lsb'))
+    TEMP_CTRL_WEIGHTS_1 = r(0x10A,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_2 = r(0x10C,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_3 = r(0x10E,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_4 = r(0x110,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_5 = r(0x112,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_6 = r(0x114,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_7 = r(0x116,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_8 = r(0x118,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_9 = r(0x11A,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_10 = r(0x11C,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_11 = r(0x11E,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_12 = r(0x120,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_13 = r(0x122,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_14 = r(0x124,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_15 = r(0x126,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_16 = r(0x128,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    FAN1_CTRL_WEIGHTS_1 = r(0x12A,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_2 = r(0x12C,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_3 = r(0x12E,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_4 = r(0x130,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_5 = r(0x132,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_6 = r(0x134,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_7 = r(0x136,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_8 = r(0x138,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_9 = r(0x13A,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_10 = r(0x13C,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_11 = r(0x13E,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_12 = r(0x140,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_13 = r(0x142,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_14 = r(0x144,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_15 = r(0x146,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_16 = r(0x148,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_1 = r(0x14A,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_2 = r(0x14C,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_3 = r(0x14E,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_4 = r(0x150,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_5 = r(0x152,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_6 = r(0x154,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_7 = r(0x156,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_8 = r(0x158,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_9 = r(0x15A,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_10 = r(0x15C,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_11 = r(0x15E,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_12 = r(0x160,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_13 = r(0x162,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_14 = r(0x164,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_15 = r(0x166,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_16 = r(0x168,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_1 = r(0x16A,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_2 = r(0x16C,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_3 = r(0x16E,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_4 = r(0x170,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_5 = r(0x172,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_6 = r(0x174,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_7 = r(0x176,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_8 = r(0x178,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_9 = r(0x17A,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_10 = r(0x17C,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_11 = r(0x17E,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_12 = r(0x180,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_13 = r(0x182,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_14 = r(0x184,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_15 = r(0x186,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_16 = r(0x188,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
 
-    # for searching: HV1MON, HV2MON, HV3MON, HV4MON
-    for j in range(4):
-        locals()['HV' + str(j+1) + 'MON'] = b(0x04+j*2, 2, 'Monitor output of HV generator ' + str(j+1) + ' (/0.12)',[ ['HV' + str(j+1),0,11,'Monitor of HV' + str(j+1) + ' voltage'] ],byteOrder='lsb')
-
-    TEMP_SENSOR_1 = b(0x0C, 2, 'Temperature sensor 1 reading (x10)', [ ['TEMP',0,11,''] ],'lsb?')
-    TEMP_SENSOR_2 = b(0x0E, 2, 'Temperature sensor 2 reading (x10)', [ ['TEMP',0,11,''] ],'lsb?')
-    TEMP_SENSOR_3 = b(0x10, 2, 'Temperature sensor 3 reading (x10)', [ ['TEMP',0,11,''] ],'lsb?')
-    TEMP_SENSOR_4 = b(0x12, 2, 'Temperature sensor 4 reading (x10)', [ ['TEMP',0,11,''] ],'lsb?')
-    TEMP_SENSOR_5 = b(0x14, 2, 'Temperature sensor (detector 1) reading (x10)', [ ['TEMP',0,11,''] ],'lsb?')
-    TEMP_SENSOR_6 = b(0x16, 2, 'Temperature sensor (analog amplifier 1) reading (x10)', [ ['TEMP',0,11,''] ],'lsb?')
-    TEMP_SENSOR_7 = b(0x18, 2, 'Temperature sensor (analog amplifier 2) reading (x10)', [ ['TEMP',0,11,''] ],'lsb?')
-    TEMP_SENSOR_8 = b(0x1A, 2, 'Temperature sensor (detector 2) reading (x10)', [ ['TEMP',0,11,''] ],'lsb?')
-    TEMP_SENSOR_9 = b(0x1C, 2, 'Temperature sensor (analog amplifier 3) reading (x10)', [ ['TEMP',0,11,''] ],'lsb?')
-    TEMP_SENSOR_10 = b(0x1E, 2, 'Temperature sensor (analog amplifier 4) reading (x10)', [ ['TEMP',0,11,''] ],'lsb?')
-    TEMP_SENSOR_11 = b(0x20, 2, 'Temperature sensor (baseplate) reading (x10)', [ ['TEMP',0,11,''] ],'lsb?')
-    TEMP_SENSOR_12 = b(0x22, 2, 'Temperature sensor 12 reading (x10)', [ ['TEMP',0,11,''] ],'lsb?')
-    TEMP_SENSOR_13 = b(0x24, 2, 'Temperature sensor (diode) reading (x10)', [ ['TEMP',0,11,''] ],'lsb?')
-    TEMP_SENSOR_14 = b(0x26, 2, 'Temperature sensor (Peltier heat sink) reading (x10)', [ ['TEMP',0,11,''] ],'lsb?')
-    TEMP_SENSOR_15 = b(0x28, 2, 'Temperature sensor (power panel) reading (x10)', [ ['TEMP',0,11,''] ],'lsb?')
-    TEMP_SENSOR_16 = b(0x2A, 2, 'Temperature sensor (power panel heat sink) reading (x10)', [ ['TEMP',0,11,''] ],'lsb?')
-    PELT_CTRL   = i(0x2C, 2, 'Actual Peltier controller output voltage(current?) [-4000..4000]. Negative means heating',byteOrder='lsb?',signed=True)
-    PELT_MANUAL = i(0x4E, 2, 'Manual Peltier controller output voltage(current?) [-4000..4000] enabled by bit#3 of ANALOG_POWER. Negative means heating',byteOrder='lsb?',signed=True) # for FW >= 1.43
-    P_GAIN = i(0x50, 2, 'Peltier controller P gain value (x100)',byteOrder='lsb?')
-    I_GAIN = i(0x52, 2, 'Peltier controller I gain value (x100)',byteOrder='lsb?')
-    D_GAIN = i(0x54, 2, 'Peltier controller D gain value (x100)',byteOrder='lsb?')
-    HV1SET = b(0x56, 2, 'Set value of high voltage generator 1 (/0.12)',[ ['HV1',0,11,''] ],byteOrder='lsb')
-    HV2SET = b(0x58, 2, 'Set value of high voltage generator 2 (/0.12)',[ ['HV2',0,11,''] ],byteOrder='lsb')
-    HV3SET = b(0x5A, 2, 'Set value of high voltage generator 3 (/0.12)',[ ['HV3',0,11,''] ],byteOrder='lsb')
-    HV4SET = b(0x5C, 2, 'Set value of high voltage generator 4 (/0.12)',[ ['HV4',0,11,''] ],byteOrder='lsb')
-    HVON = b(0x5E, 1, 'High voltages on/off',[ ['HV'+str(j+1)+'ON',j,j,'HV'+str(j+1)+' is on'] for j in range(4) ])
-    HVENABLE = i(0x60, 1, 'HV enabled (a value of 171 enables globally, otherwise disabled)')
-    IRQ_ENABLE_HV = b(0x62, 1, 'Generate interrupt if HVMON differs from HVSET by more than HV_IRQ_LEVEL', [ ['HV'+str(j+1),j,j,'Generate interrupt if HV'+str(j+1)+' has wrong value'] for j in range(4) ])
-    IRQ_POWER_PID_ENABLE = b(0x64, 1, 'Enable temperature alarm interrupt, analog +/-5V supplies, PID control',[ ['TEMPALRM',0,0,'Enable interrupt on temperature alarm'], \
-                                                                                                                 ['ANALOG5V',1,1,'Enable analog +/-5V supplies'], \
-                                                                                                                 ['PIDDISABLE',2,2,'Disable PID control'] ] )
-    HV_IRQ_LEVEL = b(0x66,2,'Maximum difference allowed between the set and monitor voltages before interrupt is generated [mV?]',[ ['LEVEL',0,11,'The threshold difference value'] ],byteOrder='lsb?')
     
-    HV_FAILURE = b(0x68, 1, 'Latched bits for HV failure (must be cleared explicitely)',[ ['HV'+str(j+1)+'FAIL',j,j,'HV'+str(j+1)+' has failed'] for j in range(4) ])
-
-    DETECTOR_TEMP_SET = b(0x6A, 2, 'Reference temperature to which the detector temperature is controlled (x10)', [ ['TEMP',0,11,'The reference temperature value'] ],byteOrder='lsb?')
-    FAN1_SPEED = i(0x6C, 1, 'Speed of fan 1 if fan is in manual mode')
-    FAN2_SPEED = i(0x6E, 1, 'Speed of fan 2 if fan is in manual mode')
-    FAN3_SPEED = i(0x70, 1, 'Speed of fan 3 if fan is in manual mode')
-    FAN1_TEMP_SET = b(0x72, 2, 'Required temperature for fan1 control (x10)', [ ['TEMP',0,11,''] ],'lsb?')
-    FAN1_TEMP_DIFF = b(0x74, 2, 'Temp. diff. to start the fan (both + and -) (x10)', [ ['TDIFF',0,11,''] ],'lsb?')
-    FAN2_TEMP_LIMIT = b(0x76, 2, 'Fan2 will switch in gradually when temp. reaches this value (x10)', [ ['TEMP',0,11,''] ],'lsb?')
-    FAN3_TEMP_LIMIT = b(0x78, 2, 'Fan3 will switch in gradually when temp. reaches this value (x10)', [ ['TEMP',0,11,''] ],'lsb?')
-    CALLIGHT = b(0x7A, 2, 'Calibration LED current. Zero value ensures complete darkneww',[ ['CURRENT',0,11,''] ],'lsb?')
-    CALUPDATE = i(0x7C, 2, 'LED update period [us]. 0 disables periodic LED update','lsb?')
-    IRQ_STATUS = b(0x7E, 1, 'Status of various interrupt requests. Can be cleared by writing 0.', [ ['HV',0,0,'Interrupt due to HV'],\
-                                                                                                    ['TEMP',1,1,'Tempertaure alarm'],\
-                                                                                                    ['CALLIGHT',2,2,'Calibration update (failure?)'] ] )
-    SHMODE  = i(0x80, 1, 'Shutter operation mode. (0 - manual [by writing to SHSTATE], 1 - external [by shutter control input])')
-    SHSTATE = i(0x82, 1, 'Shutter state (0 - closed, 1 - open)')
-    RESET_FACTORY = i(0x84, 1, 'Writing hex 0xCD here causes factory reset')
-    ERRORCODE = i(0x86, 1, 'Code of the last error',longDescription='0x41-HV1SET>HV1MAX, 0x42-HV2SET>HV1MAX, 0x43-HV3SET>HV3MAX, 0x44-HV4SET>HV4MAX, 0x50-write attempt of read-only or non-existent register, 0xF6-shutter sense is opened/closed in same time, 0x7C-Peltier controller has no valid weight values or temp sensor error')
-    FACTORY_WRITE = i(0x88,2,'Writing a hex 0x?? value enables writing FACTORY_CAL_TABLE','lsb?')
-    FIRMWARE_UPGR_ERROR_CODE = i(0x8E, 1, 'Error code for checking the integrity of uploaded firmware (0x11=OK, 0x12=checksum error)',format='hex')
-    START_FIRMWARE_UPGR = i(0x90, 1, 'Writing 0x28 triggers checking uploaded FW, 0xC4 triggers checking and installing FW')
-    #FIRMWARE_NEXT_CHAR = i(0x92,1,'Actual firmware data byte')
-    #FIRMWARE_NEXT_LINE = s(0x94,0xFF-0x94+1,'Will be the new communication method to write complete HEX line for faster FW upgrade')
-    BOARD_SERIAL = i(0x100, 2, 'Board unique serial number','lsb?')
-
-    # for searching: HV1MAX, HV2MAX, HV3MAX, HV4MAX
-    for j in range(4):
-        locals()['HV'+str(j+1)+'MAX'] = b(0x102+j*2, 2, 'Maximum allowed value for HV'+str(j+1),[ ['MAX',0,11,''] ],byteOrder='lsb')
-
-    for j in range(16):
-        locals()['TEMP_CTRL_WEIGHTS_'+str(j+1)] = i(0x10A+j*2,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
-        locals()['FAN1_CTRL_WEIGHTS_'+str(j+1)] = i(0x12A+j*2,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
-        locals()['FAN2_CTRL_WEIGHTS_'+str(j+1)] = i(0x14A+j*2,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
-        locals()['FAN3_CTRL_WEIGHTS_'+str(j+1)] = i(0x16A+j*2,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
-
-    
-class APDCAM10G_pc_registers_v2(APDCAM10G_pc_registers_v1):
+class APDCAM10G_pc_registers_v2(APDCAM10G_register_table):
     """
     CURRENTLY THIS IS A 1-TO-1O COPY OF V1, I DO NOT KNOW IF ANYTHING ON THE PC HAS CHANGED
+    
+    This class is a representation of the PC card's registers
     """
-    pass
+    # typedefs/shorthands
+    b = APDCAM10G_register_bits
+    r = APDCAM10G_register
+    r2i  = APDCAM10G_register2int
+    r2b  = APDCAM10G_register2bits
+    r2s  = APDCAM10G_register2str
+
+    def addressDisplay(self,a):
+        return hex(self.startByte)
+    
+    BOARD_VERSION = r(0x0000, 1, 'Board version code')
+    FW_VERSION    = r(0X0002, 2, 'Firmware version code (x100)','lsb')
+    HV1MON        = r(0x04, 2, 'Monitor output of HV generator 1 (/0.12)',interpreter=r2b([b(0,11,'HV1','Monitor of HV1 voltage')],byteOrder='lsb'))
+    HV2MON        = r(0x06, 2, 'Monitor output of HV generator 2 (/0.12)',interpreter=r2b([b(0,11,'HV2','Monitor of HV2 voltage')],byteOrder='lsb'))
+    HV3MON        = r(0x08, 2, 'Monitor output of HV generator 3 (/0.12)',interpreter=r2b([b(0,11,'HV3','Monitor of HV3 voltage')],byteOrder='lsb'))
+    HV4MON        = r(0x0A, 2, 'Monitor output of HV generator 4 (/0.12)',interpreter=r2b([b(0,11,'HV4','Monitor of HV4 voltage')],byteOrder='lsb'))
+    TEMP_SENSOR_1 = r(0x0C, 2, 'Temperature sensor 1 reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_2 = r(0x0E, 2, 'Temperature sensor 2 reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_3 = r(0x10, 2, 'Temperature sensor 3 reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_4 = r(0x12, 2, 'Temperature sensor 4 reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_5 = r(0x14, 2, 'Temperature sensor (detector 1) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_6 = r(0x16, 2, 'Temperature sensor (analog amplifier 1) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_7 = r(0x18, 2, 'Temperature sensor (analog amplifier 2) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_8 = r(0x1A, 2, 'Temperature sensor (detector 2) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_9 = r(0x1C, 2, 'Temperature sensor (analog amplifier 3) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_10 = r(0x1E, 2, 'Temperature sensor (analog amplifier 4) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_11 = r(0x20, 2, 'Temperature sensor (baseplate) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_12 = r(0x22, 2, 'Temperature sensor 12 reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_13 = r(0x24, 2, 'Temperature sensor (diode) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_14 = r(0x26, 2, 'Temperature sensor (Peltier heat sink) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_15 = r(0x28, 2, 'Temperature sensor (power panel) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    TEMP_SENSOR_16 = r(0x2A, 2, 'Temperature sensor (power panel heat sink) reading (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    PELT_CTRL   = r(0x2C, 2, 'Actual Peltier controller output voltage(current?) [-4000..4000]. Negative means heating',r2i(byteOrder='lsb?',signed=True))
+    PELT_MANUAL = r(0x4E, 2, 'Manual Peltier controller output voltage(current?) [-4000..4000] enabled by bit#3 of ANALOG_POWER. Negative means heating','lsb?/signed') # for FW >= 1.43
+    P_GAIN = r(0x50, 2, 'Peltier controller P gain value (x100)','lsb?')
+    I_GAIN = r(0x52, 2, 'Peltier controller I gain value (x100)','lsb?')
+    D_GAIN = r(0x54, 2, 'Peltier controller D gain value (x100)','lsb?')
+    HV1SET = r(0x56, 2, 'Set value of high voltage generator 1 (/0.12)',interpreter=r2b([b(0,11,'HV1','')],byteOrder='lsb'))
+    HV2SET = r(0x58, 2, 'Set value of high voltage generator 2 (/0.12)',interpreter=r2b([b(0,11,'HV2','')],byteOrder='lsb'))
+    HV3SET = r(0x5A, 2, 'Set value of high voltage generator 3 (/0.12)',interpreter=r2b([b(0,11,'HV3','')],byteOrder='lsb'))
+    HV4SET = r(0x5C, 2, 'Set value of high voltage generator 4 (/0.12)',interpreter=r2b([b(0,11,'HV4','')],byteOrder='lsb'))
+    HVON = r(0x5E, 1, 'High voltages on/off',interpreter=r2b([b(0,0,'HV1ON','HV1 is on'), \
+                                                                b(1,1,'HV2ON','HV2 is on'), \
+                                                                b(2,2,'HV3ON','HV3 is on'), \
+                                                                b(3,3,'HV4ON','HV4 is on')]))
+    HVENABLE = r(0x60, 1, 'HV enabled (a value of 171 enables globally, otherwise disabled)')
+    IRQ_ENABLE_HV = r(0x62, 1, 'Generate interrupt if HVMON differs from HVSET by more than HV_IRQ_LEVEL', interpreter=r2b([b(0,0,'HV1','Generate interrupt if HV1 has wrong value'), \
+                                                                                                                            b(1,1,'HV2','Generate interrupt if HV2 has wrong value'), \
+                                                                                                                            b(2,2,'HV3','Generate interrupt if HV3 has wrong value'), \
+                                                                                                                            b(3,3,'HV4','Generate interrupt if HV4 has wrong value')]))
+    IRQ_POWER_PID_ENABLE = r(0x64, 1, 'Enable temperature alarm interrupt, analog +/-5V supplies, PID control',interpreter=r2b([b(0,0,'TEMPALRM','Enable interrupt on temperature alarm'), \
+                                                                                                                                b(1,1,'ANALOG5V','Enable analog +/-5V supplies'), \
+                                                                                                                                b(2,2,'PIDDISABLE','Disable PID control')]))
+    HV_IRQ_LEVEL = r(0x66,2,'Maximum difference allowed between the set and monitor voltages before interrupt is generated [mV?]',interpreter=r2b([b(0,11,'LEVEL','The threshold difference value')],byteOrder='lsb?'))
+    HV_FAILURE = r(0x68, 1, 'Latched bits for HV failure (must be cleared explicitely)',interpreter=r2b([b(0,0,'HV1FAIL','HV1 has failed'), \
+                                                                                                         b(1,1,'HV2FAIL','HV2 has failed'), \
+                                                                                                         b(2,2,'HV3FAIL','HV3 has failed'), \
+                                                                                                         b(3,3,'HV4FAIL','HV4 has failed')]))
+    DETECTOR_TEMP_SET = r(0x6A, 2, 'Reference temperature to which the detector temperature is controlled (x10)', interpreter=r2b([b(0,11,'TEMP','The reference temperature value')],byteOrder='lsb?'))
+    FAN1_SPEED = r(0x6C, 1, 'Speed of fan 1 if fan is in manual mode')
+    FAN2_SPEED = r(0x6E, 1, 'Speed of fan 2 if fan is in manual mode')
+    FAN3_SPEED = r(0x70, 1, 'Speed of fan 3 if fan is in manual mode')
+    FAN1_TEMP_SET = r(0x72, 2, 'Required temperature for fan1 control (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    FAN1_TEMP_DIFF = r(0x74, 2, 'Temp. diff. to start the fan (both + and -) (x10)', interpreter=r2b([b(0,11,'TDIFF','')],'lsb?'))
+    FAN2_TEMP_LIMIT = r(0x76, 2, 'Fan2 will switch in gradually when temp. reaches this value (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    FAN3_TEMP_LIMIT = r(0x78, 2, 'Fan3 will switch in gradually when temp. reaches this value (x10)', interpreter=r2b([b(0,11,'TEMP','')],'lsb?'))
+    CALLIGHT = r(0x7A, 2, 'Calibration LED current. Zero value ensures complete darkneww',interpreter=r2b([b(0,11,'CURRENT','')],'lsb?'))
+    CALUPDATE = r(0x7C, 2, 'LED update period [us]. 0 disables periodic LED update','lsb?')
+    IRQ_STATUS = r(0x7E, 1, 'Status of various interrupt requests. Can be cleared by writing 0.', interpreter=r2b([b(0,0,'HV','Interrupt due to HV'),\
+                                                                                                                  b(1,1,'TEMP','Tempertaure alarm'),\
+                                                                                                                  b(2,2,'CALLIGHT','Calibration update (failure?)')]))
+    SHMODE  = r(0x80, 1, 'Shutter operation mode. (0 - manual [by writing to SHSTATE], 1 - external [by shutter control input])')
+    SHSTATE = r(0x82, 1, 'Shutter state (0 - closed, 1 - open)')
+    RESET_FACTORY = r(0x84, 1, 'Writing hex 0xCD here causes factory reset')
+    ERRORCODE = r(0x86, 1, 'Code of the last error',tooltip='0x41-HV1SET>HV1MAX, 0x42-HV2SET>HV1MAX, 0x43-HV3SET>HV3MAX, 0x44-HV4SET>HV4MAX, 0x50-write attempt of read-only or non-existent register, 0xF6-shutter sense is opened/closed in same time, 0x7C-Peltier controller has no valid weight values or temp sensor error')
+    FACTORY_WRITE = r(0x88,2,'Writing a hex 0x?? value enables writing FACTORY_CAL_TABLE','lsb?')
+    FIRMWARE_UPGR_ERROR_CODE = r(0x8E, 1, 'Error code for checking the integrity of uploaded firmware (0x11=OK, 0x12=checksum error)','hex')
+    START_FIRMWARE_UPGR = r(0x90, 1, 'Writing 0x28 triggers checking uploaded FW, 0xC4 triggers checking and installing FW')
+    FIRMWARE_NEXT_CHAR = r(0x92,1,'Actual firmware data byte')
+    FIRMWARE_NEXT_LINE = r(0x94,0xFF-0x94+1,'Will be the new communication method to write complete HEX line for faster FW upgrade',r2s())
+    BOARD_SERIAL = r(0x100, 2, 'Board unique serial number','lsb?')
+    HV1MAX = r(0x102, 2, 'Maximum allowed value for HV1',interpreter=r2b([b(0,11,'MAX','')],byteOrder='lsb'))
+    HV2MAX = r(0x104, 2, 'Maximum allowed value for HV2',interpreter=r2b([b(0,11,'MAX','')],byteOrder='lsb'))
+    HV3MAX = r(0x106, 2, 'Maximum allowed value for HV3',interpreter=r2b([b(0,11,'MAX','')],byteOrder='lsb'))
+    HV4MAX = r(0x108, 2, 'Maximum allowed value for HV4',interpreter=r2b([b(0,11,'MAX','')],byteOrder='lsb'))
+    TEMP_CTRL_WEIGHTS_1 = r(0x10A,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_2 = r(0x10C,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_3 = r(0x10E,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_4 = r(0x110,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_5 = r(0x112,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_6 = r(0x114,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_7 = r(0x116,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_8 = r(0x118,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_9 = r(0x11A,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_10 = r(0x11C,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_11 = r(0x11E,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_12 = r(0x120,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_13 = r(0x122,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_14 = r(0x124,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_15 = r(0x126,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    TEMP_CTRL_WEIGHTS_16 = r(0x128,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
+    FAN1_CTRL_WEIGHTS_1 = r(0x12A,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_2 = r(0x12C,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_3 = r(0x12E,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_4 = r(0x130,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_5 = r(0x132,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_6 = r(0x134,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_7 = r(0x136,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_8 = r(0x138,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_9 = r(0x13A,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_10 = r(0x13C,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_11 = r(0x13E,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_12 = r(0x140,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_13 = r(0x142,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_14 = r(0x144,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_15 = r(0x146,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN1_CTRL_WEIGHTS_16 = r(0x148,2,'Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_1 = r(0x14A,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_2 = r(0x14C,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_3 = r(0x14E,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_4 = r(0x150,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_5 = r(0x152,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_6 = r(0x154,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_7 = r(0x156,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_8 = r(0x158,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_9 = r(0x15A,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_10 = r(0x15C,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_11 = r(0x15E,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_12 = r(0x160,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_13 = r(0x162,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_14 = r(0x164,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_15 = r(0x166,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN2_CTRL_WEIGHTS_16 = r(0x168,2,'Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_1 = r(0x16A,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_2 = r(0x16C,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_3 = r(0x16E,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_4 = r(0x170,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_5 = r(0x172,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_6 = r(0x174,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_7 = r(0x176,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_8 = r(0x178,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_9 = r(0x17A,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_10 = r(0x17C,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_11 = r(0x17E,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_12 = r(0x180,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_13 = r(0x182,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_14 = r(0x184,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_15 = r(0x186,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+    FAN3_CTRL_WEIGHTS_16 = r(0x188,2,'Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed','lsb?')
+
     
 class APDCAM10G_adc_registers_v1(APDCAM10G_register_table):
     # typedefs/shorthands
     b = APDCAM10G_register_bits
-    i = APDCAM10G_register_int
-    s = APDCAM10G_register_str
-    ip = APDCAM10G_register_ip
-    mac = APDCAM10G_register_mac
-
-    BOARDVER    = i(0x0000, 1, 'Board version number')
-    VERSION     = i(0x0001, 2, 'Microcontroller program version',byteOrder='msb?')
-    SERIAL      = i(0x0003, 2, 'Board serial number',byteOrder='msb?')
-    XCVERSION   = i(0x0005, 2, 'FPGA program vesion',byteOrder='msb?')
-    STATUS1     = b(0x0008, 1, 'STATUS1 register', [ ['BPLLOCK',0,0,"Base PLL locked"] ] )
-    STATUS2     = b(0x0009, 1, 'STATUS2 register', [ ['ITS',0,0,"Internal trigger status"] ] )
-    TEMPERATURE = i(0x000A, 1, 'Board temperature')
-    CONTROL     = b(0x000B, 1, "CONTROL register", [ ['SATAONOFF',0,0,"SATA channels on/off"],\
-                                                     ['DSM',1,1,"Dual SATA mode"], \
-                                                     ['SS',2,2,"SATA Sync"], \
-                                                     ['TM',3,3,"Test mode on"], \
-                                                     ['FIL',4,4,"Filter on"],  \
-                                                     ['ITE',5,5,"Internal trigger enabled"], \
-                                                     ['RBO',6,6,"Reverse bit order in the stream (1=LSbit first)"] ] )
-    DSLVCLKMUL  = i(0x000C, 1, 'SATA clock multiplier relative to 20 MHz internal clock')
-    DSLVCLKDIV  = i(0x000D, 1, 'SATA clock divider relative to 20 MHz internal clock')
-    DVDD33      = i(0x000E, 2, 'DVDD 3.3V voltage in mV',byteOrder='lsb')
-    DVDD25      = i(0x0010, 2, 'DVDD 2.5V voltage in mV',byteOrder='lsb')
-    AVDD33      = i(0x0012, 2, 'AVDD 3.3V voltage in mV',byteOrder='lsb')
-    AVDD18      = i(0x0014, 2, 'AVDD 1.8V voltage in mV',byteOrder='lsb')
-    CHENABLE1   = b(0x0016, 1, 'Channels 1-8 enabled (1)/disabled (0)' , [ ['CH'+str(8-j) ,j,j,'Channel '+str(8-j) +' enabled'] for j in range(8) ])
-    CHENABLE2   = b(0x0017, 1, 'Channels 9-16 enabled (1)/disabled (0)', [ ['CH'+str(16-j),j,j,'Channel '+str(16-j)+' enabled'] for j in range(8) ])
-    CHENABLE3   = b(0x0018, 1, 'Channels 17-24 enabled (1)/disabled (0)',[ ['CH'+str(24-j),j,j,'Channel '+str(24-j)+' enabled'] for j in range(8) ])
-    CHENABLE4   = b(0x0019, 1, 'Channels 25-32 enabled (1)/disabled (0)',[ ['CH'+str(32-j),j,j,'Channel '+str(32-j)+' enabled'] for j in range(8) ])
-    RINGBUFSIZE = b(0x001A, 2, 'Ring buffer size', [ ['RBSIZE',0,9,'Ring buffer size. If 0, ring buffer is disabled'] ],byteOrder='msb?')
-    RESOLUTION = i(0x001C, 1, 'Resolution (number of bits per sample)')
-    BPSCH1     = i(0x001D, 1, 'Bytes per sample of 8-channel block 1')
-    BPSCH2     = i(0x001E, 1, 'Bytes per sample of 8-channel block 2')
-    BPSCH3     = i(0x001F, 1, 'Bytes per sample of 8-channel block 3')
-    BPSCH4     = i(0x0020, 1, 'Bytes per sample of 8-channel block 4')
-    ERRORCODE  = i(0x0024, 1, 'The code of the last error. 0 = no error')
-    RESETFACTORY = i(0x0025, 1, 'Writing 0xCD here causes factory reset')
-
-    # for searching: AD1TEST, AD2TEST, AD3TEST, AD4TEST
-    for j in range(4):
-        locals()['AD'+str(j+1)+'TEST'] = b(0x0028+j, 1, 'ADC chip'+str(j+1)+' test mode selector. 0 = normal mode',\
-                           [ ['TESTMODE',0,3,'Test mode. 0=normal,1=b100000000000(8192),2=b11111111111111(16383),3=0,4=1010...(10922),0101...(5461),5=longpseudo,6=shortpseudo,7=1111...,0000...'] ])
-
-    # for searching: ANALOGOUT1, ANALOGOUT2, ANALOGOUT3, etc
-    # for searching: TRIGLEVEL1, TRIGLEVEL2, etc
-    for j in range(32):
-        locals()['ANALOGOUT'+str(j+1)]  = b(0x0030+j*2,  2, 'Analog outputs for offset control', [ ['OFFSET',0,12,''] ], byteOrder='msb?')
-        locals()['TRIGLEVEL'+str(j+1)]  = b(0x0070+j*2,  2, 'Internal trigger control for the 32 channels', [ ['TRIGLEV',0,13,'Trigger level'],\
-                                                                                                              ['MAXMIN',14,14,'Max / min trigger'],\
-                                                                                                              ['ENABLED',15,15,'Trigger enabled'] ], byteOrder='msb?')
-
-    OVDLEVEL   = b(0xC0, 2, 'Overload level', [ ['LEVEL',0,13,''],['OVDPOLARITY',14,14,'Overload polarity'],['ENABLE',15,15,'Overload enable'] ],'msb?')
-    OVDSTATUS  = b(0xC2, 1, 'Overload status', [ ['OVDEV',0,0,'Overload event'] ])
-    OVDTIME    = i(0xC3, 2, 'Overload time [10 us units]', 'msb?')
-    COEFF_01 = i(0x00D0,2,'Filter coefficient 1','lsb?')
-    COEFF_02 = i(0x00D2,2,'Filter coefficient 2','lsb?')
-    COEFF_03 = i(0x00D4,2,'Filter coefficient 3','lsb?')
-    COEFF_04 = i(0x00D6,2,'Filter coefficient 4','lsb?')
-    COEFF_05 = i(0x00D8,2,'Filter coefficient 5','lsb?')
-    COEFF_06 = i(0x00DA,2,'Filter coefficient 6','lsb?')
-    COEFF_07 = i(0x00DC,2,'Filter coefficient 7','lsb?')
-    COEFF_08_FILTERDIV = i(0x00DE,2,'Filter divide factor (0..11)','lsb?')
+    r = APDCAM10G_register
+    r2i  = APDCAM10G_register2int
+    r2b  = APDCAM10G_register2bits
+    r2s  = APDCAM10G_register2str
+    BOARDVER    = r(0x0000, 1, 'Board version number')
+    VERSION     = r(0x0001, 2, 'Microcontroller program version','msb?')
+    SERIAL      = r(0x0003, 2, 'Board serial number','msb?')
+    XCVERSION   = r(0x0005, 2, 'FPGA program vesion','msb?')
+    STATUS1     = r(0x0008, 1, 'STATUS1 register', interpreter=r2b([b(0,0,"BPLLOCK","Base PLL locked")]))
+    STATUS2     = r(0x0009, 1, 'STATUS2 register', interpreter=r2b([b(0,0,"ITS","Internal trigger status")]))
+    TEMPERATURE = r(0x000A, 1, 'Board temperature')
+    CONTROL     = r(0x000B, 1, "CONTROL register", interpreter=r2b([b(0,0,"SATAonoff","SATA channels on/off"),\
+                                                                    b(1,1,"DSM","Dual SATA mode"), \
+                                                                    b(2,2,"SS","SATA Sync"), \
+                                                                    b(3,3,"TM","Test mode on"), \
+                                                                    b(4,4,"FIL","Filter on"),  \
+                                                                    b(5,5,"ITE","Internal trigger enabled"), \
+                                                                    b(6,6,"RBO","Reverse bit order in the stream (1=LSbit first)")]))
+    DSLVCLKMUL  = r(0x000C, 1, 'SATA clock multiplier relative to 20 MHz internal clock')
+    DSLVCLKDIV  = r(0x000D, 1, 'SATA clock divider relative to 20 MHz internal clock')
+    DVDD33      = r(0x000E, 2, 'DVDD 3.3V voltage in mV','lsb')
+    DVDD25      = r(0x0010, 2, 'DVDD 2.5V voltage in mV','lsb')
+    AVDD33      = r(0x0012, 2, 'AVDD 3.3V voltage in mV','lsb')
+    AVDD18      = r(0x0014, 2, 'AVDD 1.8V voltage in mV','lsb')
+    CHENABLE1   = r(0x0016, 1, 'Channels 1-8 enabled (1)/disabled (0)',interpreter=r2b([\
+                   b(0,0,'CH8','Channel 8 enabled'), \
+                   b(1,1,'CH7','Channel 7 enabled'), \
+                   b(2,2,'CH6','Channel 6 enabled'), \
+                   b(3,3,'CH5','Channel 5 enabled'), \
+                   b(4,4,'CH4','Channel 4 enabled'), \
+                   b(5,5,'CH3','Channel 3 enabled'), \
+                   b(6,6,'CH2','Channel 2 enabled'), \
+                   b(7,7,'CH1','Channel 1 enabled')]))
+    CHENABLE2   = r(0x0017, 1, 'Channels 9-16 enabled (1)/disabled (0)',interpreter=r2b([\
+                   b(0,0,'CH16','Channel 16 enabled'), \
+                   b(1,1,'CH15','Channel 15 enabled'), \
+                   b(2,2,'CH14','Channel 14 enabled'), \
+                   b(3,3,'CH13','Channel 13 enabled'), \
+                   b(4,4,'CH12','Channel 12 enabled'), \
+                   b(5,5,'CH11','Channel 11 enabled'), \
+                   b(6,6,'CH10','Channel 10 enabled'), \
+                   b(7,7,'CH9','Channel 9 enabled')]))
+    CHENABLE3   = r(0x0018, 1, 'Channels 17-24 enabled (1)/disabled (0)',interpreter=r2b([\
+                   b(0,0,'CH24','Channel 24 enabled'), \
+                   b(1,1,'CH23','Channel 23 enabled'), \
+                   b(2,2,'CH22','Channel 22 enabled'), \
+                   b(3,3,'CH21','Channel 21 enabled'), \
+                   b(4,4,'CH20','Channel 20 enabled'), \
+                   b(5,5,'CH19','Channel 19 enabled'), \
+                   b(6,6,'CH18','Channel 18 enabled'), \
+                   b(7,7,'CH17','Channel 17 enabled')]))
+    CHENABLE4   = r(0x0019, 1, 'Channels 25-32 enabled (1)/disabled (0)',interpreter=r2b([\
+                   b(0,0,'CH32','Channel 32 enabled'), \
+                   b(1,1,'CH31','Channel 31 enabled'), \
+                   b(2,2,'CH30','Channel 30 enabled'), \
+                   b(3,3,'CH29','Channel 29 enabled'), \
+                   b(4,4,'CH28','Channel 28 enabled'), \
+                   b(5,5,'CH27','Channel 27 enabled'), \
+                   b(6,6,'CH26','Channel 26 enabled'), \
+                   b(7,7,'CH25','Channel 25 enabled')]))
+    RINGBUFSIZE = r(0x001A, 2, 'Ring buffer size', interpreter=r2b([b(0,9,'RBSIZE','Ring buffer size. If 0, ring buffer is disabled')],'msb?'))
+    RESOLUTION = r(0x001C, 1, 'Resolution (number of bits per sample)')
+    BPSCH1     = r(0x001D, 1, 'Bytes per sample of 8-channel block 1')
+    BPSCH2     = r(0x001E, 1, 'Bytes per sample of 8-channel block 2')
+    BPSCH3     = r(0x001F, 1, 'Bytes per sample of 8-channel block 3')
+    BPSCH4     = r(0x0020, 1, 'Bytes per sample of 8-channel block 4')
+    ERRORCODE  = r(0x0024, 1, 'The code of the last error. 0 = no error')
+    RESETFACTORY = r(0x0025, 1, 'Writing 0xCD here causes factory reset')
+    AD1TEST     = r(0x0028, 1, 'ADC chip1 test mode selector. 0 = normal mode',r2b([b(0,3,'TESTMODE','Test mode. 0=normal,1=b100000000000(8192),2=b11111111111111(16383),3=0,4=1010...(10922),0101...(5461),5=longpseudo,6=shortpseudo,7=1111...,0000...')]))
+    AD2TEST     = r(0x0029, 1, 'ADC chip2 test mode selector. 0 = normal mode',r2b([b(0,3,'TESTMODE','Test mode. 0=normal,1=b100000000000(8192),2=b11111111111111(16383),3=0,4=1010...(10922),0101...(5461),5=longpseudo,6=shortpseudo,7=1111...,0000...')]))
+    AD3TEST     = r(0x002A, 1, 'ADC chip3 test mode selector. 0 = normal mode',r2b([b(0,3,'TESTMODE','Test mode. 0=normal,1=b100000000000(8192),2=b11111111111111(16383),3=0,4=1010...(10922),0101...(5461),5=longpseudo,6=shortpseudo,7=1111...,0000...')]))
+    AD4TEST     = r(0x002B, 1, 'ADC chip4 test mode selector. 0 = normal mode',r2b([b(0,3,'TESTMODE','Test mode. 0=normal,1=b100000000000(8192),2=b11111111111111(16383),3=0,4=1010...(10922),0101...(5461),5=longpseudo,6=shortpseudo,7=1111...,0000...')]))
+    ANALOGOUT  = r(0x0030,  2*32, 'Analog outputs for offset control', interpreter=r2b([b(0,12,'OFFSET','Offset')],byteOrder='msb?',bytePeriod=2))
+    TRIGLEVEL  = r(0x0070,  2*32, 'Internal trigger control for the 32 channels', \
+                   interpreter=r2b([b(0,13,'TRIGLEV','Trigger level'),b(14,14,'MAX/MIN','Max / min trigger'),b(15,15,'ENABLED','Trigger enabled')],byteOrder='msb?',bytePeriod=2))
+    OVDLEVEL   = r(0xC0, 2, 'Overload level', r2b([b(0,13,'LEVEL',''),b(14,14,'OVDPOLARITY','Overload polarity'),b(15,15,'ENABLE','Overload enable')],'msb?'))
+    OVDSTATUS  = r(0xC2, 1, 'Overload status', r2b([b(0,0,'OVDEV','Overload event')]))
+    OVDTIME    = r(0xC3, 2, 'Overload time [10 us units]', 'msb?')
+    COEFF_01 = r(0x00D0,2,'Filter coefficient 1','lsb?')
+    COEFF_02 = r(0x00D2,2,'Filter coefficient 2','lsb?')
+    COEFF_03 = r(0x00D4,2,'Filter coefficient 3','lsb?')
+    COEFF_04 = r(0x00D6,2,'Filter coefficient 4','lsb?')
+    COEFF_05 = r(0x00D8,2,'Filter coefficient 5','lsb?')
+    COEFF_06 = r(0x00DA,2,'Filter coefficient 6','lsb?')
+    COEFF_07 = r(0x00DC,2,'Filter coefficient 7','lsb?')
+    COEFF_08_FILTERDIV = r(0x00DE,2,'Filter divide factor (0..11)','lsb?')
+    #FACTCALTABLE = r(0x0100, 256, 'Factory calibration data space')
 
 class APDCAM10G_adc_registers_v2(APDCAM10G_register_table):
     # typedefs/shorthands
     b = APDCAM10G_register_bits
-    i = APDCAM10G_register_int
-    s = APDCAM10G_register_str
-    ip = APDCAM10G_register_ip
-    mac = APDCAM10G_register_mac
-
-    BOARDVER    = i(0x0000, 1, 'Board version number')
-    VERSION     = i(0x0001, 2, 'Microcontroller program version','msb?')
-    SERIAL      = i(0x0003, 2, 'Board serial number','msb?')
-    XCVERSION   = i(0x0005, 2, 'FPGA program vesion','msb?')
-    STATUS1     = b(0x0008, 1, 'STATUS1 register', [ ['BPLLOCK',0,0,"Base PLL locked"] ] )
-    STATUS2     = b(0x0009, 1, 'STATUS2 register', [ ['ITS',0,0,"Internal trigger status"] ] )
-    TEMPERATURE = i(0x000A, 1, 'Board temperature')
-    CONTROL     = b(0x000B, 1, "CONTROL register", [ ['SATAONOFF',0,0,"SATA channels on/off"],\
-                                                     ['DSM',1,1,"Dual SATA mode"], \
-                                                     ['SS',2,2,"SATA Sync"], \
-                                                     ['TM',3,3,"Test mode on"], \
-                                                     ['FIL',4,4,"Filter on"],  \
-                                                     ['ITE',5,5,"Internal trigger enabled"], \
-                                                     ['RBO',6,6,"Reverse bit order in the stream (1=LSbit first)"] ] )
-
-    DSLVCLKMUL  = i(0x000C, 1, 'SATA clock multiplier relative to 20 MHz internal clock')
-    DSLVCLKDIV  = i(0x000D, 1, 'SATA clock divider relative to 20 MHz internal clock')
-    DVDD33      = i(0x000E, 2, 'DVDD 3.3V voltage in mV',byteOrder='lsb')
-    DVDD25      = i(0x0010, 2, 'DVDD 2.5V voltage in mV',byteOrder='lsb')
-    AVDD33      = i(0x0012, 2, 'AVDD 3.3V voltage in mV',byteOrder='lsb')
-    AVDD18      = i(0x0014, 2, 'AVDD 1.8V voltage in mV',byteOrder='lsb')
-    CHENABLE1   = b(0x0016, 1, 'Channels 1-8 enabled (1)/disabled (0)' , [ ['CH'+str(8-j) ,j,j,'Channel '+str(8-j) +' enabled'] for j in range(8) ])
-    CHENABLE2   = b(0x0017, 1, 'Channels 9-16 enabled (1)/disabled (0)', [ ['CH'+str(16-j),j,j,'Channel '+str(16-j)+' enabled'] for j in range(8) ])
-    CHENABLE3   = b(0x0018, 1, 'Channels 17-24 enabled (1)/disabled (0)',[ ['CH'+str(24-j),j,j,'Channel '+str(24-j)+' enabled'] for j in range(8) ])
-    CHENABLE4   = b(0x0019, 1, 'Channels 25-32 enabled (1)/disabled (0)',[ ['CH'+str(32-j),j,j,'Channel '+str(32-j)+' enabled'] for j in range(8) ])
-#    RINGBUFSIZE = b(0x001A, 2, 'Ring buffer size', [ ['RBSIZE',0,9,'Ring buffer size. If 0, ring buffer is disabled'] ],byteOrder='msb?')
-    STREAMCONTROL = b(0x1A, 2, 'Ring buffer size / SATA test mode / Stream mode', [ ['RBSIZE',0,9,'Ring buffer size. If 0, ring buffer is disabled'],\
-                                                                                    ['SATATEST',13,13,'SATA test mode'],\
-                                                                                    ['STREAMMODE',14,15,'0 = Off/sync mode; 1 = continuous mode; 2 = gate mode; 3 = trigger mode'] ],byteOrder='msb?')
-    RESOLUTION = i(0x001C, 1, 'Resolution (number of bits per sample)')
-    BPSCH1     = i(0x001D, 1, 'Bytes per sample of 8-channel block 1')
-    BPSCH2     = i(0x001E, 1, 'Bytes per sample of 8-channel block 2')
-    BPSCH3     = i(0x001F, 1, 'Bytes per sample of 8-channel block 3')
-    BPSCH4     = i(0x0020, 1, 'Bytes per sample of 8-channel block 4')
-    ERRORCODE  = i(0x0024, 1, 'The code of the last error. 0 = no error')
-    RESETFACTORY = i(0x0025, 1, 'Writing 0xCD here causes factory reset')
-    # for searching: AD1TEST, AD2TEST, AD3TEST, AD4TEST
-    for j in range(4):
-        locals()['AD'+str(j+1)+'TEST'] = b(0x0028+j, 1, 'ADC chip'+str(j+1)+' test mode selector. 0 = normal mode',\
-                           [ ['TESTMODE',0,3,'Test mode. 0=normal,1=b100000000000(8192),2=b11111111111111(16383),3=0,4=1010...(10922),0101...(5461),5=longpseudo,6=shortpseudo,7=1111...,0000...'] ])
-    DACCONTROL = b(0x2E,1,'DAC mixed channel mode',[ ['MIXED',0,0,'ADC and DAC channel numbering is mixed'] ] )
-
-    # for searching: ANALOGOUT1, ANALOGOUT2, ANALOGOUT3, etc
-    # for searching: TRIGLEVEL1, TRIGLEVEL2, etc
-    for j in range(32):
-        locals()['ANALOGOUT'+str(j+1)]  = b(0x0030+j*2,  2, 'Analog outputs for offset control', [ ['OFFSET',0,12,''] ], byteOrder='msb?')
-        locals()['TRIGLEVEL'+str(j+1)]  = b(0x0070+j*2,  2, 'Internal trigger control for the 32 channels', [ ['TRIGLEV',0,13,'Trigger level'],\
-                                                                                                              ['MAXMIN',14,14,'Max / min trigger'],\
-                                                                                                              ['ENABLED',15,15,'Trigger enabled'] ], byteOrder='msb?')
-    OVDLEVEL   = b(0xC0, 2, 'Overload level', [ ['LEVEL',0,13,''],['OVDPOLARITY',14,14,'Overload polarity'],['ENABLE',15,15,'Overload enable'] ],'msb?')
-    OVDSTATUS  = b(0xC2, 1, 'Overload status', [ ['OVDEV',0,0,'Overload event'] ])
-    OVDTIME    = i(0xC3, 2, 'Overload time [10 us units]', 'msb?')
-    COEFF_01 = i(0x00D0,2,'Filter coefficient 1','lsb?')
-    COEFF_02 = i(0x00D2,2,'Filter coefficient 2','lsb?')
-    COEFF_03 = i(0x00D4,2,'Filter coefficient 3','lsb?')
-    COEFF_04 = i(0x00D6,2,'Filter coefficient 4','lsb?')
-    COEFF_05 = i(0x00D8,2,'Filter coefficient 5','lsb?')
-    COEFF_06 = i(0x00DA,2,'Filter coefficient 6','lsb?')
-    COEFF_07 = i(0x00DC,2,'Filter coefficient 7','lsb?')
-    COEFF_08_FILTERDIV = i(0x00DE,2,'Filter divide factor (0..11)','lsb?')
+    r = APDCAM10G_register
+    r2i  = APDCAM10G_register2int
+    r2b  = APDCAM10G_register2bits
+    r2s  = APDCAM10G_register2str
+    BOARDVER    = r(0x0000, 1, 'Board version number')
+    VERSION     = r(0x0001, 2, 'Microcontroller program version','msb?')
+    SERIAL      = r(0x0003, 2, 'Board serial number','msb?')
+    XCVERSION   = r(0x0005, 2, 'FPGA program vesion','msb?')
+    STATUS1     = r(0x0008, 1, 'STATUS1 register', interpreter=r2b([b(0,0,"BPLLOCK","Base PLL locked")]))
+    STATUS2     = r(0x0009, 1, 'STATUS2 register', interpreter=r2b([b(0,0,"ITS","Internal trigger status")]))
+    TEMPERATURE = r(0x000A, 1, 'Board temperature')
+    CONTROL     = r(0x000B, 1, "CONTROL register", interpreter=r2b([b(0,0,"SATAonoff","SATA channels on/off"),\
+                                                                    b(1,1,"DSM","Dual SATA mode"), \
+                                                                    b(2,2,"SS","SATA Sync"), \
+                                                                    b(3,3,"TM","Test mode on"), \
+                                                                    b(4,4,"FIL","Filter on"),  \
+                                                                    b(5,5,"ITE","Internal trigger enabled"), \
+                                                                    b(6,6,"RBO","Reverse bit order in the stream (1=LSbit first)")]))
+    DSLVCLKMUL  = r(0x000C, 1, 'SATA clock multiplier relative to 20 MHz internal clock')
+    DSLVCLKDIV  = r(0x000D, 1, 'SATA clock divider relative to 20 MHz internal clock')
+    DVDD33      = r(0x000E, 2, 'DVDD 3.3V voltage in mV','lsb')
+    DVDD25      = r(0x0010, 2, 'DVDD 2.5V voltage in mV','lsb')
+    AVDD33      = r(0x0012, 2, 'AVDD 3.3V voltage in mV','lsb')
+    AVDD18      = r(0x0014, 2, 'AVDD 1.8V voltage in mV','lsb')
+    CHENABLE1   = r(0x0016, 1, 'Channels 1-8 enabled (1)/disabled (0)',interpreter=r2b([\
+                   b(0,0,'CH8','Channel 8 enabled'), \
+                   b(1,1,'CH7','Channel 7 enabled'), \
+                   b(2,2,'CH6','Channel 6 enabled'), \
+                   b(3,3,'CH5','Channel 5 enabled'), \
+                   b(4,4,'CH4','Channel 4 enabled'), \
+                   b(5,5,'CH3','Channel 3 enabled'), \
+                   b(6,6,'CH2','Channel 2 enabled'), \
+                   b(7,7,'CH1','Channel 1 enabled')]))
+    CHENABLE2   = r(0x0017, 1, 'Channels 9-16 enabled (1)/disabled (0)',interpreter=r2b([\
+                   b(0,0,'CH16','Channel 16 enabled'), \
+                   b(1,1,'CH15','Channel 15 enabled'), \
+                   b(2,2,'CH14','Channel 14 enabled'), \
+                   b(3,3,'CH13','Channel 13 enabled'), \
+                   b(4,4,'CH12','Channel 12 enabled'), \
+                   b(5,5,'CH11','Channel 11 enabled'), \
+                   b(6,6,'CH10','Channel 10 enabled'), \
+                   b(7,7,'CH9','Channel 9 enabled')]))
+    CHENABLE3   = r(0x0018, 1, 'Channels 17-24 enabled (1)/disabled (0)',interpreter=r2b([\
+                   b(0,0,'CH24','Channel 24 enabled'), \
+                   b(1,1,'CH23','Channel 23 enabled'), \
+                   b(2,2,'CH22','Channel 22 enabled'), \
+                   b(3,3,'CH21','Channel 21 enabled'), \
+                   b(4,4,'CH20','Channel 20 enabled'), \
+                   b(5,5,'CH19','Channel 19 enabled'), \
+                   b(6,6,'CH18','Channel 18 enabled'), \
+                   b(7,7,'CH17','Channel 17 enabled')]))
+    CHENABLE4   = r(0x0019, 1, 'Channels 25-32 enabled (1)/disabled (0)',interpreter=r2b([\
+                   b(0,0,'CH32','Channel 32 enabled'), \
+                   b(1,1,'CH31','Channel 31 enabled'), \
+                   b(2,2,'CH30','Channel 30 enabled'), \
+                   b(3,3,'CH29','Channel 29 enabled'), \
+                   b(4,4,'CH28','Channel 28 enabled'), \
+                   b(5,5,'CH27','Channel 27 enabled'), \
+                   b(6,6,'CH26','Channel 26 enabled'), \
+                   b(7,7,'CH25','Channel 25 enabled')]))
+    #RINGBUFSIZE = r(0x001A, 2, 'Ring buffer size', interpreter=r2b([b(0,0,'DISABLE','Ring buffer disabled'),b(1,1023,'SIZE','Ring buffer size')],'msb?'))
+    STREAMCONTROL = r(0x1A, 2, 'Ring buffer size / SATA test mode / Stream mode', r2b([b(0,9,'RBSIZE','Ring buffer size. If 0, ring buffer is disabled'),\
+                                                                                       b(13,13,'SATATEST','SATA test mode'),\
+                                                                                       b(14,15,'STREAMMODE','0 = Off/sync mode; 1 = continuous mode; 2 = gate mode; 3 = trigger mode')],'msb?'))
+    RESOLUTION = r(0x001C, 1, 'Resolution (number of bits per sample)')
+    BPSCH1     = r(0x001D, 1, 'Bytes per sample of 8-channel block 1')
+    BPSCH2     = r(0x001E, 1, 'Bytes per sample of 8-channel block 2')
+    BPSCH3     = r(0x001F, 1, 'Bytes per sample of 8-channel block 3')
+    BPSCH4     = r(0x0020, 1, 'Bytes per sample of 8-channel block 4')
+    ERRORCODE  = r(0x0024, 1, 'The code of the last error. 0 = no error')
+    RESETFACTORY = r(0x0025, 1, 'Writing 0xCD here causes factory reset')
+    AD1TEST     = r(0x0028, 1, 'ADC chip1 test mode selector. 0 = normal mode')
+    AD2TEST     = r(0x0029, 1, 'ADC chip2 test mode selector. 0 = normal mode')
+    AD3TEST     = r(0x002A, 1, 'ADC chip3 test mode selector. 0 = normal mode')
+    AD4TEST     = r(0x002B, 1, 'ADC chip4 test mode selector. 0 = normal mode')
+    DACCONTROL = r(0x2E,1,'DAC mixed channel mode',r2b([b(0,0,'MIXED','ADC and DAC channel numbering is mixed')],'msb'))
+    ANALOGOUT  = r(0x0030,  2*32, 'Analog outputs for offset control', interpreter=r2b([b(0,12,'OFFSET','Offset')],byteOrder='msb?',bytePeriod=2))
+    TRIGLEVEL  = r(0x0070,  2*32, 'Internal trigger control for the 32 channels', \
+                   interpreter=r2b([b(0,13,'TRIGLEV','Trigger level'),b(14,14,'MAX/MIN','Max / min trigger'),b(15,15,'ENABLED','Trigger enabled')],byteOrder='msb?',bytePeriod=2))
+    OVDLEVEL   = r(0xC0, 2, 'Overload level', r2b([b(0,13,'LEVEL',''),b(14,14,'OVDPOLARITY','Overload polarity'),b(15,15,'ENABLE','Overload enable')],'msb?'))
+    OVDSTATUS  = r(0xC2, 1, 'Overload status', r2b([b(0,0,'OVDEV','Overload event')]))
+    OVDTIME    = r(0xC3, 2, 'Overload time [10 us units]', 'msb?')
+    COEFF_01 = r(0x00D0,2,'Filter coefficient 1','lsb?')
+    COEFF_02 = r(0x00D2,2,'Filter coefficient 2','lsb?')
+    COEFF_03 = r(0x00D4,2,'Filter coefficient 3','lsb?')
+    COEFF_04 = r(0x00D6,2,'Filter coefficient 4','lsb?')
+    COEFF_05 = r(0x00D8,2,'Filter coefficient 5','lsb?')
+    COEFF_06 = r(0x00DA,2,'Filter coefficient 6','lsb?')
+    COEFF_07 = r(0x00DC,2,'Filter coefficient 7','lsb?')
+    COEFF_08_FILTERDIV = r(0x00DE,2,'Filter divide factor (0..11)','lsb?')
     #FACTCALTABLE = r(0x0100, 256, 'Factory calibration data space')
         
 
@@ -1713,10 +2182,10 @@ class APDCAM10G_control:
             self.codes_PC  = APDCAM_PCcodes_v1()
             self.builtinAdcFreqDivider = 1
             # New framework
-            self.ADC_registers = APDCAM10G_adc_registers_v1()
-            self.CC_settings   = APDCAM10G_cc_settings_v1()
-            self.CC_variables  = APDCAM10G_cc_variables_v1()
-            self.PC_registers  = APDCAM10G_pc_registers_v1()
+            self.ADC_register_table = APDCAM10G_adc_registers_v1()
+            self.CC_settings_table  = APDCAM10G_cc_settings_v1()
+            self.CC_variables_table = APDCAM10G_cc_variables_v1()
+            self.PC_register_table  = APDCAM10G_pc_registers_v1()
             # store a class *type* which interprets the C&C header in the UDP packets
             self.udpPacketHeader = APDCAM10G_packet_header_v1
         else:
@@ -1725,10 +2194,10 @@ class APDCAM10G_control:
             self.codes_PC  = APDCAM_PCcodes_v1()
             self.builtinAdcFreqDivider = 2
             # New framework
-            self.ADC_registers = APDCAM10G_adc_registers_v2()
-            self.CC_settings   = APDCAM10G_cc_settings_v2()
-            self.CC_variables  = APDCAM10G_cc_variables_v2()
-            self.PC_registers  = APDCAM10G_pc_registers_v2()
+            self.ADC_register_table = APDCAM10G_adc_registers_v2()
+            self.CC_settings_table  = APDCAM10G_cc_settings_v2()
+            self.CC_variables_table = APDCAM10G_cc_variables_v2()
+            self.PC_register_table  = APDCAM10G_pc_registers_v2()
             # store a class *type* which interprets the C&C header in the UDP packets
             self.udpPacketHeader = APDCAM10G_packet_header_v2
 

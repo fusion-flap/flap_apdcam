@@ -70,14 +70,16 @@ class ApdcamGui(QtWidgets.QMainWindow):
         while True:
             if self.updateGuiThreadStop:
                 print("Stopping GUI update loop")
-                self.show_message("Stopping GUI update loop")
+                # modifying the gui from this thread is deadly
+                #self.show_message("Stopping GUI update loop")
                 return
 
             # if the camera is disconnected, we break the infinite loop of the update thread
             # and return, terminating the thread
             if not self.status.connected:
                 print("Camera is  disconnected, stopping the GUI update loop")
-                self.show_message("Camera is disconnected, stopping the GUI update loop")
+                # modifying the gui from this thread is deadly
+                #self.show_message("Camera is disconnected, stopping the GUI update loop")
                 return
             
             time.sleep(1)
@@ -109,6 +111,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
         super().__init__(parent)
 
         self.cameraStateRefreshed.connect(self.updateGui)
+        
 
         self.camera = APDCAM10G_control()
         self.camera.setErrorHandler(lambda msg: self.show_error(msg))
@@ -272,7 +275,6 @@ class ApdcamGui(QtWidgets.QMainWindow):
         QtWidgets.QApplication.exit(rc)
 
     def startGuiUpdate(self):
-        return 
         if not self.status.connected:
             self.show_message("Camera is not connected")
             return
@@ -295,7 +297,6 @@ class ApdcamGui(QtWidgets.QMainWindow):
             If True, the function does not return until the periodic gui-update thread stopped
 
         """
-        return
         self.show_message("Signaling the GUI update to stop")
         self.updateGuiThreadStop = True
         self.updateGuiThread = None
@@ -303,6 +304,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
             while hasattr(self.updateGuiThread,"is_alive") and self.updateGuiThread.is_alive():
                 #print("Still alive")
                 time.sleep(0.5)
+        self.show_message("GUI update thread stopped")
 
     def beforeBackendCall(self,*,name="",where=""):
         if not self.status.connected:

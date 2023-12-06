@@ -34,16 +34,16 @@ class RegisterInspector(QtWidgets.QWidget):
             self.searchDescription = description
             self.searchTooltip = tooltip
 
-        def __call__(self,registerName,register):
+        def __call__(self,register):
 
             regexp = None
             if self.regexp:
                 regexp = re.compile(self.pattern)
 
             if self.searchRegisterName:
-                if self.regexp and regexp.search(registerName) is not None:
+                if self.regexp and regexp.search(register.symbol) is not None:
                     return True
-                if not self.regexp and registerName.lower().find(self.pattern.lower()) >= 0:
+                if not self.regexp and register.symbol.lower().find(self.pattern.lower()) >= 0:
                     return True
 
             if self.searchDescription:
@@ -112,6 +112,13 @@ class RegisterInspector(QtWidgets.QWidget):
 
         buttons = QtWidgets.QHBoxLayout()
         layout.addLayout(buttons)
+        
+        self.registerVersionSelector = QtWidgets.QComboBox()
+        self.registerVersionSelector.addItem("Actual camera")
+        self.registerVersionSelector.addItem("Firmware <=1.03 (zero data)")
+        self.registerVersionSelector.addItem("Firmware >=1.05 (zero data)")
+        buttons.addWidget(self.registerVersionSelector)
+
         self.showADC1RegistersButton = QtWidgets.QPushButton("ADC1 registers")
         buttons.addWidget(self.showADC1RegistersButton)
         self.showADC1RegistersButton.clicked.connect(lambda: self.showAdcRegisterTable(1))
@@ -215,45 +222,88 @@ class RegisterInspector(QtWidgets.QWidget):
     def showAdcRegisterTable(self,adcNumber):
 
         adcNumber -= 1
-
-        register_table = self.gui.camera.ADC_register_table
-        err,d = self.gui.camera.readPDI(self.gui.camera.status.ADC_address[adcNumber],0,numberOfBytes=register_table.size(),arrayData=True)
-            
-        if err != "":
-            self.gui.show_error(err)
+        v = self.registerVersionSelector.currentText()
+        if v=="Actual camera":
+            register_table = self.gui.camera.ADC_register_table
+            err,d = self.gui.camera.readPDI(self.gui.camera.status.ADC_address[adcNumber],0,numberOfBytes=register_table.size(),arrayData=True)
+            if err != "":
+                self.gui.show_error(err)
+            else:
+                self.showRegisterTable(register_table,d[0])
+        elif v=="Firmware <=1.03":
+            register_table = APDCAM10G_adc_registers_v1()
+            data = bytearray(register_table.size())
+            self.showRegisterTable(register_table,data)
+        elif v=="Firmware >=1.05":
+            register_table = APDCAM10G_adc_registers_v2()
+            data = bytearray(register_table.size())
+            self.showRegisterTable(register_table,data)
         else:
-            self.showRegisterTable(register_table,d[0])
+            self.gui.show_error("Invalid register version selector (this should never happen)")
 
     def showPcRegisterTable(self):
 
-        register_table = self.gui.camera.PC_register_table
-        err,d = self.gui.camera.readPDI(self.gui.camera.codes_PC.PC_CARD,0,numberOfBytes=register_table.size(),arrayData=True)
-            
-        if err != "":
-            self.gui.show_error(err)
+        v = self.registerVersionSelector.currentText()
+        if v=="Actual camera":
+            register_table = self.gui.camera.PC_register_table
+            err,d = self.gui.camera.readPDI(self.gui.camera.codes_PC.PC_CARD,0,numberOfBytes=register_table.size(),arrayData=True)
+            if err != "":
+                self.gui.show_error(err)
+            else:
+                self.showRegisterTable(register_table,d[0])
+        elif v=="Firmware <=1.03":
+            register_table = APDCAM10G_pc_registers_v1()
+            data = bytearray(register_table.size())
+            self.showRegisterTable(register_table,data)
+        elif v=="Firmware >=1.05":
+            register_table = APDCAM10G_pc_registers_v2()
+            data = bytearray(register_table.size())
+            self.showRegisterTable(register_table,data)
         else:
-            self.showRegisterTable(register_table,d[0])
+            self.gui.show_error("Invalid register version selector (this should never happen)")
             
 
     def showCCSettingsTable(self):
 
-        register_table = self.gui.camera.CC_settings_table
-        err= self.gui.camera.readCCdata(dataType=0)
-
-        if err != "":
-            self.gui.show_error(err)
+        v = self.registerVersionSelector.currentText()
+        if v=="Actual camera":
+            register_table = self.gui.camera.CC_settings_table
+            err= self.gui.camera.readCCdata(dataType=0)
+            if err != "":
+                self.gui.show_error(err)
+            else:
+                self.showRegisterTable(register_table,self.gui.camera.status.CC_settings)
+        elif v=="Firmware <=1.03":
+            register_table = APDCAM10G_cc_settings_v1()
+            data = bytearray(register_table.size())
+            self.showRegisterTable(register_table,data)
+        elif v=="Firmware >=1.05":
+            register_table = APDCAM10G_cc_settings_v2()
+            data = bytearray(register_table.size())
+            self.showRegisterTable(register_table,data)
         else:
-            self.showRegisterTable(register_table,self.gui.camera.status.CC_settings)
+            self.gui.show_error("Invalid register version selector (this should never happen)")
             
     def showCCVariablesTable(self):
 
-        err= self.gui.camera.readCCdata(dataType=1)
-        register_table = self.gui.camera.CC_variables_table
-
-        if err != "":
-            self.gui.show_error(err)
+        v = self.registerVersionSelector.currentText()
+        if v=="Actual camera":
+            err= self.gui.camera.readCCdata(dataType=1)
+            register_table = self.gui.camera.CC_variables_table
+            if err != "":
+                self.gui.show_error(err)
+            else:
+                self.showRegisterTable(register_table,self.gui.camera.status.CC_settings)
+        elif v=="Firmware <=1.03":
+            register_table = APDCAM10G_cc_variables_v1()
+            data = bytearray(register_table.size())
+            self.showRegisterTable(register_table,data)
+        elif v=="Firmware >=1.05":
+            register_table = APDCAM10G_cc_variables_v2()
+            data = bytearray(register_table.size())
+            self.showRegisterTable(register_table,data)
         else:
-            self.showRegisterTable(register_table,self.gui.camera.status.CC_settings)
+            self.gui.show_error("Invalid register version selector (this should never happen)")
             
     def clearRegisterTableDisplay(self):
         # Clear the regtable layout
@@ -299,7 +349,6 @@ class RegisterInspector(QtWidgets.QWidget):
         background-color: black;
         }
         """
-
         
         line = self.registerTableLayout.rowCount()
 
@@ -341,30 +390,23 @@ class RegisterInspector(QtWidgets.QWidget):
                 lll.setStyleSheet(style)
             self.registerTableLayout.addWidget(lll,line,2)
 
-            byteorder = ''
-            if hasattr(reg.interpreter,'byteOrder'):
-                if reg.interpreter.byteOrder == 'big':
-                    byteorder = 'MSB'
-                elif reg.interpreter.byteOrder == 'little':
-                    byteorder = 'LSB'
-                else:
-                    byteorder = reg.interpreter.byteOrder
-            if hasattr(reg.interpreter,'byteOrderNotKnown') and reg.interpreter.byteOrderNotKnown==True:
+            byteorder = ('MSB' if reg.byteOrder=='big' else 'LSB')
+            if reg.byteOrderUncertain:
                 byteorder += " (???)"
             lll = QtWidgets.QLabel(byteorder)
             lll.setFrameStyle(QtWidgets.QFrame.Box)
             lll.setLineWidth(1)
-            if hasattr(reg.interpreter,'byteOrderNotKnown') and reg.interpreter.byteOrderNotKnown==True:
+            if reg.byteOrderUncertain:
                 lll.setStyleSheet("QLabel { color: red; }")
             self.registerTableLayout.addWidget(lll,line,3)
 
-            lll = QtWidgets.QLabel(str(reg.description + (' (see tooltip)' if reg.tooltip!='' else '')))
+            lll = QtWidgets.QLabel(str(reg.shortDescription + (' (see tooltip)' if reg.longDescription!='' else '')))
             lll.setFrameStyle(QtWidgets.QFrame.Box)
             lll.setLineWidth(1)
             if line%2==1:
                 lll.setStyleSheet(style)
-            if reg.tooltip != '':
-                lll.setToolTip(reg.tooltip)
+            if reg.longDescription != '':
+                lll.setToolTip(reg.longDescription)
             self.registerTableLayout.addWidget(lll,line,4)
 
             lll = QtWidgets.QFrame()
@@ -372,28 +414,30 @@ class RegisterInspector(QtWidgets.QWidget):
             lll.setLineWidth(1)
             if line%2==1:
                 lll.setStyleSheet(style)
-            values = reg.value(data)
-            lll.setLayout(QtWidgets.QVBoxLayout())
+            hhh = QtWidgets.QHBoxLayout()
+            lll.setLayout(hhh)
             self.registerTableLayout.addWidget(lll,line,5)
-            lineindex=0
-            for value_line in values:
-                hhh = QtWidgets.QHBoxLayout()
-                lll.layout().addLayout(hhh)
-                if len(values) > 1:
-                    hhh.addWidget(QtWidgets.QLabel(str(lineindex) + " - "))
-                for v in value_line:
-                    if v[1] != "":
-                        label = QtWidgets.QLabel(v[1] + ":")
-                        if v[2] != "":
-                            label.setToolTip(v[2])
-                        hhh.addWidget(label)
-                    value = QtWidgets.QLabel(str(v[0]))
-                    if v[2] != "":
-                        value.setToolTip(v[2])
-                    hhh.addWidget(value)
-                    hhh.addStretch(1)
-                hhh.addStretch(2)
-                lineindex += 1
+
+            # for bit-coded registers, loop over all bit group, and display them one-by-one
+            if hasattr(reg,'sortedBits'):
+                counter = 0
+                for b in reg.sortedBits:
+                    s = b.symbol + "(" + str(b.firstBit)
+                    if b.lastBit > b.firstBit:
+                        s += ".." + str(b.lastBit)
+                    s += "):"
+                    symbol = QtWidgets.QLabel(s)
+                    symbol.setToolTip(b.description)
+                    hhh.addWidget(symbol)
+
+                    hhh.addWidget(QtWidgets.QLabel(b.display_value(data)))
+
+                    if counter>0:
+                        hhh.addStretch(1)
+                    counter += 1
+            else:
+                hhh.addWidget(QtWidgets.QLabel(reg.display_value(data)))
+
+            hhh.addStretch(2)
 
             line += 1
-

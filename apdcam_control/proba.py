@@ -1,10 +1,13 @@
+class A:
+    aa = 1
+    def __init__(self):
+        print(self.aa)
+        print(self.bb)
+    bb = 2
 
-def loggerfunc(m):
-    print(m)
+class B(A):
+    cc = 3
 
-logger = None
-
-log = lambda m: logger(m) if (logger!=None) else 1
-
-
-log("Hello")
+a = A()
+print("---")
+b = B()

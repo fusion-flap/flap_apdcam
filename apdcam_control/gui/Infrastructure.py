@@ -227,7 +227,7 @@ class Infrastructure(QtWidgets.QWidget):
     def loadSettingsFromCamera(self):
 
         # load the HV values
-        err, hvon = self.gui.camera.getPcRegister(self.gui.camera.codes_PC.PC_REG_HVENABLE)
+        err, hvon = self.gui.camera.getPcRegister(self.gui.camera.PC_registers.HVON)
         if err != "":
             return err
 
@@ -235,20 +235,20 @@ class Infrastructure(QtWidgets.QWidget):
             err,hv = self.gui.camera.getHV(n+1)
             if err=="":
                 self.hvSet[n].setValue(hv)
-                self.hvOn[n].setChecked(hvon>>n)
+                self.hvOn[n].setChecked(hvon.HV[n]())
             else:
                 self.gui.show_error("Failed to read HV " + str(n+1) + " from camera: " + err)
-        
                 
         # shutter
-        err,sh = self.gui.camera.getPcRegister(self.gui.camera.codes_PC.PC_REG_SHSTATE)
+        err,sh = self.gui.camera.getPcRegister(self.gui.camera.PC_registers.SHSTATE)
         if err=="":
-            self.shutterOpen.setChecked(sh)
+            self.shutterOpen.setChecked(sh())
         else:
             self.gui.show_error("Failed to read shutter status from camera: " + err)
 
         # shutter external control
-        err,ext = self.gui.camera.getPcRegister(self.gui.camera.codes_PC.PC_REG_SHMODE)
+        err,ext = self.gui.camera.getPcRegister(self.gui.camera.PC_registers.SHMODE)
+        ext = ext()
         if err=="":
             self.shutterMode.setChecked(ext)
             if ext==0:
@@ -266,7 +266,7 @@ class Infrastructure(QtWidgets.QWidget):
             self.gui.show_error("Failed to read calibration light intensity from camera: " + err)
 
         ccDualSata = bool(self.gui.camera.status.CC_settings[self.gui.camera.codes_CC.CC_REGISTER_SATACONTROL] & 1)
-        err,adcDualSata = self.gui.camera.getAdcRegisterBit('all',self.gui.camera.codes_ADC.ADC_REG_CONTROL,1)
+        err,adcDualSata = self.gui.camera.getAdcRegisterBit('all',self.gui.camera.ADC_registers.CONTROL.DSM)
         dualSataOk = True
         for aaa in adcDualSata:
             if bool(aaa) != ccDualSata:

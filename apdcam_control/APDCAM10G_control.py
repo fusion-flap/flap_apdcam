@@ -18,6 +18,8 @@ TODO:
 
 """
 
+import traceback
+import re
 import threading
 import time
 import copy
@@ -28,9 +30,12 @@ import os
 import numpy as np
 from datetime import date
 #import struct
-#import sys
+import sys
 
-
+def showtrace():
+    for line in traceback.format_stack():
+        print(line.strip())
+    
 
 def DAC2ADC_channel_mapping():
     """
@@ -82,15 +87,30 @@ class APDCAM10G_register:
             self.byteOrder = 'little'
             self.byteOrderUncertain = True
     
-    def __call__(self,data):
+    def __call__(self,data=None):
         """
         Return the value of this (possibly multi-byte) register as an integer
 
         Parameters
         ^^^^^^^^^^
-        data  -- a byte array holding the contenet of the entire register table
+        data  -- if None: the function returns the value of this register which has already been acquired
+                 before from the camera and stored in this class instance (no reading from the camera now).
+                 Does not check data validity (i.e. if it has been read at all from the camera).
+                 Otherwise, 'data' must be a byte array holding the contenet of the entire register table,
+                 in which the 'startByte', 'numberOfBytes' etc are interpreted
         """
-        return int.from_bytes(data[self.startByte:self.startByte+self.numberOfBytes],signed=self.signed,byteorder=self.byteOrder)
+        return int.from_bytes(self.bytes if data is None else data[self.startByte:self.startByte+self.numberOfBytes],signed=self.signed,byteorder=self.byteOrder)
+
+    def store_value(self,registerBytes):
+        """
+        This function stores the bytes of this register in this class instance so that it is cached in memory and does not need
+        to be queried from the camera at subsequent times
+
+        Parameters:
+        ^^^^^^^^^^^
+        registerBytes - the bytes from the register table corresponding to this register
+        """
+        self.bytes = registerBytes
 
     def display_value(self,data):
         """
@@ -102,9 +122,9 @@ class APDCAM10G_register_str(APDCAM10G_register):
     def __init__(self, startByte, numberOfBytes, shortDescription, longDescription=''):
         super().__init__(startByte, numberOfBytes, shortDescription, longDescription=longDescription)
 
-    def display_value(self,data):
+    def display_value(self,data=None):
         try:
-            return data[self.startByte:self.startByte+self.numberOfBytes].decode('utf-8')
+            return (self.bytes if data is None else data[self.startByte:self.startByte+self.numberOfBytes]).decode('utf-8')
         except:
             return ">>> can not decode string <<<"
 
@@ -118,7 +138,7 @@ class APDCAM10G_register_int(APDCAM10G_register):
         super().__init__(startByte, numberOfBytes, shortDescription, byteOrder=byteOrder, signed=signed, longDescription=longDescription)
         self.format = format
 
-    def display_value(self,data):
+    def display_value(self,data=None):
         v = self.__call__(data)
         return (hex(v) if self.format=='hex' else str(v))
 
@@ -126,24 +146,24 @@ class APDCAM10G_register_ip(APDCAM10G_register):
     def __init__(self, startByte, shortDescription, longDescription=''):
         super().__init__(startByte, 4, shortDescription, byteOrder='msb', signed=False, longDescription=longDescription)
 
-    def display_value(self,data):
+    def display_value(self,data=None):
         result = ""
         for i in range(4):
             if i>0:
                 result += "."
-            result += str(int.from_bytes(data[self.startByte+i:self.startByte+i+1]))
+            result += str(int.from_bytes(self.bytes[i] if data is None else data[self.startByte+i]))
         return result
         
 class APDCAM10G_register_mac(APDCAM10G_register):
     def __init__(self, startByte, shortDescription, longDescription=''):
         super().__init__(startByte, 6, shortDescription, byteOrder='msb', signed=False, longDescription=longDescription)
 
-    def display_value(self,data):
+    def display_value(self,data=None):
         result = ""
         for i in range(6):
             if i>0:
                 result += ":"
-            result += hex(data[self.startByte+i])[2:]
+            result += hex(self.bytes[i] if data is None else data[self.startByte+i])[2:]
         return result
 
 class APDCAM10G_register_bits(APDCAM10G_register):
@@ -155,17 +175,38 @@ class APDCAM10G_register_bits(APDCAM10G_register):
             self.lastBit = lastBit
             self.description = description
             self.nBits = lastBit-firstBit+1
-            self.mask = 2**self.nBits-1
+            self.mask = 2**self.nBits-1   # mask when the bit(group) is already shifted to bit0
             self.format = format
 
-        def __call__(self, data):
-            i = int.from_bytes(data[self.parent.startByte:self.parent.startByte+self.parent.numberOfBytes],signed=False,byteorder=self.parent.byteOrder)
-            return (i>>self.firstBit)&self.mask
+        def __call__(self, data=None):
+            """
+            Returns the value of the bit (or group of bits) as an integer.
 
-        def display_value(self,data):
+            Parameters:
+            ^^^^^^^^^^^
+            data - a byte array holding the entire register table of the given board. If None, the parent register (APDCAM10G_register object)
+                   must have been set to store the corresponding bytes locally
+            """
+            int_value = int.from_bytes(self.parent.bytes if data is None else data[self.parent.startByte:self.parent.startByte+self.parent.numberOfBytes],\
+                                       signed=False,byteorder=self.parent.byteOrder)
+            return (int_value>>self.firstBit)&self.mask
+
+        def display_value(self,data=None):
             v = self.__call__(data)
             return (hex(v) if format=='hex' else str(v))
 
+        def set(self,value):
+            # Get the integer value from the byte-array stored in the parent (i.e. the register value must have already been
+            # queried from the camera and set in the parent object)
+            int_value = int.from_bytes(self.parent.bytes,signed=False,byteorder=self.parent.byteOrder)
+            # loop over all bits of this bit-group, and set the corresponding bit in the integer representation
+            for b in range(self.lastBit-self.firstBit+1):
+                if (value>>b)&1:
+                    int_value |= 1<<(self.firstBit+b)
+                else:
+                    int_value &= ~(1<<(self.firstBit+b))
+            # write back the value to the parent object
+            self.parent.bytes = int_value.to_bytes(len(self.parent.bytes),byteorder=self.parent.byteOrder,signed=False)
 
     def __init__(self, startByte, numberOfBytes, shortDescription, bits, byteOrder='msb', longDescription=''):
         """
@@ -188,8 +229,20 @@ class APDCAM10G_register_bits(APDCAM10G_register):
             bb = self.Bits(self, symbol, firstBit, lastBit, desc)
             firstBits.append(firstBit)
             unsortedBits.append(bb)
+
             # make this decoder as a symbolic attribute within the register
-            setattr(self,symbol,bb)
+            match = re.match(r'([a-zA-Z_]+)\[([0-9]+)\]',symbol)
+            if match is not None:
+                listname = match.group(1)
+                index = int(match.group(2))
+                if not hasattr(self,listname):
+                    setattr(self,listname,[])
+                list = getattr(self,listname)
+                while len(list) < index+1:
+                    list.append(None)
+                list[index] = bb
+            else:
+                setattr(self,symbol,bb)
 
         # a sorted array containing the bits ordered by their bit position (and not by their symbols, as
         # it would be achievable by iterating through the attributes of this object)
@@ -204,7 +257,9 @@ class APDCAM10G_register_table:
         for regname in dir(self):
             if regname.startswith("_") or regname.upper()!=regname:
                 continue
-            setattr(getattr(self,regname),'symbol',regname)
+            a = getattr(self,regname)
+            if type(a) is not list:
+                setattr(getattr(self,regname),'symbol',regname)
 
     def registerNames(self):
         """
@@ -752,8 +807,7 @@ class APDCAM10G_pc_registers_v1(APDCAM10G_register_table):
     FW_VERSION    = i(0X0002, 2, 'Firmware version code (x100)','lsb')
 
     # for searching: HV1MON, HV2MON, HV3MON, HV4MON
-    for j in range(4):
-        locals()['HV' + str(j+1) + 'MON'] = b(0x04+j*2, 2, 'Monitor output of HV generator ' + str(j+1) + ' (/0.12)',[ ['HV' + str(j+1),0,11,'Monitor of HV' + str(j+1) + ' voltage'] ],byteOrder='lsb')
+    HVMON = [APDCAM10G_register_bits(0x04+j*2, 2, 'Monitor output of HV generator ' + str(j) + ' (/0.12)', [['HV',0,11,'Monitor of HV' + str(j) + ' voltage']], byteOrder='lsb') for j in range(4)]
 
     TEMP_SENSOR_1 = b(0x0C, 2, 'Temperature sensor 1 reading (x10)', [ ['TEMP',0,11,''] ],'lsb?')
     TEMP_SENSOR_2 = b(0x0E, 2, 'Temperature sensor 2 reading (x10)', [ ['TEMP',0,11,''] ],'lsb?')
@@ -776,11 +830,8 @@ class APDCAM10G_pc_registers_v1(APDCAM10G_register_table):
     P_GAIN = i(0x50, 2, 'Peltier controller P gain value (x100)',byteOrder='lsb?')
     I_GAIN = i(0x52, 2, 'Peltier controller I gain value (x100)',byteOrder='lsb?')
     D_GAIN = i(0x54, 2, 'Peltier controller D gain value (x100)',byteOrder='lsb?')
-    HV1SET = b(0x56, 2, 'Set value of high voltage generator 1 (/0.12)',[ ['HV1',0,11,''] ],byteOrder='lsb')
-    HV2SET = b(0x58, 2, 'Set value of high voltage generator 2 (/0.12)',[ ['HV2',0,11,''] ],byteOrder='lsb')
-    HV3SET = b(0x5A, 2, 'Set value of high voltage generator 3 (/0.12)',[ ['HV3',0,11,''] ],byteOrder='lsb')
-    HV4SET = b(0x5C, 2, 'Set value of high voltage generator 4 (/0.12)',[ ['HV4',0,11,''] ],byteOrder='lsb')
-    HVON = b(0x5E, 1, 'High voltages on/off',[ ['HV'+str(j+1)+'ON',j,j,'HV'+str(j+1)+' is on'] for j in range(4) ])
+    HVSET = [APDCAM10G_register_bits(0x56+j*2, 2, 'Set value of high voltage generator ' + str(j), [['HV',0,11,'']], byteOrder='lsb') for j in range(4)]
+    HVON = b(0x5E, 1, 'High voltages on/off',[ ['HV['+str(j)+']',j,j,'HV'+str(j)+' is on'] for j in range(4) ])
     HVENABLE = i(0x60, 1, 'HV enabled (a value of 171 enables globally, otherwise disabled)')
     IRQ_ENABLE_HV = b(0x62, 1, 'Generate interrupt if HVMON differs from HVSET by more than HV_IRQ_LEVEL', [ ['HV'+str(j+1),j,j,'Generate interrupt if HV'+str(j+1)+' has wrong value'] for j in range(4) ])
     IRQ_POWER_PID_ENABLE = b(0x64, 1, 'Enable temperature alarm interrupt, analog +/-5V supplies, PID control',[ ['TEMPALRM',0,0,'Enable interrupt on temperature alarm'], \
@@ -815,8 +866,7 @@ class APDCAM10G_pc_registers_v1(APDCAM10G_register_table):
     BOARD_SERIAL = i(0x100, 2, 'Board unique serial number','lsb?')
 
     # for searching: HV1MAX, HV2MAX, HV3MAX, HV4MAX
-    for j in range(4):
-        locals()['HV'+str(j+1)+'MAX'] = b(0x102+j*2, 2, 'Maximum allowed value for HV'+str(j+1),[ ['MAX',0,11,''] ],byteOrder='lsb')
+    HVMAX = [APDCAM10G_register_bits(0x102+j*2, 2, 'Maximum allowed value for HV' + str(j), [['MAX',0,11,'']], byteOrder='lsb') for j in range(4)]
 
     for j in range(16):
         locals()['TEMP_CTRL_WEIGHTS_'+str(j+1)] = i(0x10A+j*2,2,'Control weight for the temperature sensor for detector temperature control','lsb?')
@@ -844,7 +894,11 @@ class APDCAM10G_adc_registers_v1(APDCAM10G_register_table):
     SERIAL      = i(0x0003, 2, 'Board serial number',byteOrder='msb?')
     XCVERSION   = i(0x0005, 2, 'FPGA program vesion',byteOrder='msb?')
     STATUS1     = b(0x0008, 1, 'STATUS1 register', [ ['BPLLOCK',0,0,"Base PLL locked"] ] )
-    STATUS2     = b(0x0009, 1, 'STATUS2 register', [ ['ITS',0,0,"Internal trigger status"] ] )
+    STATUS2     = b(0x0009, 1, 'STATUS2 register', [ ['ITS',0,0,'Internal trigger status'], \
+                                                     ['OVD',1,1,'Overload'], \
+                                                     ['LED1',2,2,'SATA1 data out LED'], \
+                                                     ['LED2',3,3,'SATA2 data out LED']
+                                                    ] )
     TEMPERATURE = i(0x000A, 1, 'Board temperature')
     CONTROL     = b(0x000B, 1, "CONTROL register", [ ['SATAONOFF',0,0,"SATA channels on/off"],\
                                                      ['DSM',1,1,"Dual SATA mode"], \
@@ -859,10 +913,13 @@ class APDCAM10G_adc_registers_v1(APDCAM10G_register_table):
     DVDD25      = i(0x0010, 2, 'DVDD 2.5V voltage in mV',byteOrder='lsb')
     AVDD33      = i(0x0012, 2, 'AVDD 3.3V voltage in mV',byteOrder='lsb')
     AVDD18      = i(0x0014, 2, 'AVDD 1.8V voltage in mV',byteOrder='lsb')
-    CHENABLE1   = b(0x0016, 1, 'Channels 1-8 enabled (1)/disabled (0)' , [ ['CH'+str(8-j) ,j,j,'Channel '+str(8-j) +' enabled'] for j in range(8) ])
-    CHENABLE2   = b(0x0017, 1, 'Channels 9-16 enabled (1)/disabled (0)', [ ['CH'+str(16-j),j,j,'Channel '+str(16-j)+' enabled'] for j in range(8) ])
-    CHENABLE3   = b(0x0018, 1, 'Channels 17-24 enabled (1)/disabled (0)',[ ['CH'+str(24-j),j,j,'Channel '+str(24-j)+' enabled'] for j in range(8) ])
-    CHENABLE4   = b(0x0019, 1, 'Channels 25-32 enabled (1)/disabled (0)',[ ['CH'+str(32-j),j,j,'Channel '+str(32-j)+' enabled'] for j in range(8) ])
+
+    # for searching: CHENABLE0, CHENABLE1, CHENABLE2, CHENABLE3, CHENABLE[0], CHENABLE[1], CHENABLE[2], CHENABLE[3] (0-based !!!)
+    CHENABLE    = [b(0x0016, 1, 'Channels 1-8 enabled (1)/disabled (0)' , [ ['CH['+str(7-j)+']',j,j,'Channel '+str(8-j) +' enabled'] for j in range(8) ]), \
+                   b(0x0017, 1, 'Channels 9-16 enabled (1)/disabled (0)', [ ['CH['+str(7-j)+']',j,j,'Channel '+str(16-j)+' enabled'] for j in range(8) ]), \
+                   b(0x0018, 1, 'Channels 17-24 enabled (1)/disabled (0)',[ ['CH['+str(7-j)+']',j,j,'Channel '+str(24-j)+' enabled'] for j in range(8) ]), \
+                   b(0x0019, 1, 'Channels 25-32 enabled (1)/disabled (0)',[ ['CH['+str(7-j)+']',j,j,'Channel '+str(32-j)+' enabled'] for j in range(8) ])]
+    
     RINGBUFSIZE = b(0x001A, 2, 'Ring buffer size', [ ['RBSIZE',0,9,'Ring buffer size. If 0, ring buffer is disabled'] ],byteOrder='msb?')
     RESOLUTION = i(0x001C, 1, 'Resolution (number of bits per sample)')
     BPSCH1     = i(0x001D, 1, 'Bytes per sample of 8-channel block 1')
@@ -872,10 +929,11 @@ class APDCAM10G_adc_registers_v1(APDCAM10G_register_table):
     ERRORCODE  = i(0x0024, 1, 'The code of the last error. 0 = no error')
     RESETFACTORY = i(0x0025, 1, 'Writing 0xCD here causes factory reset')
 
-    # for searching: AD1TEST, AD2TEST, AD3TEST, AD4TEST
-    for j in range(4):
-        locals()['AD'+str(j+1)+'TEST'] = b(0x0028+j, 1, 'ADC chip'+str(j+1)+' test mode selector. 0 = normal mode',\
-                           [ ['TESTMODE',0,3,'Test mode. 0=normal,1=b100000000000(8192),2=b11111111111111(16383),3=0,4=1010...(10922),0101...(5461),5=longpseudo,6=shortpseudo,7=1111...,0000...'] ])
+    # for searching: AD1TEST, AD2TEST, AD3TEST, AD4TEST (0-based !!!)
+    TESTMODE   = [APDCAM10G_register_int(0x0028+j, 1, 'ADC chip'+str(j)+' test mode selector. 0=normal,1=b100000000000(8192),2=b11111111111111(16383),3=0,4=1010...(10922),0101...(5461),5=longpseudo,6=shortpseudo,7=1111...,0000...') for j in range(4)]
+    # for j in range(4):
+    #     locals()['AD'+str(j+1)+'TEST'] = b(0x0028+j, 1, 'ADC chip'+str(j+1)+' test mode selector. 0 = normal mode',\
+    #                        [ ['TESTMODE',0,3,'Test mode. 0=normal,1=b100000000000(8192),2=b11111111111111(16383),3=0,4=1010...(10922),0101...(5461),5=longpseudo,6=shortpseudo,7=1111...,0000...'] ])
 
     # for searching: ANALOGOUT1, ANALOGOUT2, ANALOGOUT3, etc
     # for searching: TRIGLEVEL1, TRIGLEVEL2, etc
@@ -909,8 +967,12 @@ class APDCAM10G_adc_registers_v2(APDCAM10G_register_table):
     VERSION     = i(0x0001, 2, 'Microcontroller program version','msb?')
     SERIAL      = i(0x0003, 2, 'Board serial number','msb?')
     XCVERSION   = i(0x0005, 2, 'FPGA program vesion','msb?')
-    STATUS1     = b(0x0008, 1, 'STATUS1 register', [ ['BPLLOCK',0,0,"Base PLL locked"] ] )
-    STATUS2     = b(0x0009, 1, 'STATUS2 register', [ ['ITS',0,0,"Internal trigger status"] ] )
+    STATUS1     = b(0x0008, 1, 'STATUS1 register', [ ['BPLLOCK',0,0,'Base PLL locked'] ] )
+    STATUS2     = b(0x0009, 1, 'STATUS2 register', [ ['ITS',0,0,'Internal trigger status'], \
+                                                     ['OVD',1,1,'Overload'], \
+                                                     ['LED1',2,2,'SATA1 data out LED'], \
+                                                     ['LED2',3,3,'SATA2 data out LED']
+                                                    ] )
     TEMPERATURE = i(0x000A, 1, 'Board temperature')
     CONTROL     = b(0x000B, 1, "CONTROL register", [ ['SATAONOFF',0,0,"SATA channels on/off"],\
                                                      ['DSM',1,1,"Dual SATA mode"], \
@@ -926,10 +988,13 @@ class APDCAM10G_adc_registers_v2(APDCAM10G_register_table):
     DVDD25      = i(0x0010, 2, 'DVDD 2.5V voltage in mV',byteOrder='lsb')
     AVDD33      = i(0x0012, 2, 'AVDD 3.3V voltage in mV',byteOrder='lsb')
     AVDD18      = i(0x0014, 2, 'AVDD 1.8V voltage in mV',byteOrder='lsb')
-    CHENABLE1   = b(0x0016, 1, 'Channels 1-8 enabled (1)/disabled (0)' , [ ['CH'+str(8-j) ,j,j,'Channel '+str(8-j) +' enabled'] for j in range(8) ])
-    CHENABLE2   = b(0x0017, 1, 'Channels 9-16 enabled (1)/disabled (0)', [ ['CH'+str(16-j),j,j,'Channel '+str(16-j)+' enabled'] for j in range(8) ])
-    CHENABLE3   = b(0x0018, 1, 'Channels 17-24 enabled (1)/disabled (0)',[ ['CH'+str(24-j),j,j,'Channel '+str(24-j)+' enabled'] for j in range(8) ])
-    CHENABLE4   = b(0x0019, 1, 'Channels 25-32 enabled (1)/disabled (0)',[ ['CH'+str(32-j),j,j,'Channel '+str(32-j)+' enabled'] for j in range(8) ])
+
+    # for searching: CHENABLE0, CHENABLE1, CHENABLE2, CHENABLE3, CHENABLE[0], CHENABLE[1], CHENABLE[2], CHENABLE[3]  (0-based !!!)
+    CHENABLE    = [b(0x0016, 1, 'Channels 1-8 enabled (1)/disabled (0)' , [ ['CH['+str(7-j)+']',j,j,'Channel '+str(8-j) +' enabled'] for j in range(8) ]), \
+                   b(0x0017, 1, 'Channels 9-16 enabled (1)/disabled (0)', [ ['CH['+str(7-j)+']',j,j,'Channel '+str(16-j)+' enabled'] for j in range(8) ]), \
+                   b(0x0018, 1, 'Channels 17-24 enabled (1)/disabled (0)',[ ['CH['+str(7-j)+']',j,j,'Channel '+str(24-j)+' enabled'] for j in range(8) ]), \
+                   b(0x0019, 1, 'Channels 25-32 enabled (1)/disabled (0)',[ ['CH['+str(7-j)+']',j,j,'Channel '+str(32-j)+' enabled'] for j in range(8) ])]
+
 #    RINGBUFSIZE = b(0x001A, 2, 'Ring buffer size', [ ['RBSIZE',0,9,'Ring buffer size. If 0, ring buffer is disabled'] ],byteOrder='msb?')
     STREAMCONTROL = b(0x1A, 2, 'Ring buffer size / SATA test mode / Stream mode', [ ['RBSIZE',0,9,'Ring buffer size. If 0, ring buffer is disabled'],\
                                                                                     ['SATATEST',13,13,'SATA test mode'],\
@@ -941,10 +1006,13 @@ class APDCAM10G_adc_registers_v2(APDCAM10G_register_table):
     BPSCH4     = i(0x0020, 1, 'Bytes per sample of 8-channel block 4')
     ERRORCODE  = i(0x0024, 1, 'The code of the last error. 0 = no error')
     RESETFACTORY = i(0x0025, 1, 'Writing 0xCD here causes factory reset')
-    # for searching: AD1TEST, AD2TEST, AD3TEST, AD4TEST
-    for j in range(4):
-        locals()['AD'+str(j+1)+'TEST'] = b(0x0028+j, 1, 'ADC chip'+str(j+1)+' test mode selector. 0 = normal mode',\
-                           [ ['TESTMODE',0,3,'Test mode. 0=normal,1=b100000000000(8192),2=b11111111111111(16383),3=0,4=1010...(10922),0101...(5461),5=longpseudo,6=shortpseudo,7=1111...,0000...'] ])
+
+    # for searching: AD1TEST, AD2TEST, AD3TEST, AD4TEST (0-based !!!)
+    TESTMODE   = [APDCAM10G_register_int(0x0028+j, 1, 'ADC chip'+str(j)+' test mode selector. 0=normal,1=b100000000000(8192),2=b11111111111111(16383),3=0,4=1010...(10922),0101...(5461),5=longpseudo,6=shortpseudo,7=1111...,0000...') for j in range(4)]
+    # for j in range(4):
+    #     locals()['AD'+str(j+1)+'TEST'] = b(0x0028+j, 1, 'ADC chip'+str(j+1)+' test mode selector. 0 = normal mode',\
+    #                        [ ['TESTMODE',0,3,'Test mode. 0=normal,1=b100000000000(8192),2=b11111111111111(16383),3=0,4=1010...(10922),0101...(5461),5=longpseudo,6=shortpseudo,7=1111...,0000...'] ])
+
     DACCONTROL = b(0x2E,1,'DAC mixed channel mode',[ ['MIXED',0,0,'ADC and DAC channel numbering is mixed'] ] )
 
     # for searching: ANALOGOUT1, ANALOGOUT2, ANALOGOUT3, etc
@@ -2322,7 +2390,7 @@ class APDCAM10G_control:
                         break
                     d = d[4:len(d)]
                     if (arrayData[i] == False ) :
-                        if (byteOrder[i] == "MSB") :
+                        if (byteOrder[i] == "MSB" or byteOrder[i].lower() == 'big') :
                             d = int.from_bytes(d,'big',signed=False)
                         else :
                             d = int.from_bytes(d,'little',signed=False)
@@ -2373,7 +2441,7 @@ class APDCAM10G_control:
             then the integer is converted to a byte array of numberOfBytes 
         byteOrder
             defines the byte order for converting from integer to register data. 
-            List with 'MSB' or LSB' elements. LSB means LSB first.  Default is LSB.          
+            List with 'MSB' or 'LSB' elements. LSB means LSB first.  Default is LSB.          
         waitTime
             Wait time between register write commands in ms. Will insert a wait command
             between the read commands and also after the last one. If 0 no wait commands will be generated.
@@ -2948,41 +3016,6 @@ class APDCAM10G_control:
            return err
         return self.setAdcDualSata('all',dual_SATA_state)
 
-    # This is the old function by S. Zoletnik. Reimplemented by D. Barna as setAdcDualSata using the more general setRegisterBit utility function
-    # def setADCDualSATA(self,dual_SATA_state=True):
-    #     """
-    #     Sets the dual SATA state in all ADCs.
-            
-    #     Parameters
-    #     ^^^^^^^^^^
-    #     dual_SATA_state: bool
-    #         True: set dual SATA bits
-    #         False: clear dual SATA bits
-    #     Return value
-    #     ^^^^^^^^^^^^
-    #     str:
-    #         Returns an error text or "" of no error 
-    #     """
-    #     self.lock.acquire()
-    #     while (True):
-    #         for adc in self.status.ADC_address:
-    #             reg = self.codes_ADC.ADC_REG_CONTROL
-    #             err,data = self.readPDI(adc,reg,1,arrayData=False)
-    #             data = data[0]
-    #             if (err != ""):
-    #                 break
-    #             if (dual_SATA_state):
-    #                 data |= 0x03
-    #             else:
-    #                 data &= 0xfd
-    #             err = self.writePDI(adc,reg,data,numberOfBytes=1,arrayData=False,noReadBack=False)
-    #             if (err != ""):
-    #                 break
-    #             time.sleep(1)
-    #         break
-    #     self.lock.release()
-    #     return err
-
     def sendADCIstruction(self,address,instruction):    
         """ Sends an instruction in to the ADC board. 
         address: ADC card address
@@ -3019,7 +3052,7 @@ class APDCAM10G_control:
             value = 1
         if bits == 8:
             value = 2
-        return self.setAdcRegister(adcBoardNo,self.codes_ADC.ADC_REG_RESOLUTION,value)
+        return self.setAdcRegister(adcBoardNo,self.ADC_registers.RESOLUTION,value)
 
     def getAdcResolution(self,adcBoardNo):
         """
@@ -3039,21 +3072,23 @@ class APDCAM10G_control:
         
         """
 
-        err,reg =  self.getAdcRegister(adcBoardNo,self.codes_ADC.ADC_REG_RESOLUTION)
+        err,reg =  self.getAdcRegister(adcBoardNo,self.ADC_registers.RESOLUTION)
         if err != "":
             return err,None
 
         # if asked for a single board only, the retured value is a single value. listify it.
-        if type(adcBoardNo) == int:
+        if type(adcBoardNo) is int:
             reg = [reg]
 
-        # in-place replace the values 1,2,3 by the number of bits of the resolution
+        # in-place replace the returned values (1,2,3) by the number of bits of the resolution
 
         for i in range(len(reg)):
             # Mask the lowest 2 bits (the higher ones are 'reserved' and I don't know if they are set to zero or not)
-            reg[i] = [14,12,8,0][reg[i]&3]  # added an extra dummy to the end
-            if(type(adcBoardNo) == int):
-                return "",reg[0]
+            reg[i] = [14,12,8,0][reg[i]()&3]  # added an extra dummy to the end to avoid problems if the register value is 3 (which should not be the case...)
+            # If adcBoardNo was a single integer, then de-listify the result, return a single integer 
+
+        if type(adcBoardNo) is int:
+            return "",reg[0]
         return "",reg
         
     def setRingBufferSize(self,adcBoardNo,size):
@@ -3072,13 +3107,7 @@ class APDCAM10G_control:
         Error message or empty string
         """
 
-        return self.setAdcRegister(adcBoardNo,self.codes_ADC.ADC_REG_RINGBUFSIZE,size,2)
-
-        # if adcBoardNo<1 or len(self.status.ADC_address)<adcBoardNo:
-        #     return "Bad ADC board number: " + str(adcBoardNo)
-        # error =  self.writePDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_RINGBUFSIZE,size,numberOfBytes=2,arrayData=False)
-
-        # return error
+        return self.setAdcRegister(adcBoardNo,self.ADC_registers.RINGBUFSIZE,size)
 
     def getRingBufferSize(self,adcBoardNo):
         """
@@ -3086,7 +3115,7 @@ class APDCAM10G_control:
 
         Parameters
         ^^^^^^^^^^
-        adcBoardNo: int (1..4)
+        adcBoardNo: int (1..4) or the string 'all'
             The ADC board number
 
         Returns
@@ -3094,14 +3123,17 @@ class APDCAM10G_control:
         error
             Error message, or empty string
         buffersize
-            The size of the ring buffer
+            If adcBoardNo is a single integer, return the size of the ring buffer of this ADC board.
+            If adcBoardNo is 'all', return the sizes of the ring buffers of all ADC boards in a list
         """
 
-        if adcBoardNo<1 or len(self.status.ADC_address)<adcBoardNo:
-            return "Bad ADC board number: " + str(adcBoardNo)
-        err,bufsize= self.readPDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_RINGBUFSIZE,numberOfBytes=2,arrayData=False)
-        return err,bufsize[0]
-        
+        if hasattr(self.ADC_registers,"RINGBUFSIZE"): # v104 and before
+            err,reg = self.getAdcRegister(adcBoardNo,self.ADC_registers.RINGBUFSIZE)
+            if type(adcBoardNo) == int:
+                return err,reg()
+            return err,[r() for r in reg]
+        else:  #v105 and after (hopefully)
+            return self.getAdcRegisterBit(adcBoardNo,self.ADC_registers.STREAMCONTROL.RBSIZE)
     
     def initDAC(self,address):
         """ Sets the configuration of the DAC chips
@@ -3277,7 +3309,7 @@ class APDCAM10G_control:
         Parameters
         ^^^^^^^^^^
         adcBoardNo
-            The number of the ADC (1..4), or the string 'all' to set the pattern for all ADCs
+            The number of the ADC board (1..4), or the string 'all' to set the pattern for all ADCs
             
         Returns
         ^^^^^^^
@@ -3286,26 +3318,26 @@ class APDCAM10G_control:
         values
             List of test pattern values.
             if 'adcBoardNo' is 'all', then the list contains as many elements as the number of ADC boards, and all list element
-            is a list of 4 numbers corresponding to the 4 blocks of the ADC board
+            is a list of 4 numbers corresponding to the 4 chips of the ADC board
             if 'adcBoardNo' is a single number, the list contains 4 numbers, each corresponding to the 4 blocks of the given ADC
         """
-        err,adcAddresses = self.adcAddresses(adcBoardNo)
-        if err!="":
-            return err
+        if adcBoardNo == 'all':
+            adcBoardNos = list(range(1,1+len(self.status.ADC_address)))
+        else:
+            adcBoardNos = [adcBoardNo]
 
-        n_adc = len(adcAddresses)
-
-        data = []
-        for i_adc in range(n_adc):
-            err,d = self.readPDI(self.status.ADC_address[i_adc],self.codes_ADC.ADC_REG_AD1TESTMODE,numberOfBytes=4,arrayData=True)
+        result = []
+        for adc in adcBoardNos:
+            # Since ADC_registers.TESTMODE is an array, here we get an array of registers in return, the 4 values
+            err,regs = self.getAdcRegister(adc,self.ADC_registers.TESTMODE)
             if err != "":
-                return "Error in getTestPattern, ADC {:d}: {:s}".format(i_adc+1,err),None
-            l = [int.from_bytes(d[0][0:1]), int.from_bytes(d[0][1:2]), int.from_bytes(d[0][2:3]), int.from_bytes(d[0][3:4])]
-            if type(adcBoardNo) == int:
-                return "",l
+                return err,None
+            # evaluate and store all 4 values
+            result.append([r() for r in regs])
             time.sleep(0.1)
-            data.append(l)
-        return "",data
+        if type(adcBoardNo) is int:
+            return "",result[0]
+        return "",result
 
     def setTestPattern(self,adcBoardNo='all',value=0):
         """ Set the test pattern of the ADCs.
@@ -3473,11 +3505,9 @@ class APDCAM10G_control:
             A list of addresses (with a length of 1 if adcBoardNo is a single number)
         """
 
-        # if 'all', then generate a sequence of numbers [1..#adcs] inclusivew
         if adcBoardNo == 'all':
             adcBoardNo = list(range(1,1+len(self.status.ADC_address)))
 
-        # if adcBoardNo is not a list (i.e. hopefully it is a simple number), make it a list
         if type(adcBoardNo) is not list:
             adcBoardNo = [adcBoardNo]
 
@@ -3488,7 +3518,89 @@ class APDCAM10G_control:
             addresses.append(self.status.ADC_address[adc-1])
         return "",addresses
 
-    def getAdcRegister(self,adcBoardNo,register,numberOfBytes=1):
+    def getAdcOrPcRegister(self, boardAddress, register):
+        """
+        Return the value of a single or multiple (potentially multi-byte) register(s)
+        of an ADC or the PC board.
+
+        Parameters
+        ^^^^^^^^^^
+        boardAddress  - address of the board to read the register(s) from
+
+        register      - APDCAM10G_register object
+
+        Returns
+        ^^^^^^^
+        error   - error message or the empty string
+
+        values  - If 'register' is a list of APDCAM10G_register objects, a list of the same
+                  type of objects is returned, which contain the register values, i.e.
+                  which can be evaluated by the () operator
+
+                  If 'register' is a single APDCAM10G_register object, a single object
+                  of the same type is returned, containing the register value
+
+                  If 'register' is an integer, 
+
+        """
+        # a list of registers: make a single read from the first to the last byte of the
+        # byte range spanned by all list elements (even if this range is not continuous...)
+        if type(register) is list and isinstance(register[0],APDCAM10G_register):
+            startByte = min([r.startByte for r in register])
+            endByte   = max([r.startByte+r.numberOfBytes for r in register])
+            err,d = self.readPDI(boardAddress,startByte,numberOfBytes=endByte-startByte,arrayData=True)
+            if err != "":
+                return err,None
+            result = []
+            for r in register:
+                rcopy = copy.deepcopy(r)
+                rcopy.store_value(d[0][r.startByte-startByte:r.startByte+r.numberOfBytes-startByte])
+                result.append(rcopy)
+            return "",result
+
+        # a single register
+        elif isinstance(register,APDCAM10G_register):
+            err,d = self.readPDI(boardAddress,register.startByte,numberOfBytes=register.numberOfBytes,arrayData=True)
+            if err != "":
+                return err,None
+            r = copy.deepcopy(register)
+            r.store_value(d[0])
+            return "",r
+
+        # a register address
+        else:
+            print("getAdcOrPcRegister must be called with an APDCAM10G_register object. Use readPDI for lower-level operation.")
+            showtrace()
+            sys.exit(1)
+        time.sleep(0.005)
+
+    def setAdcOrPcRegister(self,boardAddress,register,value=None,noReadBack=False):
+        """
+        Sets the (potentially multi-byte) register of a given card
+
+        Parameters
+        ^^^^^^^^^^
+        boardAddress   - address of the board
+
+        register       - An APDCAM10G_register object containing register address, length, byteorder, etc
+
+        value          - value to be set. If None (default), the values stored in 'register' are written
+                         into the register of the camera
+        """
+
+        registerAddress = register.startByte
+        numberOfBytes = register.numberOfBytes
+        byteOrder = ''
+        if register.byteOrder.upper() == 'MSB' or register.byteOrder.upper() == 'BIG':
+            byteOrder = 'MSB'
+        if register.byteOrder.upper() == 'LSB' or register.byteOrder.upper() == 'LITTLE':
+            byteOrder = 'LSB'
+        if value is not None:
+            return self.writePDI(boardAddress,registerAddress,value,numberOfBytes=numberOfBytes,byteOrder=byteOrder,arrayData=False,noReadBack=noReadBack)
+        else:
+            return self.writePDI(boardAddress,registerAddress,register.bytes,numberOfBytes=numberOfBytes,byteOrder=byteOrder,arrayData=True,noReadBack=noReadBack)
+
+    def getAdcRegister(self,adcBoardNo,register):
         """
         Get the value of a register of a single or multiple ADC board(s)
 
@@ -3497,55 +3609,45 @@ class APDCAM10G_control:
         adcBoardNo: int(1..4) or string
             The ADC board number (1..4) or 'all' to indicate that it should be made for all ADCs
         register:
-            (Starting) address of the register
-        numberOfBytes (default 1):
-            Number of bytes to read from the given starting address
+            an APDCAM10G_register object which stores info about the register
+            (start address, num. of bytes, how to interpret)
 
         Returns
         ^^^^^^^
         err
             Error message or empty string
         value[s]
-            The value of the register if a single ADC board is queried (i.e. adcBoardNo is an integer)
-            The list of values if multiple ADC boards are queried (even if adcBoardNo is a list of length 1!)
+            if adcBoardNo is a single integer (i.e. one ADC board is queried), a single (or a list of) APDCAM10G_register
+            objects (see the documentation of getAdcOrPcRegister), depending on whether register is a single or a list of
+            APDCAM10G_register objects
+            If adcBoardNo=='all', a list of the above types (each element corresponding to one ADC board)
         """
 
         err,adcAddresses = self.adcAddresses(adcBoardNo)
-
-        # Handle the new register table type
-        registerAddress = register
-        if isinstance(register,APDCAM10G_register):
-            registerAddress = register.startByte
-            numberOfBytes = register.numberOfBytes
+        result = []
+        for adcAddress in adcAddresses:
+            err,tmp = self.getAdcOrPcRegister(adcAddress,register)
+            if err!="":
+                return err,None
+            result.append(tmp)
 
         if type(adcBoardNo) is int:
-            (err,data) = self.readPDI(adcAddresses[0],register,numberOfBytes=numberOfBytes,arrayData=False)
-            return (err,data[0])
-
-        values = []
-        err = ""
-        for adcAddress in adcAddresses:
-            err_tmp,d = self.readPDI(adcAddress,register,numberOfBytes=numberOfBytes,arrayData=False)
-            if err_tmp != "":
-                if err != "":
-                    err += ", "
-                err += err_tmp
-            values.append(d[0])
-            time.sleep(0.005)
-        return (err,values)
+            return "",result[0]
+        return "",result
         
-    def setAdcRegister(self,adcBoardNo,register,value,numberOfBytes=1):
+    def setAdcRegister(self,adcBoardNo,register,value=None,noReadBack=False):
         """
         Set a given register to a given value
 
         Parameters
         ^^^^^^^^^^
-        adcBoardNo: int(1..4) or string
+        adcBoardNo: int(1..4) or the string 'all'
             The ADC board number (1..4) or 'all' to indicate that it should be made for all ADCs
         register:
-            Address of the register
+            An APDCAM10G_register object which stores both the address and the number of bytes. 
         value:
-            Value to be written to the register
+            Value to be written to the register. If it is None (default), the value stored
+            in 'register' is used
 
         Returns
         ^^^^^^^
@@ -3558,7 +3660,7 @@ class APDCAM10G_control:
             self.lock.acquire()
 
         for adcAddress in adcAddresses:
-            err = self.writePDI(adcAddress,register,value,numberOfBytes=numberOfBytes,arrayData=False)
+            err = self.setAdcOrPcRegister(adcAddress,register,value=value,noReadBack=noReadBack)
             if err!="":
                 if len(adcAddresses) > 0:
                     self.lock.release()
@@ -3569,7 +3671,7 @@ class APDCAM10G_control:
 
         return ""
 
-    def setPcRegister(self,register,value,numberOfBytes=1,byteOrder='LSB'):
+    def setPcRegister(self,register,value=None,noReadBack=False):
         """
         Set a given register of the Power and Control unit to a given value
 
@@ -3585,45 +3687,43 @@ class APDCAM10G_control:
         Error message or empty string
 
         """
-        return self.writePDI(self.codes_PC.PC_CARD,register,value,numberOfBytes=numberOfBytes,arrayData=False,byteOrder=byteOrder.upper())
+        
+        return self.setAdcOrPcRegister(self.codes_PC.PC_CARD,register,value=value,noReadBack=noReadBack)
 
-    def getPcRegister(self,register,numberOfBytes=1,byteOrder='LSB'):
+    def getPcRegister(self,register):
         """
         Get the value of a register of the PC board
 
         Parameters
         ^^^^^^^^^^
         register:
-            (Starting) address of the register
-        numberOfBytes (default 1):
-            The number of bytes to read from the given starting address
+            An APDCAM10G_register object
 
         Returns
         ^^^^^^^
         err
             Error message or empty string
         value
-            The value of the register 
+            An APDCAM10G_register object containing the value of the register
         """
-        (err,data) = self.readPDI(self.codes_PC.PC_CARD,register,numberOfBytes=numberOfBytes,arrayData=False,byteOrder=byteOrder.upper())
-        return (err,data[0])
+
+        return self.getAdcOrPcRegister(self.codes_PC.PC_CARD,register)
         
     
-    def setAdcRegisterBit(self,adcBoardNo,register,bit,state):
+    def setAdcRegisterBit(self,adcBoardNo,register_bit,value):
         """
-        Set a single bit in the given register of the ADC. To do so, it first reads the value of the register,
+        Set a single bit (or a group of bits) in the given register of the ADC. To do so, it first reads the value of the register,
         changes the given bit to the desired value, and then writes it back to the register
 
         Parameters
         ^^^^^^^^^^
         adcBoardNo: int (1..4) or the string 'all'
             The ADC board number (1..4) or 'all' to indicate that it should be made for all ADCs
-        register:
-            The address of the register
-        bit: int (0..7)
-            The bit to be set
-        state:
-            True/False
+        register_bit:
+            An APDCAM10G_register_bits.Bits object which stores info about register address, and the sub-bits
+        value:
+            The value to be stored in the given number of bits. It is treated bit-by-bit, i.e. specifying
+            a value of '2' for a single-bit target, the result will be a zero  bit!
 
         Returns
         ^^^^^^^
@@ -3631,74 +3731,130 @@ class APDCAM10G_control:
 
         """
 
-        (error,adcAddresses) = self.adcAddresses(adcBoardNo)
-        if error != "":
-            return error
+        # copy to avoid modification of the original
+        bit = copy.deepcopy(register_bit)
+        register = bit.parent
 
-        if len(adcAddresses) > 1:
+        if adcBoardNo == 'all':
+            adcBoardNos = list(range(1,1+len(self.status.ADC_address)))
+        else:
+            adcBoardNos = [adcBoardNo]
+        
+        if len(adcBoardNos) > 1:
             self.lock.acquire()
 
-        for adcAddress in adcAddresses:
-            err,d = self.readPDI(adcAddress,register,1,arrayData=False)
+        for adc in adcBoardNos:
+            err,r = self.getAdcRegister(adc,register)
             if err != "":
-                if len(adcAddresses) > 1:
-                    self.lock.release()
-                return err
-            d = d[0]
-            if state:
-                d |= 1<<bit
-            else:
-                d &= ~(1<<bit)
-
-            err = self.writePDI(adcAddress,register,d,1,arrayData=False)
-            if err != "":
-                if len(adcAddresses) > 1:
+                if len(adcBoardNos) > 1:
                     self.lock.release()
                 return err
 
-        if len(adcAddresses) > 1:
+            # copy the value back to the original register variable
+            register.store_value(r.bytes)
+
+            # modify the bits
+            bit.set(value)
+
+            # write the value stored in 'register' back to the camera
+            err = self.setAdcRegister(adc,register)
+
+            if err != "":
+                if len(adcBoardNos) > 1:
+                    self.lock.release()
+                return err
+
+        if len(adcBoardNos) > 1:
             self.lock.release()
 
         return ""
 
-    def getAdcRegisterBit(self,adcBoardNo, register, bit):
+    def getAdcRegisterBit(self,adcBoardNo, register_bit):
         """
-        Returns a given bit (0 or 1) in a given register for a selected adc board, or all of them
+        Get a single ibt (ora group of bits) in the given register of the ADC.
+
+        Parameters:
+        ^^^^^^^^^^^
+        adcBoardNo: int (1..4) or the string 'all'
+            The ADC board number ofo 'all' to indicated that it should be made for all ADCs
+        register_bit:
+            An APDCAM10G_register_bits.Bits object which stores info about register address, and sub-bits
+
+        Returns:
+        ^^^^^^^^
+        error: error message or empty string
+
+        value:
+            If 'adcBoardNo' is an integer, the value stored in the given sub-bits.
+            If 'adcBoardNo' is 'all', a list of these values for all ADC boards
+
+        """
+
+        # copy to avoid modification of the original
+        bit = copy.deepcopy(register_bit)
+        register = bit.parent
+
+        if adcBoardNo == 'all':
+            adcBoardNos = list(range(1,1+len(self.status.ADC_address)))
+        else:
+            adcBoardNos = [adcBoardNo]
+
+        result = []
+        for adc in adcBoardNos:
+            err, reg = self.getAdcRegister(adc,register)
+            if err != "":
+                return err,None
+            # copy the obtained data into the parent of the function argument, for interpretation
+            register.store_value(reg.bytes)
+
+            # now obtain the value stored in the given sub-bits (bit() uses the data stored in its parent)
+            result.append(bit())
+
+            time.sleep(0.005)
+
+        if type(adcBoardNo) is int:
+            return "",result[0]
+        return "",result
+
+    def setPcRegisterBit(self,register_bit,value,noReadBack=False):
+        """
+        Set a single bit (or a group of bits) in the given register of the ADC. To do so, it first reads the value of the register,
+        changes the given bit to the desired value, and then writes it back to the register
 
         Parameters
         ^^^^^^^^^^
-        adcBoardNo: int (1..4) or the string 'all'
-            The ADC board number (1..4) or 'all' to indicate that it should be made for all ADCs
-        register:
-            The address of the register
-        bit: int (0..7)
-            The bit to be set
+        register_bit:
+            An APDCAM10G_register_bits.Bits object which stores info about register address, and the sub-bits
+        value:
+            The value to be stored in the given number of bits. It is treated bit-by-bit, i.e. specifying
+            a value of '2' for a single-bit target, the result will be a zero  bit!
 
         Returns
         ^^^^^^^
-        error (string)
-            error message, or empty string
-        bit (int if adcBoardNo is a single integer, and a list of ints if adcBoardNo is 'all')
-            0 if the given bit is not set, 1 if the bit is set
+        Error (or empty) string
+
         """
 
-        err,adcAddresses = self.adcAddresses(adcBoardNo)
+        # copy to avoid modification of the original
+        bit = copy.deepcopy(register_bit)
+        register = bit.parent
 
-        if type(adcBoardNo) is int:
-            (err,data) = self.readPDI(adcAddresses[0],register,numberOfBytes=1,arrayData=False)
-            return (err,1 if (data[0] & (1<<bit)) else 0)
+        err,r = self.getPcRegister(register)
+        if err != "":
+            return err
+            
+        # copy the value back to the original register variable
+        register.store_value(r.bytes)
 
-        values = []
-        err = ""
-        for adcAddress in adcAddresses:
-            err_tmp,d = self.readPDI(adcAddress,register,numberOfBytes=1,arrayData=False)
-            if err_tmp != "":
-                if err != "":
-                    err += ", "
-                err += err_tmp
-            values.append(1 if (d[0] & (1<<bit)) else 0)
-            time.sleep(0.005)
-        return (err,values)
+        # modify the bits
+        bit.set(value)
+
+        # write the value stored in 'register' back to the camera
+        err = self.setPcRegister(register,noReadBack)
+
+        if err != "":
+            return err
+        return ""
 
     def setSataOn(self,adcBoardNo,state):
         """
@@ -3716,8 +3872,7 @@ class APDCAM10G_control:
         Error message or empty string
         
         """
-
-        return self.setAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,0,state)
+        return self.setAdcRegisterBit(adcBoardNo,self.ADC_registers.CONTROL.SATAONOFF,1 if state else 0)
 
     def getSataOn(self,adcBoardNo):
         """
@@ -3726,8 +3881,7 @@ class APDCAM10G_control:
         error   - error message or empty string
         on      - boolean indicating whether SataOn bit is set
         """
-        err,bit =  self.getAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,0)
-        return err,bool(bit)
+        return  self.getAdcRegisterBit(adcBoardNo,self.ADC_registers.CONTROL.SATAONOFF)
 
     def setAdcDualSata(self,adcBoardNo,state):
         """
@@ -3746,7 +3900,7 @@ class APDCAM10G_control:
         
         """
 
-        return self.setAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,1,state)
+        return self.setAdcRegisterBit(adcBoardNo,self.ADC_registers.CONTROL.DSM,1 if state else 0)
 
     def setSataSync(self,adcBoardNo,state):
         """
@@ -3765,7 +3919,7 @@ class APDCAM10G_control:
         
         """
 
-        return self.setAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,2,state)
+        return self.setAdcRegisterBit(adcBoardNo,self.ADC_registers.CONTROL.SS,2,state)
 
     def getSataSync(self,adcBoardNo):
         """
@@ -3774,8 +3928,7 @@ class APDCAM10G_control:
         error    - error message or empty string
         bit      - True/False indicating whether the SataSync bit is set
         """
-        err, bit = self.getAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,2)
-        return err,bool(bit)
+        return  self.getAdcRegisterBit(adcBoardNo,self.ADC_registers.CONTROL.SS)
 
     def setTestPatternMode(self,adcBoardNo,state):
         """
@@ -3794,7 +3947,7 @@ class APDCAM10G_control:
         
         """
 
-        return self.setAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,3,state)
+        return self.setAdcRegisterBit(adcBoardNo,self.ADC_registers.CONTROL.TM,1 if state else 0)
     
     def getTestPatternMode(self,adcBoardNo):
         """
@@ -3803,8 +3956,7 @@ class APDCAM10G_control:
         error   - error message or empty string
         bit     - True/False indicating whether the Test Pattern Mode bit is set
         """
-        err, bit = self.getAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,3)
-        return err,bool(bit)
+        return self.getAdcRegisterBit(adcBoardNo,self.ADC_registers.CONTROL.TM)
 
     def setFilterOn(self,adcBoardNo,state):
         """
@@ -3823,7 +3975,7 @@ class APDCAM10G_control:
         
         """
 
-        return self.setAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,4,state)
+        return self.setAdcRegisterBit(adcBoardNo,self.ADC_registers.CONTROL.FIL,1 if state else 0)
 
     def setReverseBitord(self,adcBoardNo,state):
         """
@@ -3842,12 +3994,10 @@ class APDCAM10G_control:
         
         """
 
-        return self.setAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,6,state)
+        return self.setAdcRegisterBit(adcBoardNo,self.ADC_registers.CONTROL.RBO,1 if state else 0)
 
     def getReverseBitord(self,adcBoardNo):
-        err, bit = self.getAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,6)
-        return err,bool(bit)
-    
+        return self.getAdcRegisterBit(adcBoardNo,self.ADC_registers.CONTROL.RBO)
 
     def setFilterCoeffs(self,adcBoardNo,values):
         """
@@ -3999,42 +4149,17 @@ class APDCAM10G_control:
         Error message in string, empty string if no error
         """
 
-        adc_no = ((channel-1)//32)  # 0..3
-        ch_no  = ((channel-1)% 32)  # 0..31
-
-        reg = 0 # The register address. There are 4 registers, each handling 8 channels (8 bits)
-        if ch_no//8 == 0:
-            reg = self.codes_ADC.ADC_REG_CHENABLE1
-        if ch_no//8 == 1:
-            reg = self.codes_ADC.ADC_REG_CHENABLE2
-        if ch_no//8 == 2:
-            reg = self.codes_ADC.ADC_REG_CHENABLE3
-        if ch_no//8 == 3:
-            reg = self.codes_ADC.ADC_REG_CHENABLE4
-
-        # Read 1 byte of data from the given register
-        #d = self.readPDI(self.status.ADC_address[adc_no],reg,1,arrayData=False)
-        #d = d[0]
-        err,d = self.getAdcRegister(adc_no+1,reg)
-
-        ch_no %= 8 # modulo 8, channel is in the range 0..7
-        # Bit 0 in the data is the last channel. My interpretation: LSB (bit 0) is channel 7 (?), MSB is channel 0
-        ch_no = 7-ch_no
-
-        if state:  # Enable the given channel
-            d |= 1<<ch_no
-        else:
-            d &= ~(1<<ch_no)
-
-        return self.setAdcRegister(adc_no+1,reg,d)
-        #return self.writePDI(self.status.ADC_address[adc_board-1],reg,d,1,arrayData=False)
+        adc_no       = ((channel-1)//32)  # 0..3
+        channel_no   = ((channel-1)% 32)  # 0..31
+        chip_no      = channel_no//8      # 0..3
+        return self.setAdcRegisterBit(adc_no+1,self.ADC_registers.CHENABLE[chip_no].CH[channel_no%8],1 if state else 0)
 
     def getCallight(self):
         """ Get the current calibration  light setting.
         Returns error text and number
         """
-        err, d = self.getPcRegister(self.codes_PC.PC_REG_CALLIGHT,numberOfBytes=2)
-        return err,d
+        err, d = self.getPcRegister(self.PC_registers.CALLIGHT)
+        return err,d()
     
     def getHV(self,n): 
         """
@@ -4073,20 +4198,13 @@ class APDCAM10G_control:
 
         d = int(value/self.HV_conversion[n-1])  # This line was here before D. Barna replaced HV_conversion_in and HV_conversion_out by HV_conversion
 
-        self.setPcRegister(self.codes_PC.PC_REG_HV1SET+(n-1)*2,d,numberOfBytes=2,byteOrder='LSB')
-        # return self.writePDI(self.codes_PC.PC_CARD,
-        #                      self.codes_PC.PC_REG_HV1SET+(n-1)*2,
-        #                      d,
-        #                      numberOfBytes=2,
-        #                      byteOrder='LSB',
-        #                      arrayData=False,
-        #                     )
+        self.setPcRegisterBit(self.PC_registers.HVSET[n-1].HV,d)
 
     def getHV(self,n):
         if n<1 or 4<n:
             return ("Bad HV generator number",0)
-        (err,hv) = self.getPcRegister(self.codes_PC.PC_REG_HV1SET+(n-1)*2,numberOfBytes=2,byteOrder='LSB')
-        return (err,hv*self.HV_conversion[n-1])
+        err,hv = self.getPcRegister(self.PC_registers.HVMON[n-1])
+        return err,hv.HV()*self.HV_conversion[n-1]
 
     def setHVMax(self,n,value):
         """
@@ -4103,14 +4221,7 @@ class APDCAM10G_control:
         """
         
         d = int(value/self.HV_conversion[n-1])  
-
-        return self.setPcRegister(self.codes_PC.PC_REG_HV1MAX+(n-1)*2,d,numberOfBytes=2,byteOrder='LSB')
-        # return self.writePDI(self.codes_PC.PC_CARD,
-        #                      self.codes_PC.PC_REG_HV1MAX+(n-1)*2,
-        #                      d,
-        #                      numberOfBytes=2,
-        #                      arrayData=False
-        #                      )
+        return self.setPcRegister(self.PC_registers.HVMAX[n-1].MAX,d)
 
     
     def hvEnable(self,state):
@@ -4159,41 +4270,9 @@ class APDCAM10G_control:
         """
 
         # First check if global "HV Enable" is on. If not, writing PC_REG_HVON will fail
-        err, hvEnabled = self.readPDI(self.codes_PC.PC_CARD,
-                              self.codes_PC.PC_REG_HVENABLE,
-                              1,
-                              arrayData=False)
-        hvEnabled = hvEnabled[0]
+        err, hvEnabled = self.getPcRegister(self.PC_registers.HVENABLE)
 
-        # Read the actual status (bit-coded)
-        err, d = self.readPDI(self.codes_PC.PC_CARD,
-                              self.codes_PC.PC_REG_HVON,
-                              1,
-                              arrayData=False
-                              )
-        if (err != ""):
-            return err
-        d = d[0]
-
-        if on:
-            # Set the bit corresponding to this 'n' to 1, leave others unaltered
-            # d = d | 2**(n-1)
-            d |= 1<<(n-1)
-        else:
-            # Set the bit corresponding to this 'n' to 0, leave others unaltered
-            #d = d & (2**(n-1) ^ 0xff)
-            d &= ~(1<<(n-1))
-
-        # Write back the bit-coded value to the camera
-        err = self.writePDI(self.codes_PC.PC_CARD,
-                            self.codes_PC.PC_REG_HVON,
-                            d,
-                            numberOfBytes=1,
-                            arrayData=False,
-                            noReadBack=(hvEnabled!=0xAB)
-                            )
-        return err
-
+        return self.setPcRegisterBit(self.PC_registers.HVON.HV[n-1],1 if on else 0,noReadBack=(hvEnabled()!=0xAB))
 
     def setInternalTrigger(self,channel=None,enable=True,level=None,polarity=None):
         """
@@ -4261,11 +4340,10 @@ class APDCAM10G_control:
 
         """
 
-        return self.setAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,5,enable)
+        return self.setAdcRegisterBit(adcBoardNo,self.ADC_registers.CONTROL.ITE,1 if enable else 0)
 
     def getInternalTriggerAdc(self,adcBoardNo):
-        err, bit = self.getAdcRegisterBit(adcBoardNo,self.codes_ADC.ADC_REG_CONTROL,5)
-        return err,bit
+        return self.getAdcRegisterBit(adcBoardNo,self.ADC_registers.CONTROL.ITE)
     
     def setGate(self, externalGateEnabled=False, externalGateInverted=False, internalGateEnabled=False, internalGateInverted=False, camTimer0Enabled=False, camTimer0Inverted=False, swGate=False):
         """
@@ -4515,12 +4593,12 @@ class APDCAM10G_control:
             for adc in range(n_adc):
                 tmp = bytearray(4)
                 for i in range(4):
-                    err,r = self.getAdcRegister(adc+1,self.codes_ADC.ADC_REG_CHENABLE1+i)
+                    err,r = self.getAdcRegister(adc+1,self.ADC_registers.CHENABLE[i])
                     if err != "":
                         error = "Error reading the channel enabled status from the camera: " + err 
                         logger.show_error(error)
                         return error,"",None
-                    tmp[i] = r
+                    tmp[i] = r()
                 chmask[adc] = int.from_bytes(tmp,'big')
         else:
             chmask = copy.deepcopy(channelMasks)
@@ -4925,8 +5003,8 @@ class APDCAM10G_control:
         return (errors,dvdd33[0],dvdd25[0],avdd33[0],avdd18[0])  # Changed by D. Barna
 
     def getAdcTemperature(self,adcBoardNo):
-        #(err,T) = self.readPDI(self.status.ADC_address[adcBoardNo-1],self.codes_ADC.ADC_REG_TEMP,1,arrayData=False)
-        return self.getAdcRegister(adcBoardNo,self.codes_ADC.ADC_REG_TEMP)
+        err,r = self.getAdcRegister(adcBoardNo,self.ADC_registers.TEMPERATURE)
+        return err,r()
         
     def getAdcOverload(self,adcBoardNo):
         """

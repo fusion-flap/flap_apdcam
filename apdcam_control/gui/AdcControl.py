@@ -15,37 +15,25 @@ from .GuiMode import *
 
 class Adc(QtWidgets.QWidget):
     def updateGui(self):
-        a = self.gui.camera.codes_ADC
-        r = self.gui.camera.status.ADC_registers[self.number-1]
-        # (error,dvdd33,dvdd25,avdd33,avdd18) = self.gui.camera.getAdcPowerVoltages(self.number)
-        # self.dvdd33.setText("{:.3f}".format(dvdd33/1000.0))
-        # self.dvdd25.setText("{:.3f}".format(dvdd25/1000.0))
-        # self.avdd33.setText("{:.3f}".format(avdd33/1000.0))
-        # self.avdd18.setText("{:.3f}".format(avdd18/1000.0))
-        self.dvdd33.setText("{:.3f}".format(int.from_bytes(r[a.ADC_REG_DVDD33:a.ADC_REG_DVDD33+2],'little')/1000.0))
-        self.dvdd25.setText("{:.3f}".format(int.from_bytes(r[a.ADC_REG_DVDD25:a.ADC_REG_DVDD25+2],'little')/1000.0))
-        self.avdd33.setText("{:.3f}".format(int.from_bytes(r[a.ADC_REG_AVDD33:a.ADC_REG_AVDD33+2],'little')/1000.0))
-        self.avdd18.setText("{:.3f}".format(int.from_bytes(r[a.ADC_REG_AVDD18:a.ADC_REG_AVDD18+2],'little')/1000.0))
+        # the byte-array storing the entire register table of the ADC board
+        data = self.gui.camera.status.ADC_registers[self.number-1]
 
-        # (error,T) = self.gui.camera.getAdcTemperature(self.number)
-        # self.temperature.setText("{:.1f}".format(T))
-        self.temperature.setText("{:.1f}".format(r[a.ADC_REG_TEMP]))
+        regs = self.gui.camera.ADC_registers
 
-        # (error,pllLocked) = self.gui.camera.getAdcPllLocked(self.number)
-        # self.pllLocked.setChecked(pllLocked)
-        self.pllLocked.setChecked(r[a.ADC_REG_STATUS1]&1)
-
-        # (error,overload) = self.gui.camera.getAdcOverload(self.number)
-        # self.overload.setChecked(overload)
-        self.overload.setChecked(r[a.ADC_REG_OVDSTATUS]&1)
+        # evaluate registers on this table
+        self.dvdd33.setText("{:.3f}".format(regs.DVDD33(data)/1000.0))
+        self.dvdd25.setText("{:.3f}".format(regs.DVDD25(data)/1000.0))
+        self.avdd33.setText("{:.3f}".format(regs.AVDD33(data)/1000.0))
+        self.avdd18.setText("{:.3f}".format(regs.AVDD18(data)/1000.0))
+        self.temperature.setText("{:.1f}".format(regs.TEMPERATURE(data)))
+        self.pllLocked.setChecked(regs.STATUS1.BPLLOCK(data))
+        self.overload.setChecked(regs.OVDSTATUS.OVDEV(data))
 #        print("we should clear the latched bit")
 #        self.gui.show_warning("We should clear the latched overload bit")
 
-        #error,status2 = self.gui.camera.getAdcRegister(self.number,self.gui.camera.codes_ADC.ADC_REG_STATUS2)
-        status2 = r[a.ADC_REG_STATUS2]
-        self.led1.setChecked((status2>>2)&1) 
-        self.led2.setChecked((status2>>3)&1)
-        self.internalTriggerDisplay.setChecked((status2>>0)&1)
+        self.led1.setChecked(regs.STATUS2.LED1(data))
+        self.led2.setChecked(regs.STATUS2.LED2(data))
+        self.internalTriggerDisplay.setChecked(regs.STATUS2.ITS(data))
 
         # err,testpattern = self.gui.camera.getTestPattern(self.number)
         # if err=="":
@@ -697,15 +685,17 @@ class Adc(QtWidgets.QWidget):
     def loadSettingsFromCamera(self):
 
         # channelOn checkboxes
-        for i in range(4): # loop over the 4 ADCs on the board
-            err,reg = self.gui.camera.getAdcRegister(self.number,self.gui.camera.codes_ADC.ADC_REG_CHENABLE1+i)
-            if err == "":
-                for c in range(8):
-                    self.channelOn[i*8+c].blockSignals(True)
-                    self.channelOn[i*8+c].setChecked(reg & (1<<(7-c)))
-                    self.channelOn[i*8+c].blockSignals(False)
-            else:
-                self.gui.show_error(err)    
+
+        err,regs = self.gui.camera.getAdcRegister(self.number,self.gui.camera.ADC_registers.CHENABLE)
+        if err == "":
+            for i_chip in range(4):
+                for i_channel in range(8):
+                    self.channelOn[i_chip*8+i_channel].blockSignals(True)
+                    #self.channelOn[i*8+c].setChecked(reg & (1<<(7-c)))
+                    self.channelOn[i_chip*8+i_channel].setChecked(regs[i_chip].CH[i_channel]())
+                    self.channelOn[i_chip*8+i_channel].blockSignals(False)
+        else:
+            self.gui.show_error(err)    
 
         err,bit = self.gui.camera.getSataOn(self.number)
         if err=="":

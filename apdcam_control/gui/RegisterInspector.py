@@ -1,4 +1,5 @@
 import sys
+import os
 from functools import partial
 import re
 
@@ -33,7 +34,6 @@ class RegisterInspector(QtWidgets.QWidget):
             self.searchRegisterName = name
             self.searchShortDescription = shortDescription
             self.searchLongDescription = longDescription
-            self.html = ""
 
         def __call__(self,register):
 
@@ -81,6 +81,11 @@ class RegisterInspector(QtWidgets.QWidget):
     def __init__(self,parent,gui):
         self.gui = gui
         super(RegisterInspector,self).__init__(parent)
+
+        self.html = ""
+        self.defaultExportFileName = "registers.html"
+        self.lastExportDir = "."
+
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
         #layout.addStretch(1)
@@ -161,7 +166,17 @@ class RegisterInspector(QtWidgets.QWidget):
 
 
     def export(self):
-        file = open("registers.html","w")
+        options = QtWidgets.QFileDialog.Options()
+        options |= QtWidgets.QFileDialog.DontUseNativeDialog
+        fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self,"Export register table to...",\
+                                                            self.lastExportDir + os.sep + self.defaultExportFileName,\
+                                                            "HTML Files (*.html);;All Files (*)", options=options)
+        if fileName == "":
+            return
+
+        self.lastExportDir = os.path.dirname(fileName)
+
+        file = open(fileName,"w")
         file.write("<html>\n")
         file.write("  <head>\n")
         file.write("    <style>\n")
@@ -182,6 +197,8 @@ class RegisterInspector(QtWidgets.QWidget):
         #self.gui.camera.CC_settings_table  = APDCAM10G_cc_settings_v1()
         #self.gui.camera.CC_variables_table = APDCAM10G_cc_variables_v1()
         #self.gui.camera.PC_register_table  = APDCAM10G_pc_registers_v1()
+
+        self.defaultExportFileName = "register-search.html"
 
         pattern = self.searchPattern.text()
         regexp = self.searchRegexp.isChecked()
@@ -247,6 +264,8 @@ class RegisterInspector(QtWidgets.QWidget):
 
     def showAdcRegisterTable(self,adcNumber):
 
+        self.defaultExportFileName = "adc" + str(adcNumber) + "-registers.html"
+
         adcNumber -= 1
         v = self.registerVersionSelector.currentText()
         if v=="Actual camera":
@@ -268,6 +287,8 @@ class RegisterInspector(QtWidgets.QWidget):
             self.gui.show_error("Invalid register version selector (this should never happen)")
 
     def showPcRegisterTable(self):
+
+        self.defaultExportFileName = "pc-registers.html"
 
         v = self.registerVersionSelector.currentText()
         if v=="Actual camera":
@@ -291,6 +312,8 @@ class RegisterInspector(QtWidgets.QWidget):
 
     def showCCSettingsTable(self):
 
+        self.defaultExportFileName = "CC-settings.html"
+
         v = self.registerVersionSelector.currentText()
         if v=="Actual camera":
             register_table = self.gui.camera.CC_settings
@@ -312,10 +335,12 @@ class RegisterInspector(QtWidgets.QWidget):
             
     def showCCVariablesTable(self):
 
+        self.defaultExportFileName = "CC-variables.html"
+        
         v = self.registerVersionSelector.currentText()
         if v=="Actual camera":
             err= self.gui.camera.readCCdata(dataType=1)
-            register_table = self.gui.camera.CC_variables_table
+            register_table = self.gui.camera.CC_variables
             if err != "":
                 self.gui.show_error(err)
             else:

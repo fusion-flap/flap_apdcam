@@ -151,7 +151,7 @@ class APDCAM10G_register_ip(APDCAM10G_register):
         for i in range(4):
             if i>0:
                 result += "."
-            result += str(int.from_bytes(self.bytes[i] if data is None else data[self.startByte+i]))
+            result += str(int.from_bytes(self.bytes[i:i+1] if data is None else data[self.startByte+i:self.startByte+i+1]))
         return result
         
 class APDCAM10G_register_mac(APDCAM10G_register):

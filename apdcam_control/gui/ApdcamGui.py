@@ -6,6 +6,7 @@ import types
 import threading
 import os
 import glob
+import traceback
 
 import importlib
 from .QtVersion import QtVersion
@@ -32,6 +33,11 @@ from .GuiMode import *
 #import APDCAM10G
 
 from ..APDCAM10G_control import APDCAM10G_control
+
+def showtrace():
+    for line in traceback.format_stack():
+        print(line.strip())
+
 
 """
 The setEnabled method of a QWidget, when it is a tab of a QTabWidget, makes apparantly nothing.
@@ -326,6 +332,10 @@ class ApdcamGui(QtWidgets.QMainWindow):
             if not showall:
                 msg += "Last error: " + errors[len(errors)-1]
             self.show_error(msg)
+            print("----------------------------")
+            print(msg)
+            showtrace()
+            print("\n")
 
 
     def call(self,function,*,n=1,wait=1,critial=False,showall=False,name='',where=''):
@@ -372,6 +382,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
                 e = function()
 
                 if not isinstance(e,str):
+                    print(function)
                     e = "Returned value from function is not an error string: '" + str(e) + "'"
 
                 ncalls += 1

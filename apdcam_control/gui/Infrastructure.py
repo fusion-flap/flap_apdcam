@@ -45,7 +45,7 @@ class Infrastructure(QtWidgets.QWidget):
             self.hvSet[i].settingsName = "HV" + str(i+1) + " set"
             self.hvSet[i].setMinimum(0)
             self.hvSet[i].setMaximum(4095*self.gui.camera.HV_conversion[i])
-            self.hvSet[i].valueChanged.connect(self.gui.call(partial(lambda i:self.gui.camera.setHV(i+1,self.hvSet[i].value()),i)))
+            self.hvSet[i].valueChanged.connect(self.gui.call(partial(lambda i: self.gui.camera.setHV(i+1,self.hvSet[i].value()),i),name='self.gui.camera.setHV(...)'))
             self.hvSet[i].setToolTip("Set the voltage of HV generator #" + str(i+1) + ". The command takes effect immediately when the value is changed.")
             self.hvGroup[i].addWidget(self.hvSet[i],0,1)
 

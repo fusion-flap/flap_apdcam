@@ -33,6 +33,7 @@ class RegisterInspector(QtWidgets.QWidget):
             self.searchRegisterName = name
             self.searchShortDescription = shortDescription
             self.searchLongDescription = longDescription
+            self.html = ""
 
         def __call__(self,register):
 
@@ -144,6 +145,9 @@ class RegisterInspector(QtWidgets.QWidget):
         self.showCCVariablesButton = QtWidgets.QPushButton("CC variables")
         buttons.addWidget(self.showCCVariablesButton)
         self.showCCVariablesButton.clicked.connect(self.showCCVariablesTable)
+        self.exportButton = QtWidgets.QPushButton("Export")
+        buttons.addWidget(self.exportButton)
+        self.exportButton.clicked.connect(self.export)
 
         self.registerTable = QtWidgets.QScrollArea()
         layout.addWidget(self.registerTable)
@@ -154,6 +158,24 @@ class RegisterInspector(QtWidgets.QWidget):
         self.registerTableLayout.setContentsMargins(0,0,0,0)
         self.registerTableLayout.setSpacing(0)
         self.registerTableWidget.setLayout(self.registerTableLayout)
+
+
+    def export(self):
+        file = open("registers.html","w")
+        file.write("<html>\n")
+        file.write("  <head>\n")
+        file.write("    <style>\n")
+        file.write("       table, th, td { border-collapse: collapse; border: 1px solid black; }\n")
+        file.write("       td            { margin-right:10px; margin-left:10px; }\n")
+        file.write("       tr:nth-child(even) { background-color: rgb(240,240,240); }\n")
+        file.write("    </style>\n")
+        file.write("  </head>\n")
+        file.write("<body>\n")
+        file.write("  <table>")
+        file.write(self.html)
+        file.write("  </table>")
+        file.write("</body></html>")
+        file.close()
 
     def showRegisterSearch(self):
         #self.gui.camera.ADC_register_table = APDCAM10G_adc_registers_v1()
@@ -310,6 +332,8 @@ class RegisterInspector(QtWidgets.QWidget):
             self.gui.show_error("Invalid register version selector (this should never happen)")
             
     def clearRegisterTableDisplay(self):
+        self.html = ""
+
         # Clear the regtable layout
         for i in reversed(range(self.registerTableLayout.count())):
             self.registerTableLayout.itemAt(i).widget().deleteLater()
@@ -361,17 +385,20 @@ class RegisterInspector(QtWidgets.QWidget):
             t.setStyleSheet(styleTitle)
             t.setLineWidth(1)
             self.registerTableLayout.addWidget(t,line,0,1,6)
+            self.html += "    <tr><td colspan='6'>" + title + "</td></tr>\n"
             line += 1
 
         registerNames = regtable.registerNames()
         for registerName in registerNames:
 
+            self.html += "    <tr>"
             lll = QtWidgets.QLabel(registerName)
             lll.setFrameStyle(QtWidgets.QFrame.Box)
             lll.setLineWidth(1)
             if line%2==1:
                 lll.setStyleSheet(style)
             self.registerTableLayout.addWidget(lll,line,0)
+            self.html += "<td>" + registerName + "</td>"
 
             reg = getattr(regtable,registerName)
 
@@ -386,6 +413,7 @@ class RegisterInspector(QtWidgets.QWidget):
             if line%2==1:
                 lll.setStyleSheet(style)
             self.registerTableLayout.addWidget(lll,line,1)
+            self.html += "<td>" + tmp + "</td>"
 
             lll = QtWidgets.QLabel(str(reg.numberOfBytes))
             lll.setFrameStyle(QtWidgets.QFrame.Box)
@@ -393,6 +421,7 @@ class RegisterInspector(QtWidgets.QWidget):
             if line%2==1:
                 lll.setStyleSheet(style)
             self.registerTableLayout.addWidget(lll,line,2)
+            self.html += "<td>" + str(reg.numberOfBytes) + "</td>"
 
             byteorder = ('MSB' if reg.byteOrder=='big' else 'LSB')
             if reg.byteOrderUncertain:
@@ -403,8 +432,10 @@ class RegisterInspector(QtWidgets.QWidget):
             if reg.byteOrderUncertain:
                 lll.setStyleSheet("QLabel { color: red; }")
             self.registerTableLayout.addWidget(lll,line,3)
+            self.html += "<td>" + byteorder + "</td>"
 
-            lll = QtWidgets.QLabel(str(reg.shortDescription + (' (see tooltip)' if reg.longDescription!='' else '')))
+            tmp = str(reg.shortDescription + (' (see tooltip)' if reg.longDescription!='' else ''))
+            lll = QtWidgets.QLabel(tmp)
             lll.setFrameStyle(QtWidgets.QFrame.Box)
             lll.setLineWidth(1)
             if line%2==1:
@@ -412,6 +443,7 @@ class RegisterInspector(QtWidgets.QWidget):
             if reg.longDescription != '':
                 lll.setToolTip(reg.longDescription)
             self.registerTableLayout.addWidget(lll,line,4)
+            self.html += "<td>" + tmp + "</td>"
 
             lll = QtWidgets.QFrame()
             lll.setFrameStyle(QtWidgets.QFrame.Box)
@@ -421,6 +453,7 @@ class RegisterInspector(QtWidgets.QWidget):
             hhh = QtWidgets.QHBoxLayout()
             lll.setLayout(hhh)
             self.registerTableLayout.addWidget(lll,line,5)
+            self.html += "<td>"
 
             # for bit-coded registers, loop over all bit group, and display them one-by-one
             if hasattr(reg,'sortedBits'):
@@ -435,9 +468,14 @@ class RegisterInspector(QtWidgets.QWidget):
 
                     hhh.addWidget(QtWidgets.QLabel(b.display_value(data)))
                     hhh.addStretch(1)
+
+                    self.html += "<span style='margin-right:20px;'>" + s + " " + b.display_value(data) + "</span>"
             else:
                 hhh.addWidget(QtWidgets.QLabel(reg.display_value(data)))
+                self.html += reg.display_value(data)
 
             hhh.addStretch(2)
 
+            self.html += "</td>"
+            self.html += "</tr>\n"
             line += 1

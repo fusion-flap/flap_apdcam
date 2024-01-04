@@ -892,7 +892,7 @@ class APDCAM10G_adc_registers_v1(APDCAM10G_register_table):
     BOARDVER    = i(0x0000, 1, 'Board version number')
     VERSION     = i(0x0001, 2, 'Microcontroller program version',byteOrder='msb?')
     SERIAL      = i(0x0003, 2, 'Board serial number',byteOrder='msb?')
-    XCVERSION   = i(0x0005, 2, 'FPGA program vesion',byteOrder='msb?')
+    XCVERSION   = i(0x0005, 2, 'FPGA (Xilinx) program vesion',byteOrder='msb?')
     STATUS1     = b(0x0008, 1, 'STATUS1 register', [ ['BPLLOCK',0,0,"Base PLL locked"] ] )
     STATUS2     = b(0x0009, 1, 'STATUS2 register', [ ['ITS',0,0,'Internal trigger status'], \
                                                      ['OVD',1,1,'Overload'], \
@@ -966,7 +966,7 @@ class APDCAM10G_adc_registers_v2(APDCAM10G_register_table):
     BOARDVER    = i(0x0000, 1, 'Board version number')
     VERSION     = i(0x0001, 2, 'Microcontroller program version','msb?')
     SERIAL      = i(0x0003, 2, 'Board serial number','msb?')
-    XCVERSION   = i(0x0005, 2, 'FPGA program vesion','msb?')
+    XCVERSION   = i(0x0005, 2, 'FPGA (Xilinx) program vesion','msb?')
     STATUS1     = b(0x0008, 1, 'STATUS1 register', [ ['BPLLOCK',0,0,'Base PLL locked'] ] )
     STATUS2     = b(0x0009, 1, 'STATUS2 register', [ ['ITS',0,0,'Internal trigger status'], \
                                                      ['OVD',1,1,'Overload'], \
@@ -4198,7 +4198,7 @@ class APDCAM10G_control:
 
         d = int(value/self.HV_conversion[n-1])  # This line was here before D. Barna replaced HV_conversion_in and HV_conversion_out by HV_conversion
 
-        self.setPcRegisterBit(self.PC_registers.HVSET[n-1].HV,d)
+        return self.setPcRegisterBit(self.PC_registers.HVSET[n-1].HV,d)
 
     def getHV(self,n):
         if n<1 or 4<n:

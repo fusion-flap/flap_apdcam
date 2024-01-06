@@ -14,6 +14,7 @@ from .ApdcamUtils import *
 from .GuiMode import *
 from .UdpPacketInspector import *
 from .RegisterInspector import RegisterInspector
+from .ExpertSettings import *
 from functools import partial
 
 class Diagnostics(QtWidgets.QWidget):
@@ -31,4 +32,9 @@ class Diagnostics(QtWidgets.QWidget):
 
         self.registerInspector = RegisterInspector(self,self.gui)
         self.tabs.addTab(self.registerInspector,"Register inspector")
-        
+
+        self.expertSettings = ExpertSettings(self,self.gui)
+        self.tabs.addTab(self.expertSettings,"Expert settings")
+
+    def loadSettingsFromCamera(self):
+        self.registerInspector.loadSettingsFromCamera()

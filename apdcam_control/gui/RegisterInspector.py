@@ -2,6 +2,7 @@ import sys
 import os
 from functools import partial
 import re
+import html
 
 import importlib
 from .QtVersion import QtVersion
@@ -150,6 +151,9 @@ class RegisterInspector(QtWidgets.QWidget):
         self.showCCVariablesButton = QtWidgets.QPushButton("CC variables")
         buttons.addWidget(self.showCCVariablesButton)
         self.showCCVariablesButton.clicked.connect(self.showCCVariablesTable)
+        self.showAllButton = QtWidgets.QPushButton("ALL")
+        buttons.addWidget(self.showAllButton)
+        self.showAllButton.clicked.connect(lambda: self.showRegisterSearch(True))
         self.exportButton = QtWidgets.QPushButton("Export")
         buttons.addWidget(self.exportButton)
         self.exportButton.clicked.connect(self.export)
@@ -164,6 +168,24 @@ class RegisterInspector(QtWidgets.QWidget):
         self.registerTableLayout.setSpacing(0)
         self.registerTableWidget.setLayout(self.registerTableLayout)
 
+    def loadSettingsFromCamera(self):
+        n = len(self.gui.camera.status.ADC_address)
+        if n<4:
+            self.showADC4RegistersButton.setEnabled(False)
+        else:
+            self.showADC4RegistersButton.setEnabled(True)
+        if n<3:
+            self.showADC3RegistersButton.setEnabled(False)
+        else:
+            self.showADC3RegistersButton.setEnabled(True)
+        if n<2:
+            self.showADC2RegistersButton.setEnabled(False)
+        else:
+            self.showADC2RegistersButton.setEnabled(True)
+        if n<1:
+            self.showADC1RegistersButton.setEnabled(False)
+        else:
+            self.showADC1RegistersButton.setEnabled(True)
 
     def export(self):
         options = QtWidgets.QFileDialog.Options()
@@ -181,18 +203,20 @@ class RegisterInspector(QtWidgets.QWidget):
         file.write("  <head>\n")
         file.write("    <style>\n")
         file.write("       table, th, td { border-collapse: collapse; border: 1px solid black; }\n")
+        file.write("       th            { background-color: rgb(180,200,255); font-weight: bold; text-align:left; padding:5px; }\n")
         file.write("       td            { margin-right:10px; margin-left:10px; }\n")
         file.write("       tr:nth-child(even) { background-color: rgb(240,240,240); }\n")
+        file.write("       .colnames     { position: sticky; top: 0; font-weight: bold; background-color: rgb(140,110,255); }\n")
         file.write("    </style>\n")
         file.write("  </head>\n")
         file.write("<body>\n")
-        file.write("  <table>")
+        file.write("  <table style='position:relative'>")
         file.write(self.html)
         file.write("  </table>")
         file.write("</body></html>")
         file.close()
 
-    def showRegisterSearch(self):
+    def showRegisterSearch(self,showAll=False):
         #self.gui.camera.ADC_register_table = APDCAM10G_adc_registers_v1()
         #self.gui.camera.CC_settings_table  = APDCAM10G_cc_settings_v1()
         #self.gui.camera.CC_variables_table = APDCAM10G_cc_variables_v1()
@@ -210,7 +234,11 @@ class RegisterInspector(QtWidgets.QWidget):
 
         found = False
 
-        register_table = self.gui.camera.ADC_registers.filter(self.RegisterSearch(pattern=pattern,regexp=regexp,name=name,shortDescription=shortDescription,longDescription=longDescription))
+        filter = lambda r: True
+        if showAll==False:
+            filter = self.RegisterSearch(pattern=pattern,regexp=regexp,name=name,shortDescription=shortDescription,longDescription=longDescription)
+
+        register_table = self.gui.camera.ADC_registers.filter(filter)
         nbytes = register_table.size()
         if nbytes > 0:
             found = True
@@ -224,7 +252,7 @@ class RegisterInspector(QtWidgets.QWidget):
                 else:
                     self.showRegisterTable(register_table,d[0],title='ADC ' + str(i_adc+1) + ' registers',clear=False)
 
-        register_table = self.gui.camera.PC_registers.filter(self.RegisterSearch(pattern=pattern,regexp=regexp,name=name,shortDescription=shortDescription,longDescription=longDescription))
+        register_table = self.gui.camera.PC_registers.filter(filter)
         nbytes = register_table.size()
         if nbytes > 0:
             found = True
@@ -236,7 +264,7 @@ class RegisterInspector(QtWidgets.QWidget):
             else:
                 self.showRegisterTable(register_table,d[0],title='PC card registers',clear=False)
 
-        register_table = self.gui.camera.CC_settings.filter(self.RegisterSearch(pattern=pattern,regexp=regexp,name=name,shortDescription=shortDescription,longDescription=longDescription))
+        register_table = self.gui.camera.CC_settings.filter(filter)
         nbytes = register_table.size()
         if nbytes > 0:
             found = True
@@ -247,7 +275,7 @@ class RegisterInspector(QtWidgets.QWidget):
             else:
                 self.showRegisterTable(register_table,self.gui.camera.status.CC_settings,title='Communication & Control Card settings',clear=False)
 
-        register_table = self.gui.camera.CC_variables.filter(self.RegisterSearch(pattern=pattern,regexp=regexp,name=name,shortDescription=shortDescription,longDescription=longDescription))
+        register_table = self.gui.camera.CC_variables.filter(filter)
         nbytes = register_table.size()
         if nbytes > 0:
             found = True
@@ -369,12 +397,22 @@ class RegisterInspector(QtWidgets.QWidget):
             w.setStyleSheet("font-weight:bold; padding-left: 3px; padding-right: 3px; background-color: rgb(180,180,220); ")
             w.setLineWidth(1)
             layout.addWidget(w,0,cell)
+
         addHeader(self.registerTableLayout,"Symbol",0)
         addHeader(self.registerTableLayout,"Address",1)
         addHeader(self.registerTableLayout,"Num. bytes",2)
         addHeader(self.registerTableLayout,"Byte order",3)
         addHeader(self.registerTableLayout,"Description",4)
         addHeader(self.registerTableLayout,"Value(s)",5)
+
+        self.html += "    <tr>\n"
+        self.html += "      <th class='colnames'>Symbol</th>"
+        self.html += "      <th class='colnames'>Address</th>"
+        self.html += "      <th class='colnames'>Num. bytes</th>"
+        self.html += "      <th class='colnames'>Byte order</th>"
+        self.html += "      <th class='colnames'>Description</th>"
+        self.html += "      <th class='colnames'>Value(s)</th>"
+        self.html += "    </tr>\n"
 
     def showRegisterTable(self,regtable,data,title='',clear=True):
         """
@@ -410,10 +448,11 @@ class RegisterInspector(QtWidgets.QWidget):
             t.setStyleSheet(styleTitle)
             t.setLineWidth(1)
             self.registerTableLayout.addWidget(t,line,0,1,6)
-            self.html += "    <tr><td colspan='6'>" + title + "</td></tr>\n"
+            self.html += "    <tr><th colspan='6'>" + title + "</th></tr>\n"
             line += 1
 
         registerNames = regtable.registerNames()
+
         for registerName in registerNames:
 
             self.html += "    <tr>"
@@ -425,7 +464,19 @@ class RegisterInspector(QtWidgets.QWidget):
             self.registerTableLayout.addWidget(lll,line,0)
             self.html += "<td>" + registerName + "</td>"
 
-            reg = getattr(regtable,registerName)
+            
+            reg = None
+
+            # Check if this register name is of the form XXXX[number], indicating that the underlying
+            # variable is a list
+            match = re.match(r'([a-zA-Z_]+)\[([0-9]+)\]',registerName)
+            if match is not None:
+                listname = match.group(1)
+                index = int(match.group(2))
+                lll = getattr(regtable,listname)
+                reg = lll[index]
+            else:
+                reg = getattr(regtable,registerName)
 
             tmp = str(reg.startByte)
             try:
@@ -468,7 +519,7 @@ class RegisterInspector(QtWidgets.QWidget):
             if reg.longDescription != '':
                 lll.setToolTip(reg.longDescription)
             self.registerTableLayout.addWidget(lll,line,4)
-            self.html += "<td>" + tmp + "</td>"
+            self.html += "<td title='" = html.escape(reg.longDescription) + "'>" + tmp + "</td>"
 
             lll = QtWidgets.QFrame()
             lll.setFrameStyle(QtWidgets.QFrame.Box)
@@ -494,7 +545,7 @@ class RegisterInspector(QtWidgets.QWidget):
                     hhh.addWidget(QtWidgets.QLabel(b.display_value(data)))
                     hhh.addStretch(1)
 
-                    self.html += "<span style='margin-right:20px;'>" + s + " " + b.display_value(data) + "</span>"
+                    self.html += "<span title='" + html.escape(b.description) + "' style='margin-right:20px;'>" + s + " " + b.display_value(data) + "</span>"
             else:
                 hhh.addWidget(QtWidgets.QLabel(reg.display_value(data)))
                 self.html += reg.display_value(data)

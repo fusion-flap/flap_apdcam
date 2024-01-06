@@ -34,6 +34,7 @@ from .GuiMode import *
 
 from ..APDCAM10G_control import APDCAM10G_control
 
+
 def showtrace():
     for line in traceback.format_stack():
         print(line.strip())
@@ -563,6 +564,7 @@ class ApdcamGui(QtWidgets.QMainWindow):
         self.adcControl.loadSettingsFromCamera()
         self.controlTiming.loadSettingsFromCamera()
         self.cameraTimer.loadSettingsFromCamera()
+        self.diagnostics.loadSettingsFromCamera()
 
 
     def markFunctionlessControls(self):

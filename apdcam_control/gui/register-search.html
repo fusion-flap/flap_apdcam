@@ -1,0 +1,520 @@
+<html>
+  <head>
+    <style>
+       table, th, td { border-collapse: collapse; border: 1px solid black; }
+       th            { background-color: rgb(180,200,255); font-weight: bold; text-align:left; padding:5px; }
+       td            { margin-right:10px; margin-left:10px; }
+       tr:nth-child(even) { background-color: rgb(240,240,240); }
+       .colnames     { position: sticky; top: 0; font-weight: bold; background-color: rgb(140,110,255); }
+    </style>
+  </head>
+<body>
+  <table style='position:relative'>    <tr>
+      <th class='colnames'>Symbol</th>      <th class='colnames'>Address</th>      <th class='colnames'>Num. bytes</th>      <th class='colnames'>Byte order</th>      <th class='colnames'>Description</th>      <th class='colnames'>Value(s)</th>    </tr>
+    <tr><th colspan='6'>ADC 1 registers</th></tr>
+    <tr><td>BOARDVER</td><td>0</td><td>1</td><td>MSB</td><td>Board version number</td><td>33</td></tr>
+    <tr><td>VERSION</td><td>1</td><td>2</td><td>MSB (???)</td><td>Microcontroller program version</td><td>257</td></tr>
+    <tr><td>SERIAL</td><td>3</td><td>2</td><td>MSB (???)</td><td>Board serial number</td><td>6656</td></tr>
+    <tr><td>XCVERSION</td><td>5</td><td>2</td><td>MSB (???)</td><td>FPGA (Xilinx) program vesion</td><td>512</td></tr>
+    <tr><td>STATUS1</td><td>8</td><td>1</td><td>MSB</td><td>STATUS1 register</td><td><span style='margin-right:20px;'>BPLLOCK(0): 1</span></td></tr>
+    <tr><td>STATUS2</td><td>9</td><td>1</td><td>MSB</td><td>STATUS2 register</td><td><span style='margin-right:20px;'>ITS(0): 0</span><span style='margin-right:20px;'>OVD(1): 0</span><span style='margin-right:20px;'>LED1(2): 0</span><span style='margin-right:20px;'>LED2(3): 0</span></td></tr>
+    <tr><td>TEMPERATURE</td><td>10</td><td>1</td><td>MSB</td><td>Board temperature</td><td>44</td></tr>
+    <tr><td>CONTROL</td><td>11</td><td>1</td><td>MSB</td><td>CONTROL register</td><td><span style='margin-right:20px;'>SATAONOFF(0): 1</span><span style='margin-right:20px;'>DSM(1): 1</span><span style='margin-right:20px;'>SS(2): 0</span><span style='margin-right:20px;'>TM(3): 0</span><span style='margin-right:20px;'>FIL(4): 0</span><span style='margin-right:20px;'>ITE(5): 0</span><span style='margin-right:20px;'>RBO(6): 0</span></td></tr>
+    <tr><td>DSLVCLKMUL</td><td>12</td><td>1</td><td>MSB</td><td>SATA clock multiplier relative to 20 MHz internal clock</td><td>33</td></tr>
+    <tr><td>DSLVCLKDIV</td><td>13</td><td>1</td><td>MSB</td><td>SATA clock divider relative to 20 MHz internal clock</td><td>10</td></tr>
+    <tr><td>DVDD33</td><td>14</td><td>2</td><td>LSB</td><td>DVDD 3.3V voltage in mV</td><td>3236</td></tr>
+    <tr><td>DVDD25</td><td>16</td><td>2</td><td>LSB</td><td>DVDD 2.5V voltage in mV</td><td>2504</td></tr>
+    <tr><td>AVDD33</td><td>18</td><td>2</td><td>LSB</td><td>AVDD 3.3V voltage in mV</td><td>3298</td></tr>
+    <tr><td>AVDD18</td><td>20</td><td>2</td><td>LSB</td><td>AVDD 1.8V voltage in mV</td><td>1800</td></tr>
+    <tr><td>STREAMCONTROL</td><td>26</td><td>2</td><td>MSB (???)</td><td>Ring buffer size / SATA test mode / Stream mode</td><td><span style='margin-right:20px;'>RBSIZE(0..9): 3</span><span style='margin-right:20px;'>SATATEST(13): 1</span><span style='margin-right:20px;'>STREAMMODE(14..15): 3</span></td></tr>
+    <tr><td>RESOLUTION</td><td>28</td><td>1</td><td>MSB</td><td>Resolution (number of bits per sample)</td><td>0</td></tr>
+    <tr><td>BPSCH1</td><td>29</td><td>1</td><td>MSB</td><td>Bytes per sample of 8-channel block 1</td><td>13</td></tr>
+    <tr><td>BPSCH2</td><td>30</td><td>1</td><td>MSB</td><td>Bytes per sample of 8-channel block 2</td><td>14</td></tr>
+    <tr><td>BPSCH3</td><td>31</td><td>1</td><td>MSB</td><td>Bytes per sample of 8-channel block 3</td><td>14</td></tr>
+    <tr><td>BPSCH4</td><td>32</td><td>1</td><td>MSB</td><td>Bytes per sample of 8-channel block 4</td><td>13</td></tr>
+    <tr><td>ERRORCODE</td><td>36</td><td>1</td><td>MSB</td><td>The code of the last error. 0 = no error</td><td>0</td></tr>
+    <tr><td>RESETFACTORY</td><td>37</td><td>1</td><td>MSB</td><td>Writing 0xCD here causes factory reset</td><td>0</td></tr>
+    <tr><td>DACCONTROL</td><td>46</td><td>1</td><td>MSB</td><td>DAC mixed channel mode</td><td><span style='margin-right:20px;'>MIXED(0): 0</span></td></tr>
+    <tr><td>ANALOGOUT1</td><td>48</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT2</td><td>50</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT3</td><td>52</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT4</td><td>54</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT5</td><td>56</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT6</td><td>58</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT7</td><td>60</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT8</td><td>62</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT9</td><td>64</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT10</td><td>66</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT11</td><td>68</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT12</td><td>70</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT13</td><td>72</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT14</td><td>74</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT15</td><td>76</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT16</td><td>78</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT17</td><td>80</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT18</td><td>82</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT19</td><td>84</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT20</td><td>86</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT21</td><td>88</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT22</td><td>90</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT23</td><td>92</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT24</td><td>94</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT25</td><td>96</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT26</td><td>98</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT27</td><td>100</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT28</td><td>102</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT29</td><td>104</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT30</td><td>106</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT31</td><td>108</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT32</td><td>110</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>TRIGLEVEL1</td><td>112</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 448</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 1</span></td></tr>
+    <tr><td>TRIGLEVEL2</td><td>114</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 448</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL3</td><td>116</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 448</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL4</td><td>118</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 448</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL5</td><td>120</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL6</td><td>122</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL7</td><td>124</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL8</td><td>126</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL9</td><td>128</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 1</span></td></tr>
+    <tr><td>TRIGLEVEL10</td><td>130</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL11</td><td>132</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL12</td><td>134</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL13</td><td>136</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL14</td><td>138</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL15</td><td>140</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL16</td><td>142</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL17</td><td>144</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL18</td><td>146</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL19</td><td>148</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL20</td><td>150</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL21</td><td>152</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL22</td><td>154</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL23</td><td>156</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL24</td><td>158</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL25</td><td>160</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL26</td><td>162</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL27</td><td>164</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL28</td><td>166</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL29</td><td>168</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL30</td><td>170</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL31</td><td>172</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL32</td><td>174</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>OVDLEVEL</td><td>192</td><td>2</td><td>MSB (???)</td><td>Overload level</td><td><span style='margin-right:20px;'>LEVEL(0..13): 0</span><span style='margin-right:20px;'>OVDPOLARITY(14): 0</span><span style='margin-right:20px;'>ENABLE(15): 0</span></td></tr>
+    <tr><td>OVDSTATUS</td><td>194</td><td>1</td><td>MSB</td><td>Overload status</td><td><span style='margin-right:20px;'>OVDEV(0): 0</span></td></tr>
+    <tr><td>OVDTIME</td><td>195</td><td>2</td><td>MSB (???)</td><td>Overload time [10 us units]</td><td>59395</td></tr>
+    <tr><td>COEFF_01</td><td>208</td><td>2</td><td>LSB (???)</td><td>Filter coefficient 1</td><td>0</td></tr>
+    <tr><td>COEFF_02</td><td>210</td><td>2</td><td>LSB (???)</td><td>Filter coefficient 2</td><td>0</td></tr>
+    <tr><td>COEFF_03</td><td>212</td><td>2</td><td>LSB (???)</td><td>Filter coefficient 3</td><td>0</td></tr>
+    <tr><td>COEFF_04</td><td>214</td><td>2</td><td>LSB (???)</td><td>Filter coefficient 4</td><td>0</td></tr>
+    <tr><td>COEFF_05</td><td>216</td><td>2</td><td>LSB (???)</td><td>Filter coefficient 5</td><td>0</td></tr>
+    <tr><td>COEFF_06</td><td>218</td><td>2</td><td>LSB (???)</td><td>Filter coefficient 6</td><td>0</td></tr>
+    <tr><td>COEFF_07</td><td>220</td><td>2</td><td>LSB (???)</td><td>Filter coefficient 7</td><td>0</td></tr>
+    <tr><td>COEFF_08_FILTERDIV</td><td>222</td><td>2</td><td>LSB (???)</td><td>Filter divide factor (0..11)</td><td>0</td></tr>
+    <tr><th colspan='6'>ADC 2 registers</th></tr>
+    <tr><td>BOARDVER</td><td>0</td><td>1</td><td>MSB</td><td>Board version number</td><td>33</td></tr>
+    <tr><td>VERSION</td><td>1</td><td>2</td><td>MSB (???)</td><td>Microcontroller program version</td><td>257</td></tr>
+    <tr><td>SERIAL</td><td>3</td><td>2</td><td>MSB (???)</td><td>Board serial number</td><td>6400</td></tr>
+    <tr><td>XCVERSION</td><td>5</td><td>2</td><td>MSB (???)</td><td>FPGA (Xilinx) program vesion</td><td>512</td></tr>
+    <tr><td>STATUS1</td><td>8</td><td>1</td><td>MSB</td><td>STATUS1 register</td><td><span style='margin-right:20px;'>BPLLOCK(0): 1</span></td></tr>
+    <tr><td>STATUS2</td><td>9</td><td>1</td><td>MSB</td><td>STATUS2 register</td><td><span style='margin-right:20px;'>ITS(0): 0</span><span style='margin-right:20px;'>OVD(1): 0</span><span style='margin-right:20px;'>LED1(2): 0</span><span style='margin-right:20px;'>LED2(3): 0</span></td></tr>
+    <tr><td>TEMPERATURE</td><td>10</td><td>1</td><td>MSB</td><td>Board temperature</td><td>46</td></tr>
+    <tr><td>CONTROL</td><td>11</td><td>1</td><td>MSB</td><td>CONTROL register</td><td><span style='margin-right:20px;'>SATAONOFF(0): 1</span><span style='margin-right:20px;'>DSM(1): 1</span><span style='margin-right:20px;'>SS(2): 0</span><span style='margin-right:20px;'>TM(3): 0</span><span style='margin-right:20px;'>FIL(4): 0</span><span style='margin-right:20px;'>ITE(5): 0</span><span style='margin-right:20px;'>RBO(6): 0</span></td></tr>
+    <tr><td>DSLVCLKMUL</td><td>12</td><td>1</td><td>MSB</td><td>SATA clock multiplier relative to 20 MHz internal clock</td><td>33</td></tr>
+    <tr><td>DSLVCLKDIV</td><td>13</td><td>1</td><td>MSB</td><td>SATA clock divider relative to 20 MHz internal clock</td><td>10</td></tr>
+    <tr><td>DVDD33</td><td>14</td><td>2</td><td>LSB</td><td>DVDD 3.3V voltage in mV</td><td>3264</td></tr>
+    <tr><td>DVDD25</td><td>16</td><td>2</td><td>LSB</td><td>DVDD 2.5V voltage in mV</td><td>2500</td></tr>
+    <tr><td>AVDD33</td><td>18</td><td>2</td><td>LSB</td><td>AVDD 3.3V voltage in mV</td><td>3310</td></tr>
+    <tr><td>AVDD18</td><td>20</td><td>2</td><td>LSB</td><td>AVDD 1.8V voltage in mV</td><td>1790</td></tr>
+    <tr><td>STREAMCONTROL</td><td>26</td><td>2</td><td>MSB (???)</td><td>Ring buffer size / SATA test mode / Stream mode</td><td><span style='margin-right:20px;'>RBSIZE(0..9): 3</span><span style='margin-right:20px;'>SATATEST(13): 1</span><span style='margin-right:20px;'>STREAMMODE(14..15): 3</span></td></tr>
+    <tr><td>RESOLUTION</td><td>28</td><td>1</td><td>MSB</td><td>Resolution (number of bits per sample)</td><td>0</td></tr>
+    <tr><td>BPSCH1</td><td>29</td><td>1</td><td>MSB</td><td>Bytes per sample of 8-channel block 1</td><td>14</td></tr>
+    <tr><td>BPSCH2</td><td>30</td><td>1</td><td>MSB</td><td>Bytes per sample of 8-channel block 2</td><td>14</td></tr>
+    <tr><td>BPSCH3</td><td>31</td><td>1</td><td>MSB</td><td>Bytes per sample of 8-channel block 3</td><td>14</td></tr>
+    <tr><td>BPSCH4</td><td>32</td><td>1</td><td>MSB</td><td>Bytes per sample of 8-channel block 4</td><td>14</td></tr>
+    <tr><td>ERRORCODE</td><td>36</td><td>1</td><td>MSB</td><td>The code of the last error. 0 = no error</td><td>0</td></tr>
+    <tr><td>RESETFACTORY</td><td>37</td><td>1</td><td>MSB</td><td>Writing 0xCD here causes factory reset</td><td>0</td></tr>
+    <tr><td>DACCONTROL</td><td>46</td><td>1</td><td>MSB</td><td>DAC mixed channel mode</td><td><span style='margin-right:20px;'>MIXED(0): 0</span></td></tr>
+    <tr><td>ANALOGOUT1</td><td>48</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT2</td><td>50</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT3</td><td>52</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT4</td><td>54</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT5</td><td>56</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT6</td><td>58</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT7</td><td>60</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT8</td><td>62</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT9</td><td>64</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT10</td><td>66</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT11</td><td>68</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT12</td><td>70</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT13</td><td>72</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT14</td><td>74</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT15</td><td>76</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT16</td><td>78</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT17</td><td>80</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT18</td><td>82</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT19</td><td>84</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT20</td><td>86</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT21</td><td>88</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT22</td><td>90</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT23</td><td>92</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT24</td><td>94</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT25</td><td>96</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT26</td><td>98</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT27</td><td>100</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT28</td><td>102</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT29</td><td>104</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT30</td><td>106</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT31</td><td>108</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>ANALOGOUT32</td><td>110</td><td>2</td><td>MSB (???)</td><td>Analog outputs for offset control</td><td><span style='margin-right:20px;'>OFFSET(0..12): 0</span></td></tr>
+    <tr><td>TRIGLEVEL1</td><td>112</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 448</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL2</td><td>114</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 448</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL3</td><td>116</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 448</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL4</td><td>118</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 448</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL5</td><td>120</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL6</td><td>122</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL7</td><td>124</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL8</td><td>126</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL9</td><td>128</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL10</td><td>130</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL11</td><td>132</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL12</td><td>134</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL13</td><td>136</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL14</td><td>138</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL15</td><td>140</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL16</td><td>142</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL17</td><td>144</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL18</td><td>146</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL19</td><td>148</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL20</td><td>150</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL21</td><td>152</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL22</td><td>154</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL23</td><td>156</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL24</td><td>158</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL25</td><td>160</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL26</td><td>162</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL27</td><td>164</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL28</td><td>166</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL29</td><td>168</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL30</td><td>170</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL31</td><td>172</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>TRIGLEVEL32</td><td>174</td><td>2</td><td>MSB (???)</td><td>Internal trigger control for the 32 channels</td><td><span style='margin-right:20px;'>TRIGLEV(0..13): 0</span><span style='margin-right:20px;'>MAXMIN(14): 0</span><span style='margin-right:20px;'>ENABLED(15): 0</span></td></tr>
+    <tr><td>OVDLEVEL</td><td>192</td><td>2</td><td>MSB (???)</td><td>Overload level</td><td><span style='margin-right:20px;'>LEVEL(0..13): 0</span><span style='margin-right:20px;'>OVDPOLARITY(14): 0</span><span style='margin-right:20px;'>ENABLE(15): 0</span></td></tr>
+    <tr><td>OVDSTATUS</td><td>194</td><td>1</td><td>MSB</td><td>Overload status</td><td><span style='margin-right:20px;'>OVDEV(0): 0</span></td></tr>
+    <tr><td>OVDTIME</td><td>195</td><td>2</td><td>MSB (???)</td><td>Overload time [10 us units]</td><td>59395</td></tr>
+    <tr><td>COEFF_01</td><td>208</td><td>2</td><td>LSB (???)</td><td>Filter coefficient 1</td><td>0</td></tr>
+    <tr><td>COEFF_02</td><td>210</td><td>2</td><td>LSB (???)</td><td>Filter coefficient 2</td><td>0</td></tr>
+    <tr><td>COEFF_03</td><td>212</td><td>2</td><td>LSB (???)</td><td>Filter coefficient 3</td><td>0</td></tr>
+    <tr><td>COEFF_04</td><td>214</td><td>2</td><td>LSB (???)</td><td>Filter coefficient 4</td><td>0</td></tr>
+    <tr><td>COEFF_05</td><td>216</td><td>2</td><td>LSB (???)</td><td>Filter coefficient 5</td><td>0</td></tr>
+    <tr><td>COEFF_06</td><td>218</td><td>2</td><td>LSB (???)</td><td>Filter coefficient 6</td><td>0</td></tr>
+    <tr><td>COEFF_07</td><td>220</td><td>2</td><td>LSB (???)</td><td>Filter coefficient 7</td><td>0</td></tr>
+    <tr><td>COEFF_08_FILTERDIV</td><td>222</td><td>2</td><td>LSB (???)</td><td>Filter divide factor (0..11)</td><td>0</td></tr>
+    <tr><th colspan='6'>PC card registers</th></tr>
+    <tr><td>BOARD_VERSION</td><td>0</td><td>1</td><td>MSB</td><td>Board version code</td><td>64</td></tr>
+    <tr><td>FW_VERSION</td><td>2</td><td>2</td><td>LSB</td><td>Firmware version code (x100)</td><td>147</td></tr>
+    <tr><td>TEMP_SENSOR_1</td><td>12</td><td>2</td><td>LSB (???)</td><td>Temperature sensor 1 reading (x10)</td><td><span style='margin-right:20px;'>TEMP(0..11): 3453</span></td></tr>
+    <tr><td>TEMP_SENSOR_2</td><td>14</td><td>2</td><td>LSB (???)</td><td>Temperature sensor 2 reading (x10)</td><td><span style='margin-right:20px;'>TEMP(0..11): 3464</span></td></tr>
+    <tr><td>TEMP_SENSOR_3</td><td>16</td><td>2</td><td>LSB (???)</td><td>Temperature sensor 3 reading (x10)</td><td><span style='margin-right:20px;'>TEMP(0..11): 3453</span></td></tr>
+    <tr><td>TEMP_SENSOR_4</td><td>18</td><td>2</td><td>LSB (???)</td><td>Temperature sensor 4 reading (x10)</td><td><span style='margin-right:20px;'>TEMP(0..11): 3459</span></td></tr>
+    <tr><td>TEMP_SENSOR_5</td><td>20</td><td>2</td><td>LSB (???)</td><td>Temperature sensor (detector 1) reading (x10)</td><td><span style='margin-right:20px;'>TEMP(0..11): 3453</span></td></tr>
+    <tr><td>TEMP_SENSOR_6</td><td>22</td><td>2</td><td>LSB (???)</td><td>Temperature sensor (analog amplifier 1) reading (x10)</td><td><span style='margin-right:20px;'>TEMP(0..11): 3453</span></td></tr>
+    <tr><td>TEMP_SENSOR_7</td><td>24</td><td>2</td><td>LSB (???)</td><td>Temperature sensor (analog amplifier 2) reading (x10)</td><td><span style='margin-right:20px;'>TEMP(0..11): 3453</span></td></tr>
+    <tr><td>TEMP_SENSOR_8</td><td>26</td><td>2</td><td>LSB (???)</td><td>Temperature sensor (detector 2) reading (x10)</td><td><span style='margin-right:20px;'>TEMP(0..11): 3453</span></td></tr>
+    <tr><td>TEMP_SENSOR_9</td><td>28</td><td>2</td><td>LSB (???)</td><td>Temperature sensor (analog amplifier 3) reading (x10)</td><td><span style='margin-right:20px;'>TEMP(0..11): 3440</span></td></tr>
+    <tr><td>TEMP_SENSOR_10</td><td>30</td><td>2</td><td>LSB (???)</td><td>Temperature sensor (analog amplifier 4) reading (x10)</td><td><span style='margin-right:20px;'>TEMP(0..11): 3440</span></td></tr>
+    <tr><td>TEMP_SENSOR_11</td><td>32</td><td>2</td><td>LSB (???)</td><td>Temperature sensor (baseplate) reading (x10)</td><td><span style='margin-right:20px;'>TEMP(0..11): 3440</span></td></tr>
+    <tr><td>TEMP_SENSOR_12</td><td>34</td><td>2</td><td>LSB (???)</td><td>Temperature sensor 12 reading (x10)</td><td><span style='margin-right:20px;'>TEMP(0..11): 3440</span></td></tr>
+    <tr><td>TEMP_SENSOR_13</td><td>36</td><td>2</td><td>LSB (???)</td><td>Temperature sensor (diode) reading (x10)</td><td><span style='margin-right:20px;'>TEMP(0..11): 1782</span></td></tr>
+    <tr><td>TEMP_SENSOR_14</td><td>38</td><td>2</td><td>LSB (???)</td><td>Temperature sensor (Peltier heat sink) reading (x10)</td><td><span style='margin-right:20px;'>TEMP(0..11): 239</span></td></tr>
+    <tr><td>TEMP_SENSOR_15</td><td>40</td><td>2</td><td>LSB (???)</td><td>Temperature sensor (power panel) reading (x10)</td><td><span style='margin-right:20px;'>TEMP(0..11): 301</span></td></tr>
+    <tr><td>TEMP_SENSOR_16</td><td>42</td><td>2</td><td>LSB (???)</td><td>Temperature sensor (power panel heat sink) reading (x10)</td><td><span style='margin-right:20px;'>TEMP(0..11): 542</span></td></tr>
+    <tr><td>PELT_CTRL</td><td>44</td><td>2</td><td>LSB (???)</td><td>Actual Peltier controller output voltage(current?) [-4000..4000]. Negative means heating</td><td>-2100</td></tr>
+    <tr><td>PELT_MANUAL</td><td>78</td><td>2</td><td>LSB (???)</td><td>Manual Peltier controller output voltage(current?) [-4000..4000] enabled by bit#3 of ANALOG_POWER. Negative means heating</td><td>0</td></tr>
+    <tr><td>P_GAIN</td><td>80</td><td>2</td><td>LSB (???)</td><td>Peltier controller P gain value (x100)</td><td>10000</td></tr>
+    <tr><td>I_GAIN</td><td>82</td><td>2</td><td>LSB (???)</td><td>Peltier controller I gain value (x100)</td><td>0</td></tr>
+    <tr><td>D_GAIN</td><td>84</td><td>2</td><td>LSB (???)</td><td>Peltier controller D gain value (x100)</td><td>100</td></tr>
+    <tr><td>HVON</td><td>94</td><td>1</td><td>MSB</td><td>High voltages on/off</td><td><span style='margin-right:20px;'>HV[0](0): 0</span><span style='margin-right:20px;'>HV[1](1): 0</span><span style='margin-right:20px;'>HV[2](2): 0</span><span style='margin-right:20px;'>HV[3](3): 0</span></td></tr>
+    <tr><td>HVENABLE</td><td>96</td><td>1</td><td>MSB</td><td>HV enabled (a value of 171 enables globally, otherwise disabled)</td><td>0</td></tr>
+    <tr><td>IRQ_ENABLE_HV</td><td>98</td><td>1</td><td>MSB</td><td>Generate interrupt if HVMON differs from HVSET by more than HV_IRQ_LEVEL</td><td><span style='margin-right:20px;'>HV1(0): 0</span><span style='margin-right:20px;'>HV2(1): 0</span><span style='margin-right:20px;'>HV3(2): 0</span><span style='margin-right:20px;'>HV4(3): 0</span></td></tr>
+    <tr><td>IRQ_POWER_PID_ENABLE</td><td>100</td><td>1</td><td>MSB</td><td>Enable temperature alarm interrupt, analog +/-5V supplies, PID control</td><td><span style='margin-right:20px;'>TEMPALRM(0): 0</span><span style='margin-right:20px;'>ANALOG5V(1): 0</span><span style='margin-right:20px;'>PIDDISABLE(2): 0</span></td></tr>
+    <tr><td>HV_IRQ_LEVEL</td><td>102</td><td>2</td><td>LSB (???)</td><td>Maximum difference allowed between the set and monitor voltages before interrupt is generated [mV?]</td><td><span style='margin-right:20px;'>LEVEL(0..11): 150</span></td></tr>
+    <tr><td>HV_FAILURE</td><td>104</td><td>1</td><td>MSB</td><td>Latched bits for HV failure (must be cleared explicitely)</td><td><span style='margin-right:20px;'>HV1FAIL(0): 1</span><span style='margin-right:20px;'>HV2FAIL(1): 1</span><span style='margin-right:20px;'>HV3FAIL(2): 1</span><span style='margin-right:20px;'>HV4FAIL(3): 1</span></td></tr>
+    <tr><td>DETECTOR_TEMP_SET</td><td>106</td><td>2</td><td>LSB (???)</td><td>Reference temperature to which the detector temperature is controlled (x10)</td><td><span style='margin-right:20px;'>TEMP(0..11): 260</span></td></tr>
+    <tr><td>FAN1_SPEED</td><td>108</td><td>1</td><td>MSB</td><td>Speed of fan 1 if fan is in manual mode</td><td>255</td></tr>
+    <tr><td>FAN2_SPEED</td><td>110</td><td>1</td><td>MSB</td><td>Speed of fan 2 if fan is in manual mode</td><td>255</td></tr>
+    <tr><td>FAN3_SPEED</td><td>112</td><td>1</td><td>MSB</td><td>Speed of fan 3 if fan is in manual mode</td><td>255</td></tr>
+    <tr><td>FAN1_TEMP_SET</td><td>114</td><td>2</td><td>LSB (???)</td><td>Required temperature for fan1 control (x10)</td><td><span style='margin-right:20px;'>TEMP(0..11): 300</span></td></tr>
+    <tr><td>FAN1_TEMP_DIFF</td><td>116</td><td>2</td><td>LSB (???)</td><td>Temp. diff. to start the fan (both + and -) (x10)</td><td><span style='margin-right:20px;'>TDIFF(0..11): 20</span></td></tr>
+    <tr><td>FAN2_TEMP_LIMIT</td><td>118</td><td>2</td><td>LSB (???)</td><td>Fan2 will switch in gradually when temp. reaches this value (x10)</td><td><span style='margin-right:20px;'>TEMP(0..11): 300</span></td></tr>
+    <tr><td>FAN3_TEMP_LIMIT</td><td>120</td><td>2</td><td>LSB (???)</td><td>Fan3 will switch in gradually when temp. reaches this value (x10)</td><td><span style='margin-right:20px;'>TEMP(0..11): 300</span></td></tr>
+    <tr><td>CALLIGHT</td><td>122</td><td>2</td><td>LSB (???)</td><td>Calibration LED current. Zero value ensures complete darkneww</td><td><span style='margin-right:20px;'>CURRENT(0..11): 0</span></td></tr>
+    <tr><td>CALUPDATE</td><td>124</td><td>2</td><td>LSB (???)</td><td>LED update period [us]. 0 disables periodic LED update</td><td>0</td></tr>
+    <tr><td>IRQ_STATUS</td><td>126</td><td>1</td><td>MSB</td><td>Status of various interrupt requests. Can be cleared by writing 0.</td><td><span style='margin-right:20px;'>HV(0): 0</span><span style='margin-right:20px;'>TEMP(1): 1</span><span style='margin-right:20px;'>CALLIGHT(2): 0</span></td></tr>
+    <tr><td>SHMODE</td><td>128</td><td>1</td><td>MSB</td><td>Shutter operation mode. (0 - manual [by writing to SHSTATE], 1 - external [by shutter control input])</td><td>0</td></tr>
+    <tr><td>SHSTATE</td><td>130</td><td>1</td><td>MSB</td><td>Shutter state (0 - closed, 1 - open)</td><td>0</td></tr>
+    <tr><td>RESET_FACTORY</td><td>132</td><td>1</td><td>MSB</td><td>Writing hex 0xCD here causes factory reset</td><td>0</td></tr>
+    <tr><td>ERRORCODE</td><td>134</td><td>1</td><td>MSB</td><td>Code of the last error (see tooltip)</td><td>0</td></tr>
+    <tr><td>FACTORY_WRITE</td><td>136</td><td>2</td><td>LSB (???)</td><td>Writing a hex 0x?? value enables writing FACTORY_CAL_TABLE</td><td>0</td></tr>
+    <tr><td>FIRMWARE_UPGR_ERROR_CODE</td><td>142</td><td>1</td><td>MSB</td><td>Error code for checking the integrity of uploaded firmware (0x11=OK, 0x12=checksum error)</td><td>0x0</td></tr>
+    <tr><td>START_FIRMWARE_UPGR</td><td>144</td><td>1</td><td>MSB</td><td>Writing 0x28 triggers checking uploaded FW, 0xC4 triggers checking and installing FW</td><td>0</td></tr>
+    <tr><td>BOARD_SERIAL</td><td>256</td><td>2</td><td>LSB (???)</td><td>Board unique serial number</td><td>1</td></tr>
+    <tr><td>TEMP_CTRL_WEIGHTS_1</td><td>266</td><td>2</td><td>LSB (???)</td><td>Control weight for the temperature sensor for detector temperature control</td><td>0</td></tr>
+    <tr><td>TEMP_CTRL_WEIGHTS_2</td><td>268</td><td>2</td><td>LSB (???)</td><td>Control weight for the temperature sensor for detector temperature control</td><td>0</td></tr>
+    <tr><td>TEMP_CTRL_WEIGHTS_3</td><td>270</td><td>2</td><td>LSB (???)</td><td>Control weight for the temperature sensor for detector temperature control</td><td>0</td></tr>
+    <tr><td>TEMP_CTRL_WEIGHTS_4</td><td>272</td><td>2</td><td>LSB (???)</td><td>Control weight for the temperature sensor for detector temperature control</td><td>0</td></tr>
+    <tr><td>TEMP_CTRL_WEIGHTS_5</td><td>274</td><td>2</td><td>LSB (???)</td><td>Control weight for the temperature sensor for detector temperature control</td><td>0</td></tr>
+    <tr><td>TEMP_CTRL_WEIGHTS_6</td><td>276</td><td>2</td><td>LSB (???)</td><td>Control weight for the temperature sensor for detector temperature control</td><td>0</td></tr>
+    <tr><td>TEMP_CTRL_WEIGHTS_7</td><td>278</td><td>2</td><td>LSB (???)</td><td>Control weight for the temperature sensor for detector temperature control</td><td>0</td></tr>
+    <tr><td>TEMP_CTRL_WEIGHTS_8</td><td>280</td><td>2</td><td>LSB (???)</td><td>Control weight for the temperature sensor for detector temperature control</td><td>0</td></tr>
+    <tr><td>TEMP_CTRL_WEIGHTS_9</td><td>282</td><td>2</td><td>LSB (???)</td><td>Control weight for the temperature sensor for detector temperature control</td><td>0</td></tr>
+    <tr><td>TEMP_CTRL_WEIGHTS_10</td><td>284</td><td>2</td><td>LSB (???)</td><td>Control weight for the temperature sensor for detector temperature control</td><td>0</td></tr>
+    <tr><td>TEMP_CTRL_WEIGHTS_11</td><td>286</td><td>2</td><td>LSB (???)</td><td>Control weight for the temperature sensor for detector temperature control</td><td>0</td></tr>
+    <tr><td>TEMP_CTRL_WEIGHTS_12</td><td>288</td><td>2</td><td>LSB (???)</td><td>Control weight for the temperature sensor for detector temperature control</td><td>0</td></tr>
+    <tr><td>TEMP_CTRL_WEIGHTS_13</td><td>290</td><td>2</td><td>LSB (???)</td><td>Control weight for the temperature sensor for detector temperature control</td><td>0</td></tr>
+    <tr><td>TEMP_CTRL_WEIGHTS_14</td><td>292</td><td>2</td><td>LSB (???)</td><td>Control weight for the temperature sensor for detector temperature control</td><td>1</td></tr>
+    <tr><td>TEMP_CTRL_WEIGHTS_15</td><td>294</td><td>2</td><td>LSB (???)</td><td>Control weight for the temperature sensor for detector temperature control</td><td>0</td></tr>
+    <tr><td>TEMP_CTRL_WEIGHTS_16</td><td>296</td><td>2</td><td>LSB (???)</td><td>Control weight for the temperature sensor for detector temperature control</td><td>0</td></tr>
+    <tr><td>FAN1_CTRL_WEIGHTS_1</td><td>298</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN1_CTRL_WEIGHTS_2</td><td>300</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN1_CTRL_WEIGHTS_3</td><td>302</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN1_CTRL_WEIGHTS_4</td><td>304</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN1_CTRL_WEIGHTS_5</td><td>306</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN1_CTRL_WEIGHTS_6</td><td>308</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN1_CTRL_WEIGHTS_7</td><td>310</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN1_CTRL_WEIGHTS_8</td><td>312</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN1_CTRL_WEIGHTS_9</td><td>314</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN1_CTRL_WEIGHTS_10</td><td>316</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN1_CTRL_WEIGHTS_11</td><td>318</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN1_CTRL_WEIGHTS_12</td><td>320</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN1_CTRL_WEIGHTS_13</td><td>322</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN1_CTRL_WEIGHTS_14</td><td>324</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN1_CTRL_WEIGHTS_15</td><td>326</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN1_CTRL_WEIGHTS_16</td><td>328</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan1. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN2_CTRL_WEIGHTS_1</td><td>330</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN2_CTRL_WEIGHTS_2</td><td>332</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN2_CTRL_WEIGHTS_3</td><td>334</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN2_CTRL_WEIGHTS_4</td><td>336</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN2_CTRL_WEIGHTS_5</td><td>338</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN2_CTRL_WEIGHTS_6</td><td>340</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN2_CTRL_WEIGHTS_7</td><td>342</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN2_CTRL_WEIGHTS_8</td><td>344</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN2_CTRL_WEIGHTS_9</td><td>346</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN2_CTRL_WEIGHTS_10</td><td>348</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN2_CTRL_WEIGHTS_11</td><td>350</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN2_CTRL_WEIGHTS_12</td><td>352</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN2_CTRL_WEIGHTS_13</td><td>354</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN2_CTRL_WEIGHTS_14</td><td>356</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN2_CTRL_WEIGHTS_15</td><td>358</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN2_CTRL_WEIGHTS_16</td><td>360</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan2. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN3_CTRL_WEIGHTS_1</td><td>362</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN3_CTRL_WEIGHTS_2</td><td>364</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN3_CTRL_WEIGHTS_3</td><td>366</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN3_CTRL_WEIGHTS_4</td><td>368</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN3_CTRL_WEIGHTS_5</td><td>370</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN3_CTRL_WEIGHTS_6</td><td>372</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN3_CTRL_WEIGHTS_7</td><td>374</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN3_CTRL_WEIGHTS_8</td><td>376</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN3_CTRL_WEIGHTS_9</td><td>378</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN3_CTRL_WEIGHTS_10</td><td>380</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN3_CTRL_WEIGHTS_11</td><td>382</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN3_CTRL_WEIGHTS_12</td><td>384</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN3_CTRL_WEIGHTS_13</td><td>386</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN3_CTRL_WEIGHTS_14</td><td>388</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN3_CTRL_WEIGHTS_15</td><td>390</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><td>FAN3_CTRL_WEIGHTS_16</td><td>392</td><td>2</td><td>LSB (???)</td><td>Control weight for the control of fan3. If all are zero, fan is manually controlled by setting speed</td><td>0</td></tr>
+    <tr><th colspan='6'>Communication & Control Card settings</th></tr>
+    <tr><td>BOARD_VERSION</td><td>0</td><td>10</td><td>MSB</td><td>Board type</td><td>BSP12-0001</td></tr>
+    <tr><td>FIRMWARE_GROUP</td><td>10</td><td>14</td><td>MSB</td><td>Firmware group</td><td>BSF12-0001-105</td></tr>
+    <tr><td>FIRMWARE_GROUP_VERSION</td><td>24</td><td>2</td><td>MSB</td><td>Firmware group version</td><td><span style='margin-right:20px;'>VL(0..7): 5</span><span style='margin-right:20px;'>VH(8..15): 1</span></td></tr>
+    <tr><td>UPGRADEDATE</td><td>26</td><td>4</td><td>MSB</td><td>Upgrade date</td><td><span style='margin-right:20px;'>D(0..7): 6</span><span style='margin-right:20px;'>M(8..15): 12</span><span style='margin-right:20px;'>Y(16..31): 2023</span></td></tr>
+    <tr><td>MAN_FIRMWAREGROUP</td><td>30</td><td>14</td><td>MSB</td><td>Manufacturer firmware group</td><td>>>> can not decode string <<<</td></tr>
+    <tr><td>MAN_PROGRAMDATE</td><td>44</td><td>4</td><td>MSB</td><td>Manufacturer program date</td><td><span style='margin-right:20px;'>D(0..7): 255</span><span style='margin-right:20px;'>M(8..15): 255</span><span style='margin-right:20px;'>Y(16..31): 65535</span></td></tr>
+    <tr><td>MAN_SERIAL</td><td>48</td><td>4</td><td>MSB</td><td>Manufacturer serial number</td><td>285212675</td></tr>
+    <tr><td>MAN_TESTRESULT</td><td>52</td><td>4</td><td>MSB</td><td>Manufacturer test result</td><td>4294967295</td></tr>
+    <tr><td>SETTINGS_VERSION</td><td>64</td><td>1</td><td>MSB (???)</td><td>Settings version</td><td>1</td></tr>
+    <tr><td>DEV_NAME</td><td>65</td><td>48</td><td>MSB</td><td>Device name</td><td>10 GB Communication & Control Card              </td></tr>
+    <tr><td>DEV_TYPE</td><td>113</td><td>2</td><td>MSB</td><td>Device type</td><td>65535</td></tr>
+    <tr><td>DEV_SERIAL</td><td>115</td><td>4</td><td>MSB</td><td>Device serial number</td><td>4294967295</td></tr>
+    <tr><td>COMPANY</td><td>119</td><td>18</td><td>MSB</td><td>Company name</td><td>Fusion Instruments</td></tr>
+    <tr><td>HOST_NAME</td><td>137</td><td>12</td><td>MSB</td><td>Host name</td><td>BS-10GB-CC13</td></tr>
+    <tr><td>CONFIG</td><td>149</td><td>2</td><td>MSB</td><td>Configuration</td><td><span style='margin-right:20px;'>LOCK(0): 0</span></td></tr>
+    <tr><td>USER_TEXT</td><td>151</td><td>15</td><td>MSB</td><td>User text</td><td>Fusion Instrum.</td></tr>
+    <tr><td>MANAGE_MAC</td><td>192</td><td>6</td><td>MSB</td><td>Management port static MAC address</td><td>ff:ff:ff:ff:ff:ff</td></tr>
+    <tr><td>MANAGE_IP</td><td>198</td><td>4</td><td>MSB</td><td>Management port IPv4 address</td><td>10.123.13.101</td></tr>
+    <tr><td>MANAGE_IP_MASK</td><td>202</td><td>4</td><td>MSB</td><td>Management port IPv4 network mask</td><td>255.0.0.0</td></tr>
+    <tr><td>MANAGE_MAC_MODE</td><td>206</td><td>1</td><td>MSB</td><td>Management port MAC mode (0 - factorydefault, 1 - CW-Auto, 2 - static)</td><td>1</td></tr>
+    <tr><td>MANAGE_IP_MODE</td><td>207</td><td>1</td><td>MSB</td><td>Management port IP mode (1 - static, 2 - DHCP)</td><td>1</td></tr>
+    <tr><td>MANAGE_GW_MODE</td><td>208</td><td>1</td><td>MSB</td><td>Management port gateway mode (0 - None, 1 - static, 2 - DHCP)</td><td>0</td></tr>
+    <tr><td>MANAGE_GW_IP</td><td>209</td><td>4</td><td>MSB</td><td>Management port gateway IPv4 address</td><td>10.123.13.1</td></tr>
+    <tr><td>MANAGE_ARP</td><td>213</td><td>1</td><td>MSB</td><td>Management port ARP (Advertisement Report Period) [s]</td><td>15</td></tr>
+    <tr><td>MANAGE_IGMP</td><td>214</td><td>1</td><td>MSB</td><td>Management port IGMP report period [s]</td><td>60</td></tr>
+    <tr><td>MANAGE_IP_TTL</td><td>215</td><td>1</td><td>MSB</td><td>Management port IPv4 Time To Live (TTL value in the IPv4 header)</td><td>128</td></tr>
+    <tr><td>MANAGE_MAC_DEFAULT</td><td>216</td><td>6</td><td>MSB</td><td>Management port factory default MAC address</td><td>ff:ff:ff:ff:ff:ff</td></tr>
+    <tr><td>STREAM_PORT_MAC</td><td>240</td><td>6</td><td>MSB</td><td>Stream port static MAC address</td><td>ff:ff:ff:ff:ff:ff</td></tr>
+    <tr><td>STREAM_PORT_IP</td><td>246</td><td>4</td><td>MSB</td><td>Stream port IPv4 address</td><td>10.123.13.102</td></tr>
+    <tr><td>STREAM_PORT_IP_MASK</td><td>250</td><td>4</td><td>MSB</td><td>Stream port Ipv4 mask</td><td>255.0.0.0</td></tr>
+    <tr><td>STREAM_PORT_MAC_MODE</td><td>254</td><td>1</td><td>MSB</td><td>Stream port MAC mode (0 - factory default, 1 - CW-auto, 2 - static)</td><td>1</td></tr>
+    <tr><td>STREAM_PORT_IP_MODE</td><td>255</td><td>1</td><td>MSB</td><td>Stream port IP mode (1 - static, 2 - DHCP)</td><td>1</td></tr>
+    <tr><td>STREAM_PORT_GW_MODE</td><td>256</td><td>1</td><td>MSB</td><td>Stream port gateway mode (0 - none, 1 - static, 2 - DHCP)</td><td>0</td></tr>
+    <tr><td>STREAM_PORT_GW_IP</td><td>257</td><td>4</td><td>MSB</td><td>Stream port gateway IPv4 address</td><td>10.123.13.1</td></tr>
+    <tr><td>STREAM_PORT_ARP</td><td>261</td><td>1</td><td>MSB</td><td>Stream port ARP Advertisement Report Period (0=off) [s]</td><td>15</td></tr>
+    <tr><td>STREAM_PORT_IGMP</td><td>262</td><td>1</td><td>MSB</td><td>Stream port IGMP report period (0=off) [s]</td><td>60</td></tr>
+    <tr><td>STREAM_PORT_IP_TTL</td><td>263</td><td>1</td><td>MSB</td><td>Stream port IPv4 Time To Live (TTL value in the IPv4 header)</td><td>128</td></tr>
+    <tr><td>STREAM_PORT_MAC_DEFAULT</td><td>264</td><td>6</td><td>MSB</td><td>Stream port factory default MAC address</td><td>ff:ff:ff:ff:ff:ff</td></tr>
+    <tr><td>HTTP_PORT</td><td>288</td><td>2</td><td>LSB</td><td>HTTP Port</td><td>80</td></tr>
+    <tr><td>SMTP_PORT</td><td>290</td><td>2</td><td>LSB</td><td>SMTP server port</td><td>25</td></tr>
+    <tr><td>CLOCK_CONTROL</td><td>320</td><td>1</td><td>MSB</td><td>Clock control (SETCLOCKCONTROL instruction)</td><td><span style='margin-right:20px;'>AS(2): 0</span><span style='margin-right:20px;'>AA(3): 0</span><span style='margin-right:20px;'>SS(4): 0</span></td></tr>
+    <tr><td>CLOCK_ENABLE</td><td>321</td><td>1</td><td>MSB</td><td>Clock enable (SETCLOCKENABLE instruction)</td><td><span style='margin-right:20px;'>CC(0): 1</span><span style='margin-right:20px;'>EC(1): 1</span><span style='margin-right:20px;'>CS(2): 1</span><span style='margin-right:20px;'>ES(3): 1</span></td></tr>
+    <tr><td>BASE_PLL_MULT</td><td>322</td><td>1</td><td>MSB</td><td>Base PLL multiply value</td><td>20</td></tr>
+    <tr><td>BASE_PLL_DIV0</td><td>323</td><td>1</td><td>MSB</td><td>Base PLL divide value 0</td><td>10</td></tr>
+    <tr><td>BASE_PLL_DIV_ADC</td><td>324</td><td>1</td><td>MSB</td><td>Base PLL divide value 1 (going to clock signal F1/ADC)</td><td>20</td></tr>
+    <tr><td>BASE_PLL_DIV2</td><td>325</td><td>1</td><td>MSB</td><td>Base PLL divide value 2</td><td>58</td></tr>
+    <tr><td>BASE_PLL_DIV3</td><td>326</td><td>1</td><td>MSB</td><td>Base PLL divide value 3</td><td>66</td></tr>
+    <tr><td>EXT_DCM_MULT</td><td>327</td><td>1</td><td>MSB</td><td>External DCM multiply value</td><td>16</td></tr>
+    <tr><td>EXT_DCM_DIV</td><td>328</td><td>1</td><td>MSB</td><td>External DCM divide value</td><td>12</td></tr>
+    <tr><td>SAMPLEDIV</td><td>329</td><td>2</td><td>MSB</td><td>Sample divide value</td><td>20</td></tr>
+    <tr><td>SPAREIO</td><td>331</td><td>1</td><td>MSB</td><td>Spare IO control</td><td><span style='margin-right:20px;'>OUTVAL0(0): 0</span><span style='margin-right:20px;'>OUTVAL1(1): 0</span><span style='margin-right:20px;'>OUTVAL2(2): 0</span><span style='margin-right:20px;'>OUTVAL3(3): 0</span><span style='margin-right:20px;'>DIR0(4): 0</span><span style='margin-right:20px;'>DIR1(5): 0</span><span style='margin-right:20px;'>DIR2(6): 0</span><span style='margin-right:20px;'>DIR3(7): 0</span></td></tr>
+    <tr><td>XFP</td><td>332</td><td>1</td><td>MSB</td><td>XFP</td><td><span style='margin-right:20px;'>REFCLKENABLE(0): 1</span></td></tr>
+    <tr><td>SAMPLECOUNT</td><td>333</td><td>6</td><td>MSB</td><td>Sample count</td><td>0</td></tr>
+    <tr><td>EIO_ADC_CLK_DIV</td><td>339</td><td>1</td><td>MSB</td><td>EIO ADC clock divider value</td><td>64</td></tr>
+    <tr><td>TRIGDELAY</td><td>340</td><td>4</td><td>MSB</td><td>Trigger delay</td><td>0</td></tr>
+    <tr><td>SERIAL_PLL_MULT</td><td>344</td><td>1</td><td>MSB</td><td>Serial PLL multiply value</td><td>33</td></tr>
+    <tr><td>SERIAL_PLL_DIV</td><td>345</td><td>1</td><td>MSB</td><td>Serial PLL divide value 0</td><td>10</td></tr>
+    <tr><td>SATACONTROL</td><td>349</td><td>1</td><td>MSB</td><td>SATA Control</td><td><span style='margin-right:20px;'>DSM(0): 1</span></td></tr>
+    <tr><td>G1TRIGCONTROL</td><td>350</td><td>1</td><td>MSB</td><td>G1 trigger control (SETG1TRIGGERMODULE instruction)</td><td><span style='margin-right:20px;'>ETR(0): 1</span><span style='margin-right:20px;'>ETF(1): 1</span><span style='margin-right:20px;'>IT(2): 1</span><span style='margin-right:20px;'>CTR(3): 1</span><span style='margin-right:20px;'>CTF(4): 1</span><span style='margin-right:20px;'>SWT(5): 1</span><span style='margin-right:20px;'>SWC(6): 1</span><span style='margin-right:20px;'>CTS(7): 1</span></td></tr>
+    <tr><td>G2GATECONTROL</td><td>351</td><td>1</td><td>MSB</td><td>G2 gate control (SETG2GATEMODULE instruction)</td><td><span style='margin-right:20px;'>EGP(0): 1</span><span style='margin-right:20px;'>ETE(1): 1</span><span style='margin-right:20px;'>IGP(2): 1</span><span style='margin-right:20px;'>IGE(3): 1</span><span style='margin-right:20px;'>CTGP(4): 1</span><span style='margin-right:20px;'>CTGE(5): 1</span><span style='margin-right:20px;'>SWG(7): 1</span></td></tr>
+    <tr><td>STREAMCONTROL</td><td>356</td><td>1</td><td>MSB</td><td>Stream control (SETSTREAMCONTROL instruction)</td><td><span style='margin-right:20px;'>EN1(0): 0</span><span style='margin-right:20px;'>EN2(1): 0</span><span style='margin-right:20px;'>EN3(2): 0</span><span style='margin-right:20px;'>EN4(3): 0</span><span style='margin-right:20px;'>TM1(4): 0</span><span style='margin-right:20px;'>TM2(5): 0</span><span style='margin-right:20px;'>TM3(6): 0</span><span style='margin-right:20px;'>TM4(7): 0</span></td></tr>
+    <tr><td>UDPTESTCLOCK_DIV</td><td>357</td><td>4</td><td>MSB</td><td>UDP test clock divider value</td><td>15624999</td></tr>
+    <tr><td>UDPOCTET1</td><td>368</td><td>2</td><td>MSB</td><td>Stream 1 octet</td><td>1118</td></tr>
+    <tr><td>UDPMAC1</td><td>370</td><td>6</td><td>MSB</td><td>Stream 1 MAC address</td><td>1:0:5e:7b:d:64</td></tr>
+    <tr><td>IP1</td><td>376</td><td>4</td><td>MSB</td><td>Stream 1 IPv4 address</td><td>239.123.13.100</td></tr>
+    <tr><td>UDPPORT1</td><td>380</td><td>2</td><td>MSB</td><td>Stream 1 UDP port</td><td>10002</td></tr>
+    <tr><td>UDPOCTET2</td><td>384</td><td>2</td><td>MSB</td><td>Stream 2 octet</td><td>1118</td></tr>
+    <tr><td>UDPMAC2</td><td>386</td><td>6</td><td>MSB</td><td>Stream 2 MAC address</td><td>1:0:5e:7b:d:64</td></tr>
+    <tr><td>IP2</td><td>392</td><td>4</td><td>MSB</td><td>Stream 2 IPv4 address</td><td>239.123.13.100</td></tr>
+    <tr><td>UDPPORT2</td><td>396</td><td>2</td><td>MSB</td><td>Stream 2 UDP port</td><td>10003</td></tr>
+    <tr><td>UDPOCTET3</td><td>400</td><td>2</td><td>MSB</td><td>Stream 3 octet</td><td>1118</td></tr>
+    <tr><td>UDPMAC3</td><td>402</td><td>6</td><td>MSB</td><td>Stream 3 MAC address</td><td>1:0:5e:7b:d:64</td></tr>
+    <tr><td>IP3</td><td>408</td><td>4</td><td>MSB</td><td>Stream 3 IPv4 address</td><td>239.123.13.100</td></tr>
+    <tr><td>UDPPORT3</td><td>412</td><td>2</td><td>MSB</td><td>Stream 3 UDP port</td><td>10003</td></tr>
+    <tr><td>UDPOCTET4</td><td>416</td><td>2</td><td>MSB</td><td>Stream 4 octet</td><td>1118</td></tr>
+    <tr><td>UDPMAC4</td><td>418</td><td>6</td><td>MSB</td><td>Stream 4 MAC address</td><td>1:0:5e:7b:d:64</td></tr>
+    <tr><td>IP4</td><td>424</td><td>4</td><td>MSB</td><td>Stream 4 IPv4 address</td><td>239.123.13.100</td></tr>
+    <tr><td>UDPPORT4</td><td>428</td><td>2</td><td>MSB</td><td>Stream 4 UDP port</td><td>10005</td></tr>
+    <tr><td>CAMTIMER1DELAY</td><td>432</td><td>4</td><td>MSB</td><td>CT timer 1 delay</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER1ON</td><td>436</td><td>4</td><td>MSB</td><td>CT timer 1 on</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER1OFF</td><td>440</td><td>4</td><td>MSB</td><td>CT timer 1 off</td><td>268435455</td></tr>
+    <tr><td>CAMTIMER1NPULSES</td><td>444</td><td>4</td><td>MSB</td><td>CT timer 1 number of pulses</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER2DELAY</td><td>448</td><td>4</td><td>MSB</td><td>CT timer 2 delay</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER2ON</td><td>452</td><td>4</td><td>MSB</td><td>CT timer 2 on</td><td>268435455</td></tr>
+    <tr><td>CAMTIMER2OFF</td><td>456</td><td>4</td><td>MSB</td><td>CT timer 2 off</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER2NPULSES</td><td>460</td><td>4</td><td>MSB</td><td>CT timer 2 number of pulses</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER3DELAY</td><td>464</td><td>4</td><td>MSB</td><td>CT timer 3 delay</td><td>268435455</td></tr>
+    <tr><td>CAMTIMER3ON</td><td>468</td><td>4</td><td>MSB</td><td>CT timer 3 on</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER3OFF</td><td>472</td><td>4</td><td>MSB</td><td>CT timer 3 off</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER3NPULSES</td><td>476</td><td>4</td><td>MSB</td><td>CT timer 3 number of pulses</td><td>268435455</td></tr>
+    <tr><td>CAMTIMER4DELAY</td><td>480</td><td>4</td><td>MSB</td><td>CT timer 4 delay</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER4ON</td><td>484</td><td>4</td><td>MSB</td><td>CT timer 4 on</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER4OFF</td><td>488</td><td>4</td><td>MSB</td><td>CT timer 4 off</td><td>268435455</td></tr>
+    <tr><td>CAMTIMER4NPULSES</td><td>492</td><td>4</td><td>MSB</td><td>CT timer 4 number of pulses</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER5DELAY</td><td>496</td><td>4</td><td>MSB</td><td>CT timer 5 delay</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER5ON</td><td>500</td><td>4</td><td>MSB</td><td>CT timer 5 on</td><td>268435455</td></tr>
+    <tr><td>CAMTIMER5OFF</td><td>504</td><td>4</td><td>MSB</td><td>CT timer 5 off</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER5NPULSES</td><td>508</td><td>4</td><td>MSB</td><td>CT timer 5 number of pulses</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER6DELAY</td><td>512</td><td>4</td><td>MSB</td><td>CT timer 6 delay</td><td>268435455</td></tr>
+    <tr><td>CAMTIMER6ON</td><td>516</td><td>4</td><td>MSB</td><td>CT timer 6 on</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER6OFF</td><td>520</td><td>4</td><td>MSB</td><td>CT timer 6 off</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER6NPULSES</td><td>524</td><td>4</td><td>MSB</td><td>CT timer 6 number of pulses</td><td>268435455</td></tr>
+    <tr><td>CAMTIMER7DELAY</td><td>528</td><td>4</td><td>MSB</td><td>CT timer 7 delay</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER7ON</td><td>532</td><td>4</td><td>MSB</td><td>CT timer 7 on</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER7OFF</td><td>536</td><td>4</td><td>MSB</td><td>CT timer 7 off</td><td>268435455</td></tr>
+    <tr><td>CAMTIMER7NPULSES</td><td>540</td><td>4</td><td>MSB</td><td>CT timer 7 number of pulses</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER8DELAY</td><td>544</td><td>4</td><td>MSB</td><td>CT timer 8 delay</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER8ON</td><td>548</td><td>4</td><td>MSB</td><td>CT timer 8 on</td><td>268435455</td></tr>
+    <tr><td>CAMCONTROL</td><td>552</td><td>2</td><td>MSB</td><td>CAM timer control</td><td>0</td></tr>
+    <tr><td>CAMTIMER8OFF</td><td>552</td><td>4</td><td>MSB</td><td>CT timer 8 off</td><td>20000</td></tr>
+    <tr><td>CAMCLKDIV</td><td>554</td><td>2</td><td>MSB</td><td>CAM timer clock divide value</td><td>20000</td></tr>
+    <tr><td>CAMOUTPUT</td><td>556</td><td>2</td><td>MSB</td><td>CAM timer output</td><td>3840</td></tr>
+    <tr><td>CAMTIMER8NPULSES</td><td>556</td><td>4</td><td>MSB</td><td>CT timer 8 number of pulses</td><td>251723775</td></tr>
+    <tr><td>CAMTIMER9DELAY</td><td>560</td><td>4</td><td>MSB</td><td>CT timer 9 delay</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER9ON</td><td>564</td><td>4</td><td>MSB</td><td>CT timer 9 on</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER9OFF</td><td>568</td><td>4</td><td>MSB</td><td>CT timer 9 off</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER9NPULSES</td><td>572</td><td>4</td><td>MSB</td><td>CT timer 9 number of pulses</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER10DELAY</td><td>576</td><td>4</td><td>MSB</td><td>CT timer 10 delay</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER10ON</td><td>580</td><td>4</td><td>MSB</td><td>CT timer 10 on</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER10OFF</td><td>584</td><td>4</td><td>MSB</td><td>CT timer 10 off</td><td>4294967295</td></tr>
+    <tr><td>CAMTIMER10NPULSES</td><td>588</td><td>4</td><td>MSB</td><td>CT timer 10 number of pulses</td><td>4294967295</td></tr>
+    <tr><th colspan='6'>Communication & Control Card variables</th></tr>
+    <tr><td>MANAGE_MAC</td><td>0</td><td>6</td><td>MSB</td><td>Management port MAC address</td><td>42:53:50:31:32:2d</td></tr>
+    <tr><td>MANAGE_IP</td><td>6</td><td>4</td><td>MSB</td><td>Management port IPv4 address</td><td>48.48.48.49</td></tr>
+    <tr><td>MANAGE_IP_MASK</td><td>10</td><td>4</td><td>MSB</td><td>Management port IPv4 network mask</td><td>66.83.70.49</td></tr>
+    <tr><td>MANAGE_LINK_ON</td><td>14</td><td>1</td><td>MSB</td><td>Management port link on</td><td>50</td></tr>
+    <tr><td>MANAGE_GW_STATE</td><td>15</td><td>1</td><td>MSB</td><td>Management port gateway state (0=none, 1=ok, 2=searching mac, 3=searching IP with DHCP)</td><td>45</td></tr>
+    <tr><td>MANAGE_IP_STATE</td><td>16</td><td>1</td><td>MSB</td><td>Management port IP state (1=ok, 3=searching IP with DHCP)</td><td>48</td></tr>
+    <tr><td>MANAGE_DHCP_STATE</td><td>17</td><td>1</td><td>MSB</td><td>Management port DHCP state (0=idle, 1=request, 2=discover)</td><td>48</td></tr>
+    <tr><td>MANAGE_GW_MAC</td><td>18</td><td>6</td><td>MSB</td><td>Management port gateway MAC address</td><td>30:31:2d:31:30:35</td></tr>
+    <tr><td>MANAGE_GW_IP</td><td>24</td><td>4</td><td>MSB</td><td>Management port gateway IPv4 address</td><td>1.5.7.231</td></tr>
+    <tr><td>MANAGE_DHCP_MAC</td><td>28</td><td>6</td><td>MSB</td><td>Management port DHCP server MAC address</td><td>c:6:ff:ff:ff:ff</td></tr>
+    <tr><td>MANAGE_DHCP_SERVER_IP</td><td>34</td><td>4</td><td>MSB</td><td>Management port DHCP server IPv4 address</td><td>255.255.255.255</td></tr>
+    <tr><td>MANAGE_IGMP_MAC</td><td>38</td><td>6</td><td>MSB</td><td>Management port IGMP switch MAC address</td><td>ff:ff:ff:ff:ff:ff</td></tr>
+    <tr><td>MANAGE_IGMP_IP</td><td>44</td><td>4</td><td>MSB</td><td>Management port IGMP switch IPv4 address</td><td>255.255.255.255</td></tr>
+    <tr><td>MANAGE_DHCP_LT</td><td>48</td><td>4</td><td>LSB</td><td>Management port DHCP lease time</td><td>50331665</td></tr>
+    <tr><td>MANAGE_ETHRX</td><td>52</td><td>4</td><td>LSB</td><td>Management port ethernet RX frames</td><td>4294967295</td></tr>
+    <tr><td>MANAGE_ETHTX</td><td>56</td><td>4</td><td>LSB</td><td>Management port ethernet TX frames</td><td>4294967295</td></tr>
+    <tr><td>STREAM_PORT_MAC</td><td>64</td><td>6</td><td>MSB</td><td>Stream port MAC address</td><td>1:31:30:20:47:42</td></tr>
+    <tr><td>STREAM_PORT_IP</td><td>70</td><td>4</td><td>MSB</td><td>Stream port IPv4 address</td><td>32.67.111.109</td></tr>
+    <tr><td>STREAM_PORT_IP_MASK</td><td>74</td><td>4</td><td>MSB</td><td>Stream port IPv4 network mask</td><td>109.117.110.105</td></tr>
+    <tr><td>STREAM_PORT_LINK_ON</td><td>78</td><td>1</td><td>MSB</td><td>Stream port link on</td><td>99</td></tr>
+    <tr><td>STREAM_PORT_GW_STATE</td><td>79</td><td>1</td><td>MSB</td><td>Stream port gateway state (0=none, 1=ok, 2=searching MAC, 3=searching IP with DHCP)</td><td>97</td></tr>
+    <tr><td>STREAM_PORT_IP_STATE</td><td>80</td><td>1</td><td>MSB</td><td>Stream port IP state (1=ok, 3=searching IP with DHCP)</td><td>116</td></tr>
+    <tr><td>STREAM_PORT_DHCP_STATE</td><td>81</td><td>1</td><td>MSB</td><td>Stream port DHCP state (0=idle, 1=request, 2=discover)</td><td>105</td></tr>
+    <tr><td>STREAM_PORT_GW_MAC</td><td>82</td><td>6</td><td>MSB</td><td>Stream port gateway MAC address</td><td>6f:6e:20:26:20:43</td></tr>
+    <tr><td>STREAM_PORT_GW_IP</td><td>88</td><td>4</td><td>MSB</td><td>Stream port gateway IPv4 address</td><td>111.110.116.114</td></tr>
+    <tr><td>STREAM_PORT_DHCP_MAC</td><td>92</td><td>6</td><td>MSB</td><td>Stream port DHCP server MAC address</td><td>6f:6c:20:43:61:72</td></tr>
+    <tr><td>STREAM_PORT_DHCP_IP</td><td>98</td><td>4</td><td>MSB</td><td>Stream port DHCP server IPv4 address</td><td>100.32.32.32</td></tr>
+    <tr><td>STREAM_PORT_IGMP_MAC</td><td>102</td><td>6</td><td>MSB</td><td>Stream port IGMP switch MAC address</td><td>20:20:20:20:20:20</td></tr>
+    <tr><td>STREAM_PORT_IGMP_IP</td><td>108</td><td>4</td><td>MSB</td><td>Stream port IGMP switch IPv4 address</td><td>32.32.32.32</td></tr>
+    <tr><td>STREAM_PORT_DHCP_LT</td><td>112</td><td>4</td><td>LSB</td><td>Stream port DHCP lease time</td><td>4294967072</td></tr>
+    <tr><td>STREAM_PORT_ETHRX</td><td>116</td><td>4</td><td>LSB</td><td>Stream port ethernet RX frames</td><td>1191182335</td></tr>
+    <tr><td>STREAM_PORT_ETHTX</td><td>120</td><td>4</td><td>LSB</td><td>Stream port ethernet TX frames</td><td>1869181813</td></tr>
+    <tr><td>MANAGE_ETHBUF</td><td>128</td><td>1</td><td>MSB</td><td>Management port ethernet buffers used</td><td>115</td></tr>
+    <tr><td>MANAGE_ETHBUFMAX</td><td>129</td><td>1</td><td>MSB</td><td>Management port ethernet buffers used max.</td><td>116</td></tr>
+    <tr><td>MANAGE_ETHDROP</td><td>132</td><td>4</td><td>LSB</td><td>Management port ethernet dropped frames</td><td>1953391981</td></tr>
+    <tr><td>MANAGE_TCPRX</td><td>136</td><td>4</td><td>LSB</td><td>Management port TCP RX packets</td><td>760431219</td></tr>
+    <tr><td>MANAGE_TCPTX</td><td>140</td><td>4</td><td>LSB</td><td>Management port TCP TX packets</td><td>1111961649</td></tr>
+    <tr><td>MANAGE_TCPESTCONN</td><td>144</td><td>4</td><td>LSB</td><td>Management port TCP established connections</td><td>826491693</td></tr>
+    <tr><td>MANAGE_TCPREJCONN</td><td>148</td><td>4</td><td>LSB</td><td>Management port TCP rejected connections</td><td>1174405171</td></tr>
+    <tr><td>MANAGE_TCPCLOCONN</td><td>152</td><td>4</td><td>LSB</td><td>Management port TCP closed connections</td><td>1869181813</td></tr>
+    <tr><td>MANAGE_TCPACTCONN</td><td>156</td><td>4</td><td>LSB</td><td>Management port TCP active connections</td><td>1850286190</td></tr>
+    <tr><td>MANAGE_TCPKATO</td><td>160</td><td>4</td><td>LSB</td><td>Management port TCP keep alive timeout</td><td>1970435187</td></tr>
+    <tr><td>MANAGE_TCPRETTO</td><td>164</td><td>4</td><td>LSB</td><td>Management port TCP retransmit timeout</td><td>4294913645</td></tr>
+    <tr><td>MANAGE_TCPRETRANS</td><td>168</td><td>4</td><td>LSB</td><td>Management port TCP retransmissions</td><td>4294967295</td></tr>
+    <tr><td>SYSTEMUPTIME</td><td>176</td><td>4</td><td>LSB</td><td>System up time [ms]</td><td>4294967295</td></tr>
+    <tr><td>HWERROR</td><td>180</td><td>2</td><td>LSB</td><td>Hardware error</td><td><span style='margin-right:20px;'>SDRAM(0): 1</span><span style='margin-right:20px;'>EEPROM(1): 1</span><span style='margin-right:20px;'>FPGA(2): 1</span><span style='margin-right:20px;'>FLASH(3): 1</span><span style='margin-right:20px;'>FLASH1(4): 1</span><span style='margin-right:20px;'>FLASH2(5): 1</span></td></tr>
+    <tr><td>IICERROR</td><td>182</td><td>2</td><td>LSB</td><td>IIC error</td><td><span style='margin-right:20px;'>NOACK(0): 1</span><span style='margin-right:20px;'>ADDOVG(1): 1</span><span style='margin-right:20px;'>POLL(2): 1</span></td></tr>
+    <tr><td>FPGAVH</td><td>185</td><td>1</td><td>MSB</td><td>FPGA program version high</td><td>255</td></tr>
+    <tr><td>FPGAVL</td><td>186</td><td>1</td><td>MSB</td><td>FPGA program version low</td><td>255</td></tr>
+    <tr><td>FPGA_STATUS</td><td>187</td><td>1</td><td>MSB</td><td>FPGA status</td><td><span style='margin-right:20px;'>BPLLLCK(0): 1</span><span style='margin-right:20px;'>SPLLLCK(1): 1</span><span style='margin-right:20px;'>EPLLLCK(2): 1</span><span style='margin-right:20px;'>EXTCLKVAL(3): 1</span><span style='margin-right:20px;'>CAMTIM(4..5): 3</span><span style='margin-right:20px;'>STRADC(6): 1</span><span style='margin-right:20px;'>OVLD(7): 1</span></td></tr>
+    <tr><td>STREAM_PORT_ETHSTAT</td><td>188</td><td>1</td><td>MSB</td><td>Stream port ethernet status</td><td><span style='margin-right:20px;'>XDCMLCK(0): 1</span><span style='margin-right:20px;'>XLNK(1): 1</span><span style='margin-right:20px;'>TXFULL(2): 1</span></td></tr>
+    <tr><td>EXTCLKFREQ</td><td>189</td><td>2</td><td>MSB</td><td>External clock frequench [kHz]</td><td>65535</td></tr>
+    <tr><td>DSLVLCK</td><td>191</td><td>1</td><td>MSB</td><td>DSLV lock status</td><td>255</td></tr>
+    <tr><td>STREAM_PORT_RXERRCNT</td><td>192</td><td>2</td><td>MSB</td><td>Stream port RX error counter</td><td>65535</td></tr>
+    <tr><td>STREAM_PORT_RXOVFCNT</td><td>194</td><td>2</td><td>MSB</td><td>Stream port RX overflow counter</td><td>65535</td></tr>
+    <tr><td>STREAM_PORT_RXPKTCNT</td><td>196</td><td>2</td><td>MSB</td><td>Stream port RX packetk counter</td><td>65535</td></tr>
+    <tr><td>TRIGSTATE</td><td>198</td><td>1</td><td>MSB</td><td>Trigger status</td><td><span style='margin-right:20px;'>ETR(0): 0</span><span style='margin-right:20px;'>ETF(1): 1</span><span style='margin-right:20px;'>IT(2): 0</span><span style='margin-right:20px;'>CTR(3): 1</span><span style='margin-right:20px;'>CTF(4): 0</span><span style='margin-right:20px;'>SWT(5): 0</span><span style='margin-right:20px;'>G1(6): 0</span><span style='margin-right:20px;'>G2(7): 0</span></td></tr>
+    <tr><td>SPAREIOIN</td><td>199</td><td>1</td><td>MSB</td><td>Spare IO input</td><td><span style='margin-right:20px;'>INVAL0(0): 1</span><span style='margin-right:20px;'>INVAL1(1): 1</span><span style='margin-right:20px;'>INVAL2(2): 0</span><span style='margin-right:20px;'>INVAL3(3): 1</span></td></tr>
+    <tr><td>STATUS</td><td>208</td><td>4</td><td>LSB</td><td>Status</td><td><span style='margin-right:20px;'>WEBBSY(0): 0</span><span style='margin-right:20px;'>STBSY(1): 0</span></td></tr>
+    <tr><td>FUPCHKSUM</td><td>264</td><td>4</td><td>MSB (???)</td><td>FUP checksum</td><td>4294967295</td></tr>
+    <tr><td>FUPPROGR</td><td>268</td><td>1</td><td>MSB</td><td>FUP in process</td><td>255</td></tr>
+    <tr><td>BOARDTEMP</td><td>269</td><td>1</td><td>MSB</td><td>Board temperature [C]</td><td>255</td></tr>
+    <tr><td>VDD33</td><td>272</td><td>2</td><td>LSB</td><td>VDD 3.3V voltage [mV] (main power supply)</td><td>65535</td></tr>
+    <tr><td>VDD25</td><td>274</td><td>2</td><td>LSB</td><td>VDD 2.5V voltage [mV]</td><td>65535</td></tr>
+    <tr><td>VDD18</td><td>276</td><td>2</td><td>LSB</td><td>VDD 1.8V XC voltage [mV] (Xilinx FPGA)</td><td>65535</td></tr>
+    <tr><td>VDD12</td><td>278</td><td>2</td><td>LSB</td><td>VDD 1.2V ST voltage [mV] (core voltage of Stellaris Microcontroll.)</td><td>65535</td></tr>
+    <tr><td>SCBVER</td><td>280</td><td>2</td><td>MSB (???)</td><td>SCB controller version</td><td>65535</td></tr>
+    <tr><td>MARVELLBC</td><td>282</td><td>2</td><td>MSB</td><td>Marvell boot counter (for internal use)</td><td>65535</td></tr>
+    <tr><td>DEBUGSTATE</td><td>292</td><td>2</td><td>MSB</td><td>Debug state (for internal use)</td><td>65535</td></tr>
+    <tr><td>MAXBOARDTEMP</td><td>295</td><td>1</td><td>MSB</td><td>Maximum board temperature</td><td>255</td></tr>
+    <tr><td>MAXVDD33</td><td>296</td><td>2</td><td>LSB (???)</td><td>Maximum VDD 3.3V</td><td>65535</td></tr>
+    <tr><td>SAMPLECOUNT1</td><td>316</td><td>6</td><td>MSB (???)</td><td>Actual value ofo the stream #4 sample counter</td><td>281474976645135</td></tr>
+  </table></body></html>

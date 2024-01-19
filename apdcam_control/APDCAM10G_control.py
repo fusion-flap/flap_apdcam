@@ -1760,7 +1760,11 @@ class APDCAM10G_control:
             "" or error txt
 
         """
-        
+
+        if (platform.platform().lower()[:len('windows')] == 'windows'):
+            print("Windows system detected. Cannot determine interface. Measuement does not work with APDTest.")
+            self.interface =  " "
+            return ""        
         ip = self.getIP()
         net = ip.split('.')
         net = net[0]+'.'+net[1]+'.'+net[2]+'.'

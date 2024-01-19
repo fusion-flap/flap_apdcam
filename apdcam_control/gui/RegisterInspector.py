@@ -519,7 +519,7 @@ class RegisterInspector(QtWidgets.QWidget):
             if reg.longDescription != '':
                 lll.setToolTip(reg.longDescription)
             self.registerTableLayout.addWidget(lll,line,4)
-            self.html += "<td title='" = html.escape(reg.longDescription) + "'>" + tmp + "</td>"
+            self.html += "<td title='" + html.escape(reg.longDescription) + "'>" + tmp + "</td>"
 
             lll = QtWidgets.QFrame()
             lll.setFrameStyle(QtWidgets.QFrame.Box)

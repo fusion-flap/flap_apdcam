@@ -31,6 +31,7 @@ import numpy as np
 from datetime import date
 #import struct
 import sys
+import platform
 
 # Sorry, probably worst practice, could not get it working without explicitely
 # specifying the directory for the APDCAM10G_registers script
@@ -706,7 +707,7 @@ class Terminal:
     def show_warning(self,s):
         print(self.WARNING + s + self.ENDCs)
     def show_error(self,s):
-        print(self.FAIL + s + self.ENDCs)
+        print(self.FAIL + s + self.ENDC)
         
 class APDCAM10G_control:
     """
@@ -1763,7 +1764,7 @@ class APDCAM10G_control:
 
         if (platform.platform().lower()[:len('windows')] == 'windows'):
             print("Windows system detected. Cannot determine interface. Measuement does not work with APDTest.")
-            self.interface =  " "
+            self.interface =  ""
             return ""        
         ip = self.getIP()
         net = ip.split('.')
@@ -3301,7 +3302,7 @@ class APDCAM10G_control:
         Parameters
         ^^^^^^^^^^
         n : int
-            The HV teneratlr number (1...)
+            The HV generator number (1...)
 
         on: bool
             If true, switches the given generator on. If false, switches off
@@ -3727,7 +3728,12 @@ class APDCAM10G_control:
             return err,"",None
 
         if (dataReceiver.lower() == 'apdtest'):
-        
+            if (self.interface == ""):
+                error = "Cannot measure, as network interface could not be found." 
+                logger.show_error(error)
+                return error,"",None 
+
+                
             cmdfile_name = "apd_python_meas.cmd"
             cmdfile = datapath+'/'+cmdfile_name
             logger.show_message("[MEASUREMENT] Command file: " + cmdfile)

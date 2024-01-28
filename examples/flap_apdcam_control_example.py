@@ -24,10 +24,10 @@ flap_apdcam.register()
 
 def apdcam_control_example(camera_type = 'APDCAM-10G_8x16A'):
     # Creating an APDCAM control class variable
-    apdcam = apdcam_control.APDCAM10G_regCom()
+    apdcam = apdcam_control.APDCAM10G_control()
     # Connecting to the camera with the default address
     print("Connecting...")
-    ret = apdcam.connect(ip="10.123.13.102")
+    ret = apdcam.connect(ip="10.123.13.101")
     if (ret != ""):
         print("{:s}".format(ret))
         apdcam.close()
@@ -42,7 +42,7 @@ def apdcam_control_example(camera_type = 'APDCAM-10G_8x16A'):
     print("Connected. Number of channels: {:d}.".format(len(apdcam.status.ADC_address) * 32))
     
     # Enabling HV
-    ret = apdcam.enableHV()
+    ret = apdcam.hvEnable(True)
     if (ret != ""):
         print("Error enabling HV.")
         apdcam.close()
@@ -50,7 +50,7 @@ def apdcam_control_example(camera_type = 'APDCAM-10G_8x16A'):
     
     # Switching on detector HVs. It is assumed that the value is already set.
     for i in range(4):
-        ret = apdcam.HVOn(i + 1)
+        ret = apdcam.hvOnOff(i + 1, True)
         if (ret != ""):
             print("Error switching on HV{:d}.".format(i + 1))
             apdcam.close()
@@ -67,20 +67,16 @@ def apdcam_control_example(camera_type = 'APDCAM-10G_8x16A'):
     # Measurement lengt 0.1 s
     meas_length = 0.1
     numberOfSamples = int(round(meas_length * samplerate * 1E6))
-    
-    # Software trigger
-    externalTriggerPolarity = None
-     
+         
     #Startting measurement. Placing data in directory 'data'
     # This will return when the measurement is done
     # To return when it has been started set waitForResult to False and use apdcam.measurementStatus()
-    err, warning = apdcam.measure(numberOfSamples=numberOfSamples,
+    err, warning,data = apdcam.measure(numberOfSamples=numberOfSamples,
                                   channelMasks=channel_masks,
                                   sampleDiv=sampleDiv,
                                   datapath="data",
                                   bits=14,
                                   waitForResult=True,
-                                  externalTriggerPolarity=externalTriggerPolarity,
                                   triggerDelay=0
                                   )
     if (warning != ''):
@@ -91,7 +87,7 @@ def apdcam_control_example(camera_type = 'APDCAM-10G_8x16A'):
         return
    
     # Disabling HV
-    ret = apdcam.disableHV()
+    ret = apdcam.hvEnable(True)
     if (ret != ""):
         print("Error disabling HV.")
         apdcam.close()

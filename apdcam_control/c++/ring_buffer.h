@@ -48,7 +48,18 @@ namespace apdcam10g
     private:
         mutable rw_mutex mutex_;
 
+        // The capacity (allocated continuous memory) to store data in a cyclic way
         unsigned int capacity_ = 0;
+
+        // The user can request to allocate an extended continuous memory region for the following purpose.
+        // The data will normally still be only stored in the 'normal' memory region, i.e.
+        // in the range [0..capacity_[, but the underlying continuous memory region will be longer, so that
+        // if some client can only handle a continuous memory region when reading, and it wants to access
+        // a range of data that is split (at the end of the buffer, and at the beginning), then instead
+        // of copying/merging both of these two data segments into a newly allocated continuous memory,
+        // only the segment at the beginning of the ring buffer needs to be copied to the end (if there is
+        // sufficient space available)
+        unsigned int extended_capacity_ = 0;
 
         T *buffer_= 0; // Pointer to the first object of the available buffer space
 
@@ -65,9 +76,9 @@ namespace apdcam10g
     public:
         typedef T type;
 
-        ring_buffer(unsigned int capacity=0)
+        ring_buffer(unsigned int capacity=0, unsigned int extended_capacity=0)
         {
-            resize(capacity);
+            resize(capacity,extended_capacity);
         }
         ~ring_buffer()  
         { 
@@ -79,7 +90,7 @@ namespace apdcam10g
         // and will be in an undefinite state
         ring_buffer(const ring_buffer<T,S> &rhs) : mutex_() 
         {
-            resize(rhs.capacity_);
+            resize(rhs.capacity_,rhs.extended_capacity_);
             for(unsigned int i=rhs.front_index_; i%capacity_<rhs.back_index_; ++i)
             {
                 buffer_[i%capacity_] = rhs.buffer_[i%capacity_];
@@ -124,20 +135,30 @@ namespace apdcam10g
             // This is just the same code (should be) as 'size()'
         }
 
-        // Allocate a given size of memory for the buffer, and initialize the write/read
-        // pointers to the beginning of the buffer. Reset the counter to zero.
-        void resize(unsigned int capacity) 
+        // Allocate memory for storing the data. The size of the allocated memory that will be available for
+        // writing data is 'capacity', but if the argument 'extended_capacity' is not zero (and in this case must
+        // be larger or equal to capacity), then in fact a larger memory region of size extended_capacity is
+        // allocated. This extra space will allow copying data segments from the beginning of the buffer
+        // to the end to make data available in a continuous way for clients that only can use data this way.
+        // That is, we do not need to copy two data segments (from the end and from the beginning of the buffer)
+        // to a newly allocated continuous memory in this case, but only the segment from the beginning of the buffer.
+        // Initialize the write/read pointers to the beginning of the buffer. Reset the counter to zero.
+        void resize(unsigned int capacity,unsigned int extended_capacity=0) 
         {
-            rw_mutex::write_lock wl(mutex_);
+            if(extended_capacity==0) extended_capacity=capacity;
+            if(extended_capacity<capacity) APDCAM_ERROR("Extended capacity must not be smaller than capacity");
 
-            capacity_ = capacity;
+            rw_mutex::write_lock wl(mutex_);
 
             // If there is previously reserved buffer, unlock it first, and then free it
             if(buffer_)
             {
-                if(::munlock(buffer_,sizeof(T)*capacity_) != 0) APDCAM_ERROR_ERRNO(errno);
+                if(::munlock(buffer_,sizeof(T)*extended_capacity_) != 0) APDCAM_ERROR_ERRNO(errno);
                 delete [] buffer_;
             }
+
+            capacity_ = capacity;
+            extended_capacity_ = extended_capacity_;
 
             // These settings themselves would be equivalent to a full buffer, but the empty_ flag indicates
             // it is in fact empty.
@@ -154,8 +175,8 @@ namespace apdcam10g
             // resized later
             if(capacity_==0) return;
 
-            buffer_ = new T[capacity];
-            if(::mlock(buffer_,sizeof(T)*capacity) != 0) APDCAM_ERROR_ERRNO(errno);
+            buffer_ = new T[extended_capacity];
+            if(::mlock(buffer_,sizeof(T)*extended_capacity) != 0) APDCAM_ERROR_ERRNO(errno);
         }
 
         // WARNING! This function is not thread-safe in the sense that even though it returns low-level memory pointers
@@ -214,6 +235,42 @@ namespace apdcam10g
             return {buffer_+start,size1,buffer_,size2};
         }
 
+        // The same as read_region, but if the requested data is only available in a split way, copy
+        // the segment from the beginng of the buffer to the end (into the extended memory region), if it fits.
+        // If it does not fit, or if the required amount of data is not available, return zero
+        // Note that data copying is made by memcpy, i.e. not by object copy constructors. 
+        T* read_region_continuous(unsigned int read_size, unsigned int offset=0)
+        {
+            rw_mutex::read_lock rl(mutex_);
+            if((empty_ ? 0 : (back_index_ + (back_index_<front_index_?capacity_:0))-front_index_+1) < offset+read_size) return 0;
+            //  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  this is equivalent to 'size()'
+            const unsigned int start = (front_index_+offset)%capacity_;
+
+            // If this size is available continuously, just return
+            if(start+read_size <= capacity_) return buffer_+start;
+
+            // If the flattened data would not fit into the extended range, return zero
+            if(start+read_size >= extended_capacity_) return 0;
+
+
+            const unsigned int size1 = capacity_ - start; // front_index_ is less than capacity_, guaranteed, so subtracting these two unsigned ints is ok
+            const unsigned int size2 = read_size-size1;
+            memcpy(buffer_+capacity_,buffer_,size2*sizeof(T));
+            return buffer_+start;
+        }
+
+        // The same as read_region_continuous, but accessing a data range by the absolute object counter.
+        T *operator()(unsigned int counter_from, unsigned int counter_to)
+        {
+            if(S==safe)
+            {
+                if(counter_from < front_counter_ || back_counter_ <= counter_to) APDCAM_ERROR("Trying to access out-of-range data by counter in ring buffer");
+            }
+            unsigned int offset = counter_from - front_counter_;
+            unsigned int read_size = counter_to - counter_from + 1;
+            return read_region_continuous(read_size,offset);
+        }
+        
         // Iterators
         
         class iterator
@@ -401,6 +458,8 @@ namespace apdcam10g
             return buffer_[(front_index_+counter-front_counter_)%capacity_];
         }
 
+        
+        
 
         // Access objects indexed from the front of the buffer. That is, offset=0 will return the front object
         // With 'S'=='safe', range checking is done and out-of-range access will throw apdcam10g::error

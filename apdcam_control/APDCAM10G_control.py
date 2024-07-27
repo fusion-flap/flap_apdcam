@@ -702,11 +702,11 @@ class Terminal:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-    def show_message(self,s):
+    def showMessage(self,s):
         print(s)
-    def show_warning(self,s):
-        print(self.WARNING + s + self.ENDCs)
-    def show_error(self,s):
+    def showWarning(self,s):
+        print(self.WARNING + s + self.ENDC)
+    def showError(self,s):
         print(self.FAIL + s + self.ENDC)
         
 class APDCAM10G_control:
@@ -736,7 +736,7 @@ class APDCAM10G_control:
         self.UDP_data = None  # This will collect UDP commands before sending them
         self.status = APDCAM10G_status()
         self.measurePara = measurePara_class()
-        self.versionCode = None;  # code for firmware type 0: before 105, 1: from 105
+        self.version = None;  # code for firmware type 0: before 105, 1: from 105
 #        self.HV_conversion_out = [0.12, 0.12, 0.12, 0.12] # V/digit   # Removed by D. Barna
 #        self.HV_conversion_in  = [0.12, 0.12, 0.12, 0.12] # V/digit   # Removed by D. Barna
         self.HV_conversion  = [0.12, 0.12, 0.12, 0.12] # V/digit       # Added by D. Barna
@@ -791,17 +791,9 @@ class APDCAM10G_control:
             err = "Unknown camera firmware."
             self.close()
             return err
-        v = int(self.status.CC_firmware[11:14])
+        self.version = int(self.status.CC_firmware[11:14])
 
-        self.log("Firmware version: " + str(v))
-
-        # Set up firmware-dependent command codes
-        if (v < 105):
-            self.versionCode = 0
-        else:
-            self.versionCode = 1        
-        
-        if (self.versionCode == 0) :
+        if (self.version < 105) :
             self.codes_CC  = APDCAM10G_codes_v1()
             self.codes_ADC = APDCAM10G_ADCcodes_v1()
             self.codes_PC  = APDCAM_PCcodes_v1()
@@ -845,7 +837,7 @@ class APDCAM10G_control:
                 self.status.ADC_FPGA_version.append(str(int.from_bytes([d[5]],'little',signed=False))+\
                                         "."+str(int.from_bytes([d[6]],'little',signed=False)))
                 self.status.ADC_MC_version.append(str(int.from_bytes([d[1]],'little',signed=False))+\
-                                        "."+str(int.from_bytes([d[1]],'little',signed=False)))
+                                        "."+str(int.from_bytes([d[2]],'little',signed=False)))
         if (len(self.status.ADC_address) == 0) :
             self.close()
             return "No ADC board found."
@@ -876,6 +868,10 @@ class APDCAM10G_control:
         if (ret != ""):
             return ret
         self.dualSATA = ds
+
+        if self.version >= 105:
+            self.setAdcStreamMode('all','off')
+
         return ""
         
     def close(self):
@@ -965,7 +961,12 @@ class APDCAM10G_control:
             Other error text relating to network
         """
         import socket
-        
+
+        #if opCode != None:
+        #    print("sendCommand: " + hex(opCode) + ", " + str(len(userData)) + ", " + str([hex(userData[i]) for i in range(len(userData))]))
+        #else:
+        #    print("sendCommand: None")
+
         self.lock.acquire()
         # if there is now half-written UDP packet starting a new
         if self.UDP_data == None :
@@ -976,12 +977,12 @@ class APDCAM10G_control:
                 c_len = len(userData)
                 UDP_command_block += bytes([c_len//256])+bytes([c_len%256])+userData
             else :
-                UDP_command_block += bytes(2)
+                UDP_command_block += bytes(2) # Shouldn't it be initialized to zero? Or is it automatically done?
             self.UDP_data += UDP_command_block
         if sendImmediately == False :
             self.lock.release()
             return ""
-        if self.UDP_data == None :
+        if self.UDP_data == None :  # this will never occur... (!)
             self.lock.release()
             return "No data to send"        
         try:
@@ -1762,10 +1763,12 @@ class APDCAM10G_control:
 
         """
 
+        # Added by S. Zoletnik (2024. January 19)
         if (platform.platform().lower()[:len('windows')] == 'windows'):
             print("Windows system detected. Cannot determine interface. Measuement does not work with APDTest.")
             self.interface =  ""
             return ""        
+        
         ip = self.getIP()
         net = ip.split('.')
         net = net[0]+'.'+net[1]+'.'+net[2]+'.'
@@ -2072,13 +2075,48 @@ class APDCAM10G_control:
         err = self.sendCommand(self.codes_CC.OP_WRITEPDI,data,sendImmediately=True)
         return err
 
+    def setAdcStreamMode(self,adcBoardNo,mode):
+        """
+        Sets the stream mode of the given ADC.
+
+        Parameters
+        ^^^^^^^^^^
+        adcBoardNo: int(1..4) or the string 'all'
+            The ADC board number (1..4) or 'all' if the stream mode of all ADC board is to be set
+        mode: string or integer
+            Possible string values: 'Off', 'Continuous', 'Gated', 'Triggered' (case insensitive)
+            Possible integer values: 0b00, 0b01,         0b10,    0b11
+
+        Returns
+        ^^^^^^^
+        error message, or empty string
+
+        """
+
+        print("Set ADC stream mode for " + str(adcBoardNo) + ": " + mode)
+
+        if self.version < 105:
+            return "ADC stream mode can only be set for version >=1.05"
+
+        if mode == 0b00 or mode.lower() == 'off':
+            return self.setAdcRegisterBit(adcBoardNo,self.ADC_registers.STREAMCONTROL.STREAMMODE,0)
+        if mode == 0b01 or mode.lower() == 'continuous':
+            return self.setAdcRegisterBit(adcBoardNo,self.ADC_registers.STREAMCONTROL.STREAMMODE,0b01)
+        if mode == 0b10 or mode.lower() == 'gated':
+            return self.setAdcRegisterBit(adcBoardNo,self.ADC_registers.STREAMCONTROL.STREAMMODE,0b10)
+        if mode == 0b11 or mode.lower() == 'triggered':
+            return self.setAdcRegisterBit(adcBoardNo,self.ADC_registers.STREAMCONTROL.STREAMMODE,0b11)
+
+        return "Bad mode: " + str(mode)
+
+
     def setAdcResolution(self,adcBoardNo,bits):
         """
         Set the data resolution
 
         Parameters
         ^^^^^^^^^^
-        adcBoardNo: int(1..4) or string
+        adcBoardNo: int(1..4) or string the string 'all'
             The ADC board number (1..4) or 'all' if the resolution of all ADC boards is to be set
         bits: 8, 12 or 14
             The number of bits (resolution)
@@ -2151,7 +2189,11 @@ class APDCAM10G_control:
         Error message or empty string
         """
 
-        return self.setAdcRegister(adcBoardNo,self.ADC_registers.RINGBUFSIZE,size)
+        print("Setting ring buffer size of adc: " + str(adcBoardNo) + " --> " + str(size))
+
+        if hasattr(self.ADC_registers,'RINGBUFSIZE'):
+            return self.setAdcRegister(adcBoardNo,self.ADC_registers.RINGBUFSIZE,size)
+        return self.setAdcRegisterBit(adcBoardNo,self.ADC_registers.STREAMCONTROL.RBSIZE,size)
 
     def getRingBufferSize(self,adcBoardNo):
         """
@@ -3397,6 +3439,8 @@ class APDCAM10G_control:
         if not hasattr(self.codes_CC,"OP_SETG2GATEMODULE"):
             return "APDCAM10G.set_gate can not be used for this firmware"
 
+        print("Setting gate")
+
         data = 0
         if externalGateEnabled:
             data |= 1<<1
@@ -3413,9 +3457,11 @@ class APDCAM10G_control:
         if swGate:
             data |= 1<<7
 
-        return self.sendCommand(self.codes_CC.OP_SETG2GATEMODULE,data,sendImmediately=True)
+        print(bin(data))
 
-    def setTrigger(self, externalTriggerPos=False, externalTriggerNeg=False, internalTrigger=False, camTimer0Pos=None, camTimer0Neg=None, softwareTrigger=None, clearOutput=None, clearTriggerStatus=None, triggerDelay = 0, disableWhileStreamsOff = None):
+        return self.sendCommand(self.codes_CC.OP_SETG2GATEMODULE,bytearray([data]),sendImmediately=True)
+
+    def setTrigger(self, externalTriggerPos=False, externalTriggerNeg=False, internalTrigger=False, camTimer0Pos=None, camTimer0Neg=None, softwareTrigger=None, clearOutput=None, clearTriggerStatus=None, triggerDelay = 0, disableWhileStreamsOff = None, numberOfSamples = None):
         """
         Sets the trigger scheme in the camera. New implementation by D. Barna
 
@@ -3439,7 +3485,7 @@ class APDCAM10G_control:
             (only available in firmware v1.05 or above, it is ignored otherwise with an error message)
         
         softwareTrigger: boolean
-            Enable a software trigger flag as a gate signal
+            Generate a software trigger
             (only available in firmware v1.05 or above, it is ignored otherwise with an error message)
 
         clearOutput: boolean
@@ -3448,15 +3494,28 @@ class APDCAM10G_control:
 
         clearTriggerStatus: boolean
 
-
         triggerDelay:       Trigger with this delay [microsec]
 
         disableWhileStreamsOff: ???
+
+        numberOfSamples: int
+            The number of samples to be recorded. Only effective if the ADCs are in 'gated' mode, and
+            a trigger event occurs (either by some hardware input, or by software, now, if the softwareTrigger
+            flag is set to true.
 
         Returns
         ^^^^^^^
         Error message or empty string
         """
+
+        if softwareTrigger and (externalTriggerPos or externalTriggerNeg or internalTrigger or camTimer0Pos or camTimer0Neg):
+            return "Either a software trigger, or the combination of hardware triggers can be specified, but not both"
+
+        if clearTriggerStatus and (softwareTrigger or externalTriggerPos or externalTriggerNeg or internalTrigger or camTimer0Pos or camTimer0Neg):
+            return "clearTriggerStatus can not be specified with any other triggers"
+
+        if clearOutput and (softwareTrigger or externalTriggerPos or externalTriggerNeg or internalTrigger or camTimer0Pos or camTimer0Neg):
+            return "clearOutput can not be specified with any other triggers"
 
         error = ""
 
@@ -3465,6 +3524,7 @@ class APDCAM10G_control:
         else:
             triggerDelay = int(triggerDelay)
 
+        # The control byte (#5) of the command
         control=0
 
         if hasattr(self.codes_CC,"OP_SETTRIGGER"):
@@ -3515,9 +3575,22 @@ class APDCAM10G_control:
         user_data = bytes([control]) + triggerDelay.to_bytes(4,'big',signed=False) 
         if hasattr(self.codes_CC,"OP_SETTRIGGER"):
             err = self.sendCommand(self.codes_CC.OP_SETTRIGGER,user_data,sendImmediately=True)
+
+        # For FW version >=1.05 we need to append the number of samples to the data bytes of this command
         elif hasattr(self.codes_CC,"OP_SETG1TRIGGERMODULE"):
-            user_data += self.status.CC_settings[self.codes_CC.CC_REGISTER_SAMPLECOUNT:self.codes_CC.CC_REGISTER_SAMPLECOUNT+6]
+            # If the user provided number of samples as a function argument, use this
+            if numberOfSamples is not None:
+                user_data += numberOfSamples.to_bytes(6,'big',signed=False)
+            # otherwise use the value stored in the corresponding camera register
+            else:
+                #user_data += self.status.CC_settings[self.codes_CC.CC_REGISTER_SAMPLECOUNT:self.codes_CC.CC_REGISTER_SAMPLECOUNT+6]
+                user_data += self.CC_settings.SAMPLECOUNT(self.status.CC_settings).to_bytes(6,'big',signed=False)
+            print("SETG1TRIGGERMODULE user data: ")
+            for i in range(len(user_data)):
+                print(hex(user_data[i]))
             err = self.sendCommand(self.codes_CC.OP_SETG1TRIGGERMODULE,user_data,sendImmediately=True)
+            print("command is sent")
+
         if (err != ""):
             error += ("\n" if error != "" else "") + err
 
@@ -3540,11 +3613,28 @@ class APDCAM10G_control:
            if (err != ""):
                return "Error clearing internal trigger"
         return ""
-           
+
+    def startContinuousData(self):
+        print("======================= start continuous data stream for 100 samples ======================")
+        # Enable all streams
+        data = bytes([15])
+        self.sendCommand(self.codes_CC.OP_SETSTREAMCONTROL,data,sendImmediately=True)
+
+        self.setAdcStreamMode('all','off')
+        time.sleep(1)
+        self.setAdcStreamMode('all','gated')
+
+        #             SWT     Delay    
+        data = bytes([0x20,   0,0,0,0,   0,0,0,0,0,0x64])
+        self.sendCommand(self.codes_CC.OP_SETG1TRIGGERMODULE,data,sendImmeidately=True)
+
     # def measure(self,numberOfSamples=100000, channelMasks=[0xffffffff,0xffffffff, 0xffffffff, 0xffffffff], \
     #             sampleDiv=10, datapath="data", bits=14, waitForResult=0, externalTriggerPolarity=None,\
     #             internalTrigger=False, internalTriggerADC=None,  triggerDelay=0, data_receiver='APDTest'):
-    def measure(self,numberOfSamples=None, \
+    def measure(self,
+                streamMode=None, \
+                numberOfSamples=None, \
+                generateSwTriggerWithDelay=None,
                 channelMasks=None, \
                 sampleDiv=None, \
                 datapath="data",
@@ -3557,14 +3647,27 @@ class APDCAM10G_control:
                 triggerDelay=0, \
                 dataReceiver='APDTest',
                 timeout=10000000,
-                logger=Terminal()):
+                logger=Terminal(),
+                onProgress=None
+                ):
         """
         Start measurement in APDCAM.
         
         Parameters
         ^^^^^^^^^^
+        streamMode : string
+            Stream mode, obligatory for firmware 1.05, must not be given for earlier firmware versions
+            'Continuous', 'Gated' or 'Triggered' (case insensitive)
         numberOfSamples : int, optional
             The number of samples to measure in one ADC channel. The default is 100000.
+        generateSwTriggerWithDelay : int
+            If not the default None, after setting up the camera (ADC stream modes, streams started, etc),
+            generate a software trigger with this delay (in microsecs)
+            It is useful if you want to start the measurement immediately, without waiting for any
+            internal or external trigger event. Note that trigger conditions (such as external trigger enabled, etc)
+            set earlier are not changed, so if these occur during the wait period, they can trigger
+            the data sampling/transmission earlier than specified by this argument. If you want precise control,
+            disable all triggers before.
         channelMasks : list of integers, length must be the same as number of ADC boards, optional
             Channel masks to enable ADC channel. Each bit enables one channel. 
             If omitted, the status is obtained from the registers CHENABLEx (x=1..4)
@@ -3608,7 +3711,12 @@ class APDCAM10G_control:
         timeout: int (10000000)
             Timeout in milliseconds for the external data acquisition program APDtest
         logger: object
-            An object that must have  show_message(string), show_warning(string) and show_error(string) functions to show eventual messages
+            An object that must have  showMessage(string), showWarning(string) and showError(string) functions to show eventual messages
+
+        onProgress: a function that will be periodically executed during data acquisition. It can inform the calling thread about the progress.
+            It must have two arguments: a floating point value (which will have a value between 0..1 indicating the progress), and a string,
+            which gives a textual information about the progress or anything that is happening.
+            It must return a boolean. If it returns True, data acquisition continues. False will cause data acquisition to be stopped.
 
         Returns
         ^^^^^^^
@@ -3622,7 +3730,18 @@ class APDCAM10G_control:
 
         """
 
-        logger.show_message("[MEASUREMENT] Starts")
+        logger.showMessage("[MEASUREMENT] Starts")
+
+        # Argument consistency checks
+        if self.version >= 105:
+            if streamMode is None:
+                return "Stream mode must be specified for firmware version >=1.05"
+        else:
+            if streamMode is not None:
+                return "Stream mode must not be given for firmware version <1.05"
+
+#        if streamMode is not None and streamMode.lower() != 'gated' and numberOfSamples is not None:
+#            return "Number of samples can only be specified if stream mode is 'gated'"
 
         self.readStatus()
 
@@ -3640,7 +3759,7 @@ class APDCAM10G_control:
                     err,r = self.getAdcRegister(adc+1,self.ADC_registers.CHENABLE[i])
                     if err != "":
                         error = "Error reading the channel enabled status from the camera: " + err 
-                        logger.show_error(error)
+                        logger.showError(error)
                         return error,"",None
                     tmp[i] = r()
                 chmask[adc] = int.from_bytes(tmp,'big')
@@ -3662,7 +3781,7 @@ class APDCAM10G_control:
         if (bits != None):
             err = self.setAdcResolution('all',bits)
             if err!='':
-                logger.show_error(err)
+                logger.showError(err)
                 return err,"",None
             self.measurePara.bits = bits
         else:
@@ -3670,26 +3789,37 @@ class APDCAM10G_control:
             for i in range(len(resolutions)-1):
                 if resolutions[0] != resolutions[i+1]:
                     error = "ADC blocks have different resolution setting." 
-                    logger.show_error(error)
+                    logger.showError(error)
                     return error,"",None
             if resolutions[0] != 8 and resolutions[0] != 12 and resolutions[0] != 14:
                 error = "Invalid bit resolution setting in ADCs." 
-                logger.show_error(error)
+                logger.showError(error)
                 return error,"",None 
             bits = resolutions[0]
             self.measurePara.bits = resolutions[0]
 
+        trigstate = None
+        if hasattr(self.CC_settings,"TRIGSTATE"):
+            trigstate = self.CC_settings.TRIGSTATE
+        elif hasattr(self.CC_settings,"G1TRIGCONTROL"):
+            trigstate = self.CC_settings.G1TRIGCONTROL
+
+        # IF TRIGGERS ARE NOT SPECIFIED, DO WE NEED TO READ THE TRIGGER SETTINGS FROM THE CAMERA AND WRITE IT BACK???
+        
         # Trigger settings
         if externalTriggerPos is None: # default value, i.e. parameter not specified, then take it from the camera
-            externalTriggerPos = bool(self.status.CC_settings[self.codes_CC.CC_REGISTER_TRIGSTATE] & (1<<0))
+            #externalTriggerPos = bool(self.status.CC_settings[self.codes_CC.CC_REGISTER_TRIGSTATE] & (1<<0))
+            externalTriggerPos = trigstate.ETR(self.status.CC_settings)
+
         if externalTriggerNeg is None: 
-            externalTriggerNeg = bool(self.status.CC_settings[self.codes_CC.CC_REGISTER_TRIGSTATE] & (1<<1))
+            externalTriggerNeg = trigstate.ETF(self.status.CC_settings)
 
         if internalTrigger is None: # default value, i.e. parameter not specified, then take it from the camera
-            internalTrigger = bool(self.status.CC_settings[self.codes_CC.CC_REGISTER_TRIGSTATE] & (1<<2))
+            internalTrigger = trigstate.IT(self.status.CC_settings)
 
         if triggerDelay is None: # default value, i.e. parameter not specified, then take it from the camera
-            triggerDelay = int.from_bytes(self.status.CC_settings[self.codes_CC.CC_REGISTER_TRIGDELAY:self.codes_CC.CC_REGISTER_TRIGDELAY+4],'big')
+            #triggerDelay = int.from_bytes(self.status.CC_settings[self.codes_CC.CC_REGISTER_TRIGDELAY:self.codes_CC.CC_REGISTER_TRIGDELAY+4],'big')
+            triggerDelay = self.CC_settings.TRIGDELAY(self.status.CC_settings)
 
         if hasattr(self.codes_CC,"OP_SETTRIGGER"):
             err = self.setTrigger(externalTriggerPos=externalTriggerPos,
@@ -3697,7 +3827,7 @@ class APDCAM10G_control:
                                   internalTrigger=internalTrigger,
                                   triggerDelay=triggerDelay)
         elif hasattr(self.codes_CC,"OP_SETG1TRIGGERMODULE"):
-            print("FIXME! self.setTrigger in measure() must be updated for this firmware")
+            #print("FIXME! self.setTrigger in measure() must be updated for this firmware")
             err = self.setTrigger(externalTriggerPos=externalTriggerPos,
                                   externalTriggerNeg=externalTriggerNeg,
                                   internalTrigger=internalTrigger,
@@ -3716,7 +3846,7 @@ class APDCAM10G_control:
         self.measurePara.numberOfSamples = numberOfSamples
         
         if (err != ""):
-            logger.show_error(err)
+            logger.showError(err)
             return err,"",None
         
         if (internalTriggerADC is not None):
@@ -3724,24 +3854,28 @@ class APDCAM10G_control:
     
         err = self.syncADC()
         if (err != ""):
-            logger.show_error(err)
+            logger.showError(err)
             return err,"",None
 
         if (dataReceiver.lower() == 'apdtest'):
+
+            if streamMode is not None:
+                print("Can not launch apdtest for the new hardware yet")
+                return "Can not launch apdtest for the new hardware yet"
+
             if (self.interface == ""):
                 error = "Cannot measure, as network interface could not be found." 
                 logger.show_error(error)
                 return error,"",None 
-
-                
+            
             cmdfile_name = "apd_python_meas.cmd"
             cmdfile = datapath+'/'+cmdfile_name
-            logger.show_message("[MEASUREMENT] Command file: " + cmdfile)
+            logger.showMessage("[MEASUREMENT] Command file: " + cmdfile)
             try:
                 f = open(cmdfile,"wt")
             except:
                 error = "Error opening file "+cmdfile
-                logger.show_error(error)
+                logger.showError(error)
                 return error,"",None 
             
             ip = self.getIP()
@@ -3779,7 +3913,7 @@ class APDCAM10G_control:
                 f.close()
             except :
                 error = "Error writing command file " + cmdfile
-                logger.show_error(error)
+                logger.showError(error)
                 return error,"",None 
                 f.close()
             
@@ -3788,7 +3922,7 @@ class APDCAM10G_control:
             apdtest_prog = 'APDTest_10G'
             apdtest = os.path.join(thisdir,'../apdcam_control/APDTest_10G','APDTest_10G')
             cmd = "killall -KILL "+apdtest_prog+" 2> /dev/null ; cd "+datapath+" ; rm APDTest_10G.out Channel*.dat 2> /dev/null ; "+apdtest+" "+cmdfile_name+" >APDTest_10G.out 2>&1 &"
-            logger.show_message("[MEASUREMENT] Executing: " + cmd)
+            logger.showMessage("[MEASUREMENT] Executing: " + cmd)
 
             d = subprocess.run([cmd],check=False,shell=True)
             sleeptime = 0.1
@@ -3806,7 +3940,7 @@ class APDCAM10G_control:
                 for il in range(len(all_txt)):
                    if (all_txt[il].lower().find("error") >= 0):
                       err = "Error starting measurement: "+all_txt[il]
-                      logger.show_error(err)
+                      logger.showError(err)
                       return err,"",None
                    if (all_txt[il].lower().find("start succes") >= 0):
                       started = True
@@ -3817,44 +3951,54 @@ class APDCAM10G_control:
     
             if (not started):
                 err = "APDCAM did not start"
-                logger.show_error(err)
+                logger.showError(err)
                 return err,"",None
         else:
             # Native Python measurement
             data_receiver = APDCAM10G_data(self,logger)
+
             ret = data_receiver.get_net_parameters()
             if (ret != ""):
-                logger.show_error(ret)
+                logger.showError(ret)
                 return ret,"",data_receiver
+
             ret = data_receiver.allocate(channel_masks=chmask,sample_number=numberOfSamples,bits=bits)
             if (ret != ""):
-                logger.show_error(ret)
+                logger.showError(ret)
                 return ret,"",data_receiver
+
             ret = data_receiver.start_receive()
             if (ret != ""):
-                logger.show_error(ret)
+                logger.showError(ret)
                 return ret,"",data_receiver
-            ret = data_receiver.start_stream()
+
+            ret = data_receiver.start_stream(streamMode)
             if (ret != ""):
-                logger.show_error(ret)
+                logger.showError(ret)
                 return ret,"",data_receiver
-            err, warn = data_receiver.get_data()
-            logger.show_message("[MEASUREMENT] Stop streams")
+
+            if generateSwTriggerWithDelay is not None:
+                print("Setting trigger with delay: " + str(generateSwTriggerWithDelay))
+                self.setTrigger(softwareTrigger=True,triggerDelay=generateSwTriggerWithDelay,numberOfSamples=numberOfSamples)
+
+            err, warn = data_receiver.get_data(onProgress)
+            logger.showMessage("[MEASUREMENT] Stop streams")
+
             data_receiver.stop_stream()
-            logger.show_message("[MEASUREMENT] Stop receive")
+            logger.showMessage("[MEASUREMENT] Stop receive")
             data_receiver.stop_receive()
             if err != "":
-                logger.show_error(err)
+                logger.showError(err)
             if warn != "":
-                logger.show_warning(warn)
-            logger.show_message("[MEASUREMENT] Finished")
+                logger.showWarning(warn)
+            logger.showMessage("[MEASUREMENT] Finished")
             return err,warn,data_receiver
             
         if (waitForResult <=0):
             return "","",None
         
         err,warning = self.waitForMeasurement(waitForResult)
-        logger.show_message("[MEASUREMENT] Finished")
+        logger.showMessage("[MEASUREMENT] Finished")
         return err,warning,None
    
     def measurementStatus(self,datapath="data"):
@@ -4403,15 +4547,11 @@ class APDCAM10G_data:
         Constructor for an APDCAM10G.data object. 
 
         Parameters
-        ----------
+        ^^^^^^^^^^
         APDCAM : controller
             The communication class for the camera. 
             It does not need to be connected at the time of construction of the
             APDCAM10G.data class.
-
-        Returns
-        -------
-        None.
 
         """
         self.logger = logger
@@ -4438,7 +4578,7 @@ class APDCAM10G_data:
                 self.receiveSockets[i].close()
             
     def allocate(self,channel_masks=[0xffffffff,0xffffffff,0xffffffff,0xffffffff],sample_number=100000,bits=14):
-        self.logger.show_message("Bits: " + str(bits))
+        self.logger.showMessage("Bits: " + str(bits))
         if (self.MTU is None):
             raise ValueError("Network parameters should be determined before calling allocate.")
         self.sample_number = sample_number
@@ -4449,16 +4589,17 @@ class APDCAM10G_data:
         self.chip_bytes_per_sample = [[0,0,0,0]]*len(self.APDCAM.status.ADC_address)
         self.packets = [None] * len(self.APDCAM.status.ADC_address)      # we collect packets associated with ADCs
         for i_adc in range(len(self.APDCAM.status.ADC_address)):
-            self.logger.show_message("ADC BOARD: " + str(i_adc+1))
+            print("ALLOCATING MEMORY FOR ADC " + str(i_adc+1))
+            self.logger.showMessage("ADC BOARD: " + str(i_adc+1))
             for i_chip in range(4):
                 for i_channel in range(8):
                     self.channel_masks[i_adc][i_chip][i_channel] = (channel_masks[i_adc]>>(i_chip*8+(7-i_channel))) & 1
                 #chip_chmask = (channel_masks[i_adc] >> i_chip * 8) % 256
-                #self.logger.show_message("   Chip " + str(i_chip) + " mask: " + str(chip_chmask))
+                #self.logger.showMessage("   Chip " + str(i_chip) + " mask: " + str(chip_chmask))
 
                 self.chip_bits_per_sample[i_adc][i_chip] = bits*sum(self.channel_masks[i_adc][i_chip])
 
-                self.logger.show_message("   Chip bits per sample: " + str(self.chip_bits_per_sample[i_adc][i_chip]))
+                self.logger.showMessage("   Chip bits per sample: " + str(self.chip_bits_per_sample[i_adc][i_chip]))
                 # Each chip's data is rounded up to full bytes
                 self.chip_bytes_per_sample[i_adc][i_chip] = self.chip_bits_per_sample[i_adc][i_chip] // 8
                 if ((self.chip_bits_per_sample[i_adc][i_chip] % 8) != 0):
@@ -4469,7 +4610,6 @@ class APDCAM10G_data:
 
             # An ADC board's data is rounded up to integer multiples of 32 bits
 
-
             if ((self.bytes_per_sample[i_adc] * 8) % 32 != 0):
                 # Attention, attention! Here in the original code there was a simple division by 8:
                 # self.bytes_per_sample[i_adc] = ((self.bytes_per_sample[i_adc] * 8) // 32 + 1) * 32 / 8
@@ -4477,19 +4617,20 @@ class APDCAM10G_data:
                 # is an integer multiple of 8. Must use integer division !!!
                 self.bytes_per_sample[i_adc] = ((self.bytes_per_sample[i_adc] * 8) // 32 + 1) * 32 // 8
 
-
-            #Calculate the number of packages
+            #Calculate the number of packets
             packets_per_adc = (self.bytes_per_sample[i_adc] * self.sample_number) // (self.octet * 8) 
             if (self.bytes_per_sample[i_adc] * self.sample_number) % (self.octet * 8) != 0:
                 packets_per_adc += 1
 
-            # pre-allocate the number of packages for each ADC board. We do not store the number of packets per adc
+            # pre-allocate the number of packets for each ADC board. We do not store the number of packets per adc
             # for each ADC board in a separate variable, the length of the pre-allocated packet list, len(self.packets[i_adc])
             # can be used for that
+            print("  Packets per adc: " + str(packets_per_adc))
             self.packets[i_adc] = [None]*packets_per_adc
             firstSampleNumber = 0
             firstSampleStartByte = 0
             for i_packet in range(packets_per_adc):
+                print("    Allocating a packet...")
                 self.packets[i_adc][i_packet] = APDCAM10G_packet(header=self.APDCAM.udpPacketHeader())
             
                 self.packets[i_adc][i_packet].plannedFirstSampleNumber = firstSampleNumber
@@ -4516,7 +4657,7 @@ class APDCAM10G_data:
                     self.packets[i_adc][i_packet].plannedLastSampleStopByte = remainingBytes - nFullSamples*self.bytes_per_sample[i_adc]  # also the number of bytes of the last sample
                     firstSampleNumber = self.packets[i_adc][i_packet].plannedLastSampleNumber
                     firstSampleStartByte =  self.packets[i_adc][i_packet].plannedLastSampleStopByte
-                
+                print("    DONE")
 
         self.APDCAM.setSampleNumber(sampleNumber=sample_number)
         
@@ -4637,9 +4778,9 @@ class APDCAM10G_data:
                         break
         if ((mac is None) or (IP is None) or (mtu is None)):
             return "Cannot determine all host network parameters, neither with ip, nor with ifconfig."
-        self.logger.show_message("[MEASUREMENT] MAC: " + str(self.hostMac))
-        self.logger.show_message("[MEASUREMENT] MTU: " + str(self.MTU))
-        self.logger.show_message("[MEASUREMENT] IP : " + str(self.hostIP))
+        self.logger.showMessage("[MEASUREMENT] MAC: " + str(self.hostMac))
+        self.logger.showMessage("[MEASUREMENT] MTU: " + str(self.MTU))
+        self.logger.showMessage("[MEASUREMENT] IP : " + str(self.hostIP))
 
         self.set_octet()
         return ""    
@@ -4703,12 +4844,14 @@ class APDCAM10G_data:
         str:
             "" or error message.
         """
+        
+        # Create a clear situation with all sockets closed
         self.stop_receive()
         
         # True means the stream will be active
-        self.streamActive = [False]*4  # True/False indicating whether the given stream is active
-        self.streamAdc  = [0]*4      # The ADC number this stream is associated with
-        self.streamLastPacketNumber = [-1]*4    # Latest received packet number in the given stream
+        self.streamActive = [False]*4         # True/False indicating whether the given stream is active
+        self.streamAdc  = [0]*4               # The ADC number this stream is associated with
+        self.streamLastPacketNumber = [-1]*4  # Latest received packet number in the given stream
         self.streamErrors = [""]*4
 
         if self.APDCAM.dualSATA:
@@ -4725,16 +4868,22 @@ class APDCAM10G_data:
         for i in range(4) :
             if (self.streamActive[i] == True) :
                 try:
+                    print("Opening socket " + str(i))
                     self.receiveSockets[i] = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 except socket.error as se:
+                    print("Failed to open socket")
                     return se.args[1]
+
                 try:
+                    print("Binding socket " + str(i) + " to port " + str(self.RECEIVE_PORTS[i]))
                     self.receiveSockets[i].bind(('', self.RECEIVE_PORTS[i]))
+                    print("Success")
                 except socket.error as se :
+                    print("Failed")
                     return str(se.args[1])
                 
-#                self.receiveSockets[i].setblocking(False) # Non-blocking mode
-                self.receiveSockets[i].settimeout(1)
+                self.receiveSockets[i].setblocking(False) # Non-blocking mode
+                self.receiveSockets[i].settimeout(2)
                 UDP_data = bytearray(15)
                 UDP_data[0] = i+1
                 UDP_data[1] = self.octet // 256
@@ -4758,13 +4907,14 @@ class APDCAM10G_data:
                     return err
         return ""
      
-    def start_stream(self):
+    def start_stream(self, streamMode=None):
         """
         Starts the data streams in APDCAM.
 
         Parameters
         ----------
-        None
+        streamMode : string
+            'Continuous', 'Gated' or 'Triggered' (case-insensitive)
         
         Returns
         -------
@@ -4773,17 +4923,37 @@ class APDCAM10G_data:
 
         """
 
+        print("--> start_stream")
+
+        # if streamMode is given (version >=1.05) then first set all ADCs to OFF mode, so that the streams
+        # are first enabled, waiting for the BURST_START issued by the ADC cards when they are set to any of the transmitting modes
+#        if streamMode is not None:
+#            print("Setting ADC stream modes to OFF")
+#            self.APDCAM.setAdcStreamMode('all','off')
+
         self.stop_stream()
         
         strcontrol = bytearray([0])       
         for i in range(4) :
             if (self.streamActive[i]) :
-                strcontrol[0] = strcontrol[0] | 2**i
+                # this line was strcontrol[0] |= 2<<i which is clearly a bug. How did it work at all before? Did it? when was this bug introduced?
+                strcontrol[0] |= 1<<i
         self.stream_start_time_1 = time.time()
-        strcontrol[0] = 0x0f
+
+        print("strcontrol = " + str(bin(strcontrol[0])))
+
         err = self.APDCAM.sendCommand(self.APDCAM.codes_CC.OP_SETSTREAMCONTROL,strcontrol,sendImmediately=True,waitAfter=None)
         self.stream_start_time_2 = time.time()
-        return err
+        if err != "":
+            return err
+
+        # now, if streamMode is given (i.e. FW>=1.05, where ADC boards have different stream modes), then set them
+        if streamMode is not None:
+            err = self.APDCAM.setAdcStreamMode('all',streamMode)
+        if err != "":
+            return err
+
+        return ""
     
     def stop_stream(self):
         """
@@ -4797,9 +4967,18 @@ class APDCAM10G_data:
             "" or warning
 
         """
+
+        print("--> stop_stream")
+
+        # for firmware version >=1.05 the ADC stream mode needs to be set to 'Off' as well
+        if self.APDCAM.version >= 105:
+            print("Setting all ADC stream modes to OFF")
+            self.APDCAM.setAdcStreamMode('all','off')
+
+        # disable all streams
         return self.APDCAM.sendCommand(self.APDCAM.codes_CC.OP_SETSTREAMCONTROL,bytes([0]),sendImmediately=True)
 
-    def get_data(self):
+    def get_data(self,onProgress=None):
         """
         Get UDP data from a stream.
 
@@ -4808,31 +4987,53 @@ class APDCAM10G_data:
         streamNo : int
             The stream number (0...3).
 
+        onProgress : see the documentation of APDCAM10G_control.measure
+
         Returns
         -------
         str:
             "" or error message.
 
         """
-                
+
+        print("--> get data")
+
         packet_size = self.CC_STREAMHEADER + self.octet * 8
         streamRunning = self.streamActive
-        # Loop until we get the expected number of packages, or the streams fail
-        while (streamRunning[0] or streamRunning[1] or streamRunning[2] or streamRunning[3]):
+        # Loop until we get the expected number of packets, or the streams fail, or another thread sets the stopMeasurement flag
+        while ((streamRunning[0] or streamRunning[1] or streamRunning[2] or streamRunning[3]) ):
+
+            # if onProgress was specified, call it. It can inform the calling thread about the progress, it can process
+            # Qt events (if this backend is used in a Qt environment), and it will return a true/false flag
+            # indicating whether data acquisition should be continued
+            print("STREAM read loop")
+            if onProgress is not None:
+                if not onProgress(0,"no message yet"):
+                    break
+
             for i_stream in range(4):
                 # skip those streams which are not sending data, or which have completed or failed
                 if not self.streamActive[i_stream] or not streamRunning[i_stream]:
                     continue;
 
+                print("       Checking stream: " + str(i_stream))
+
                 try:
+                    print("      now calling recv")
                     error = ""
+                    print(self.receiveSockets[i_stream].gettimeout())
                     data = self.receiveSockets[i_stream].recv(packet_size)
+                    print("      received socket with length: " + str(len(data)))
                     if (len(data) == 0):
                         continue
                     if (len(data) != packet_size):
                         self.streamErrors[i_stream] += "Data size is not equal to packet size.\n"
-                        
+
+                    # This is the same in both V1.03 and V1.05, but it would be more elegant to decode it by the
+                    # data header class implemented for the specific firmware version
                     packetNumber = int.from_bytes(data[8:14],'big')
+
+                    print("      packet number: " + str(packetNumber))
 
                     # Check for monotonic increase of packet number obtained from the CC header. If non-monotonic, print
                     # error message and stop reading from this stream
@@ -4864,6 +5065,8 @@ class APDCAM10G_data:
 
                 # and finally if we fail to read from the stream, mark it as stopped
                 except socket.error as se :
+                    print("Socket error occurred while retrieving data from stream %i: %s" % (i_stream,se))
+                    #return "Socket error occurred while retrieving data from stream " + str(i_stream) + ": " se, "", None
                     streamRunning[i_stream] = False
 
         for i_stream in range(4):
@@ -4935,7 +5138,7 @@ class APDCAM10G_data:
                 sample_data = adc_data[i_data:]
                 # Switch to the next packet
                 i_packet += 1
-                adc_data = self.packets[adc_board][i_packet].get_adc_data()
+                adc_data = self.packets[adc_board][i_packet].get_adc_data()  # Shouldn't it be getAdcData ?
                 # Calculate the number of bytes missing from previous packet for this sample. 'n' is used for better clarity:
                 n = self.bytes_per_sample[adc_board]-len(sample_data)  
                 # append this many bytes to the sample data

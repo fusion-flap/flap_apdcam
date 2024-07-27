@@ -1,0 +1,4 @@
+#echo -n "hello" | nc -4u -q1 localhost 8080
+
+
+nc -4u  localhost 8080

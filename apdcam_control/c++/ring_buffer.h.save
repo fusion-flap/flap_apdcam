@@ -1,0 +1,230 @@
+#ifndef __APDCAM10G_RING_BUFFER_H__
+#define __APDCAM10G_RING_BUFFER_H__
+
+/*
+
+  A templated ring-buffer, which automatically calls 'mlock' on the reserved memory to
+  inhibit swapping it out to disk
+
+ */
+
+#include "error.h"
+#include "safeness.h"
+#include <mutex>
+#include <bit>
+#include <sys/mman.h>
+
+namespace apdcam10g
+{
+    template <typename T = std::byte>
+    class ring_buffer
+    {
+    private:
+        unsigned int capacity_ = 0;
+
+        // A flag to indicate whether the read_ptr_==write_ptr_ condition means buffer full or empty
+        bool full_ = false;
+        T *buffer_begin_= 0; // Pointer to the first object of the available buffer space
+        T *buffer_end_= 0;   // The end pointer is pointing 1 object behind the usable space
+        T *read_ptr_=0, *write_ptr_=0;
+
+        mutable std::recursive_mutex mutex_;
+        
+    public:
+        typedef T type;
+
+        class pointer
+        {
+        private:
+            ring_buffer<T> *ring_buffer_;
+            unsigned int index_=0;
+            
+        public:
+            pointer(ring_buffer<T> *b,int index=0) : ring_buffer_(b),index_(index) {}
+            
+            pointer(const pointer &rhs) : ring_buffer_(rhs.ring_buffer_), index_(rhs.index_) {}
+            
+            // Dereference operator
+            T &operator*() { return ring_buffer_->buffer_begin_[index_%ring_buffer_->capacity_]; }
+
+            // Increment operators
+            pointer &operator++() { index_ = (++index_)%ring_buffer_->capacity_; return *this; }
+            pointer  operator++(int) { pointer result = *this; index_ = (++index_)%ring_buffer_->capacity_; return result; }
+
+            T &operator[](0
+
+        };
+
+        ring_buffer(unsigned int capacity=0)
+        {
+            resize(capacity);
+        }
+        ~ring_buffer() 
+            { 
+                // unlock the reserved memory
+                if(::munlock(buffer_begin_,sizeof(T)*capacity_) != 0) APDCAM_ERROR_ERRNO(errno);
+                // Free the reserved memory space
+                delete [] buffer_begin_; 
+            }
+        ring_buffer(const ring_buffer &rhs)
+        {
+            resize(rhs.capacity_);
+        }
+
+        bool full() const
+        {
+            return full_ && (read_ptr_==write_ptr_);
+        }
+        bool empty() const
+        {
+            return !full_ && read_ptr_==write_ptr_;
+        }
+
+        // Get the capacity (i.e. the physical size of the buffer, irrespectively of how full it is)
+        unsigned int capacity() const { return capacity_; }
+
+        // Return the size of data actually available in the buffer
+        unsigned int size() const
+        {
+            std::scoped_lock lock(mutex_);
+            if(write_ptr_ > read_ptr_) return (unsigned int)(write_ptr_-read_ptr_);
+            if(write_ptr_ < read_ptr_) return (unsigned int)(capacity_-(read_ptr_-write_ptr_));
+            if(full_) return capacity_;
+            return 0;
+        }
+
+        // Allocate a given size of memory for the buffer, and initialize the write/read
+        // pointers to the beginning of the buffer
+        ring_buffer &resize(unsigned int size)
+        {
+            std::scoped_lock lock(mutex_);
+            capacity_ = size;
+
+            // If there is previously reserved buffer, unlock it first, and then free it
+            if(buffer_begin_)
+            {
+                if(::munlock(buffer_begin_,sizeof(T)*capacity_) != 0) APDCAM_ERROR_ERRNO(errno);
+                delete [] buffer_begin_;
+            }
+            if(size>0)
+            {
+                buffer_begin_ = new T[size];
+                if(::mlock(buffer_begin_,sizeof(T)*size) != 0) APDCAM_ERROR_ERRNO(errno);
+                buffer_end_ = buffer_begin_+size;
+                write_ptr_ = read_ptr_ = buffer_begin_;
+                full_ = false;
+            }
+            else
+            {
+                buffer_begin_ = buffer_end_ = write_ptr_ = read_ptr_ = 0;
+                full_ = true;
+            }
+            return *this;
+        }
+
+        T *write_ptr()  { return write_ptr_; }
+        T *read_ptr()  { return read_ptr_; }
+
+        // Return the write pointer if we have a continuous memory space for n objects here,
+        // otherwise zero. If non-zero is returned, it is safe to use low-level write
+        // operations on the memory region starting there, for n objects
+        T *continuous_write(unsigned int n)
+        {
+            std::scoped_lock lock(mutex_);
+            if(capacity_-size()>=n && write_ptr_+n<=buffer_end_) return write_ptr_;
+            return 0;
+        }
+
+        // Return the read pointer if we have a continuous memory space of n objects filled with data,
+        // otherwise zero. If non-zero is returned, it is safe to use low-level read
+        // operations on the memory region starting there, for n objects
+        T *continuous_read(unsigned int n)
+        {
+            std::scoped_lock lock(mutex_);
+            if(size()>=n && read_ptr_+n<=buffer_end_) return read_ptr_;
+            return 0;
+        }
+
+        
+
+        // Increment the write pointer by 'n', returns true if it could be done without
+        // going beyond the read pointer
+        template <safeness s=default_safeness>
+        bool increment_write_ptr(unsigned int n)
+        {
+            std::scoped_lock lock(mutex_);
+            if(full()) return false;
+            if(write_ptr_+n<buffer_end_)
+            {
+                // If we stepped over the read pointer, do nothing. We have returned earlier if the buffer is full,
+                // so here we are assured that the buffer is not full. 
+                if(write_ptr_<read_ptr_ && read_ptr_<write_ptr_+n) return false;
+                write_ptr_ += n;
+                if(write_ptr_ == read_ptr_) full_ = true;
+                return true;
+            }
+            // Optimized out by the compiler if s!=safe
+            if(s==safe && n>capacity_) APDCAM_ERROR("Ring buffer write pointer can not be incremented by more than the buffer length");
+            
+            T *new_pos = buffer_begin_ + (n - (buffer_end_-write_ptr_));
+            if(write_ptr_<read_ptr_ || read_ptr_<new_pos) return false;
+            write_ptr_ = new_pos;
+            if(write_ptr_==read_ptr_) full_ = true;
+            return true;
+        }
+            
+
+        // Increment the read pointer by 'n'. Returns whether we passed the end of the buffer: true if we
+        // crossed the end and jumped back to the beginnin, false if not.
+        template <safeness s=default_safeness>
+        bool increment_read_ptr(unsigned int n)
+        {
+            std::scoped_lock lock(mutex_);
+            if(empty()) return false;
+            if(read_ptr_+n<buffer_end_)
+            {
+                // If we stepped over the write pointer, do nothing
+                if(read_ptr_<write_ptr_ && write_ptr_<read_ptr_+n) return false;
+                read_ptr_ += n;
+                full_ = false;
+                return false;
+            }
+            // Optimized out by the compiler if s!=safe
+            if(s==safe && n>capacity_) APDCAM_ERROR("Ring buffer write pointer can not be incremented by more than the buffer length");
+            
+            T *new_pos = buffer_begin_ + (n - (buffer_end_-read_ptr_));
+            if(read_ptr_<write_ptr_ || write_ptr_<new_pos) return false;
+            read_ptr_ = new_pos;
+            full_ = false;
+            return true;
+        }
+
+        // Return the incremented value of the read pointer (if it could be incremented as in 'increment_read_ptr(n)'),
+        // but do not actually increment this pointer within the buffer
+        template <safeness s=default_safeness>
+        T *incremented_read_ptr(unsigned int n)
+        {
+            std::scoped_lock lock(mutex_);
+            if(empty()) return 0;
+            if(read_ptr_+n<buffer_end_)
+            {
+                // If we stepped over the write pointer, do nothing
+                if(read_ptr_<write_ptr_ && write_ptr_<read_ptr_+n) return 0;
+                read_ptr_ += n;
+                return 0;
+            }
+            // Optimized out by the compiler if s!=safe
+            if(s==safe && n>capacity_) APDCAM_ERROR("Ring buffer write pointer can not be incremented by more than the buffer length");
+            
+            T *new_pos = buffer_begin_ + (n - (buffer_end_-read_ptr_));
+            if(read_ptr_<write_ptr_ || write_ptr_<new_pos) return 0;
+            return new_pos;
+        }
+    };
+
+
+             
+
+}
+
+#endif

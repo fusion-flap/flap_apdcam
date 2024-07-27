@@ -1,4 +1,16 @@
+"""
+This file implements classes to store information about registers (address, number of bytes, symbolic names,
+values encoded in sub-bits, documentation) of all cards (PC, ADC and CC) in a self-documenting and easy-to-write way.
+
+There are several registers which are 'list-like'. An example is the HVMON1, HVMON2, HVMON3, HVMON4 registers of the
+PC card (these symbolic names are from the user manual, or some other documentation). After a long consideration, it
+was decided
+
+"""
+
 import re
+import copy
+
 
 class APDCAM10G_register:
     def __init__(self, startByte, numberOfBytes, shortDescription, byteOrder='msb', signed=False, longDescription=''):
@@ -139,6 +151,10 @@ class APDCAM10G_register_bits(APDCAM10G_register):
             return (hex(v) if format=='hex' else str(v))
 
         def set(self,value):
+            """
+            Sets the bits to the given value (the value is bit-shifted to the right bit-location within the register).
+            """
+
             # Get the integer value from the byte-array stored in the parent (i.e. the register value must have already been
             # queried from the camera and set in the parent object)
             int_value = int.from_bytes(self.parent.bytes,signed=False,byteorder=self.parent.byteOrder)
@@ -269,16 +285,22 @@ class APDCAM10G_register_table:
 
         registerNames = self.registerNames()
         for registerName in registerNames:
-            match = re.match(r'([a-zA-Z_]+)\[([0-9]+)\]',registerName)
+            match = re.match(r'([a-zA-Z_0-9]+)\[([0-9]+)\]',registerName)
             if match is not None:
                 listname = match.group(1)
                 index = int(match.group(2))
-                lll = getattr(self,listname)
-                register = lll[index]
+                register_list = getattr(self,listname)
+                register = register_list[index]
+                # we call the filter for each list element, and if it is true for any of the elements (then
+                # most probably it would be true for all other elements as well), then we copy the entire
+                # list (only once)
+                if filter(register) == True:
+                    if not hasattr(result,listname):
+                        setattr(result,listname,copy.deepcopy(register_list))
             else:
                 register = getattr(self,registerName)
-            if filter(register) == True:
-                setattr(result,registerName,register)
+                if filter(register) == True:
+                    setattr(result,registerName,register)
         return result
 
 class APDCAM10G_cc_settings_v1(APDCAM10G_register_table):
@@ -301,7 +323,7 @@ class APDCAM10G_cc_settings_v1(APDCAM10G_register_table):
     BOARD_VERSION  = s(7-7, 10, 'Board type')
     FIRMWARE_GROUP = s(17-7, 30-17+1, 'Firmware group')
     FIRMWARE_GROUP_VERSION = b(31-7,2,'Firmware group version',[['VL',0,7,'Version low'],['VH',8,15,'Version high']],byteOrder='msb')
-    UPGRADEDATE            = b(33-7, 36-33+1,'Upgrade date',[['D',0,7,'Day'],['M',8,15,'Month'],['Y',16,31,'Year']],byteOrder='msb')
+    UPGRADEDATE            = b(33-7, 36-33+1,'Firmware upgrade date',[['D',0,7,'Day'],['M',8,15,'Month'],['Y',16,31,'Year']],byteOrder='msb')
     MAN_FIRMWAREGROUP      = s(37-7,50-37+1,'Manufacturer firmware group')
     MAN_PROGRAMDATE        = b(51-7,54-51+1,'Manufacturer program date',[['D',0,7,'Day'],['M',8,15,'Month'],['Y',16,31,'Year']],byteOrder='msb')
     MAN_SERIAL             = i(55-7,58-55+1,'Manufacturer serial number',byteOrder='msb')
@@ -359,10 +381,10 @@ class APDCAM10G_cc_settings_v1(APDCAM10G_register_table):
                                                            ['OUTVAL3',3,3,'Spare IO pin 3 output value'] ], byteOrder='msb' )  # 4..7: direction in v2
     XFP         = b(275-7+71-7,1,'XFP',[ ['REFCLKENABLE',0,0,'XFP reference clock enable'] ] )
     SAMPLECOUNT = i(276-7+71-7,281-276+1,'Sample count','msb')
-    TRIGSTATE   = b(282-7+71-7,1,'Trigger control (SETTRIGGER instruction)',[ ['ETR',0,0,'External trigger rising slope (0 - disabled, 1 - enabled)'], \
-                                                                              ['ETF',1,1,'External trigger falling slope (0 - disabled, 1 - enabled)'], \
-                                                                              ['IT', 2,2,'Internal trigger (0 - disabled, 1 - enabled)' ], \
-                                                                              ['DT', 6,6,'Disable trigger event if streams are disabled'] ], byteOrder='msb' )
+    TRIGSTATE   = b(282-7+71-7,1,'Trigger control (SETTRIGGER instruction) [FW version <=103]',[ ['ETR',0,0,'External trigger rising slope (0 - disabled, 1 - enabled)'], \
+                                                                                                 ['ETF',1,1,'External trigger falling slope (0 - disabled, 1 - enabled)'], \
+                                                                                                 ['IT', 2,2,'Internal trigger (0 - disabled, 1 - enabled)' ], \
+                                                                                                 ['DT', 6,6,'Disable trigger event if streams are disabled'] ], byteOrder='msb' )
     TRIGDELAY       = i(283-7+71-7, 286-283+1,'Trigger delay',byteOrder='msb')
     SERIAL_PLL_MULT = i(287-7+71-7,1,'Serial PLL multiply value')
     SERIAL_PLL_DIV  = i(288-7+71-7,1,'Serial PLL divide value 0')
@@ -412,7 +434,7 @@ class APDCAM10G_cc_settings_v2(APDCAM10G_register_table):
     BOARD_VERSION  = s(7-7, 10, 'Board type')
     FIRMWARE_GROUP = s(17-7, 30-17+1, 'Firmware group')
     FIRMWARE_GROUP_VERSION = b(31-7,2,'Firmware group version',[['VL',0,7,'Version low'],['VH',8,15,'Version high']],byteOrder='msb')
-    UPGRADEDATE            = b(33-7, 36-33+1,'Upgrade date',[['D',0,7,'Day'],['M',8,15,'Month'],['Y',16,31,'Year']],byteOrder='msb')
+    UPGRADEDATE            = b(33-7, 36-33+1,'Firmware upgrade date',[['D',0,7,'Day'],['M',8,15,'Month'],['Y',16,31,'Year']],byteOrder='msb')
     MAN_FIRMWAREGROUP      = s(37-7,50-37+1,'Manufacturer firmware group')
     MAN_PROGRAMDATE        = b(51-7,54-51+1,'Manufacturer program date',[['D',0,7,'Day'],['M',8,15,'Month'],['Y',16,31,'Year']],byteOrder='msb')
     MAN_SERIAL             = i(55-7,58-55+1,'Manufacturer serial number',byteOrder='msb')
@@ -840,9 +862,9 @@ class APDCAM10G_adc_registers_v1(APDCAM10G_register_table):
     mac = APDCAM10G_register_mac
 
     BOARDVER    = i(0x0000, 1, 'Board version number')
-    VERSION     = i(0x0001, 2, 'Microcontroller program version',byteOrder='msb?')
+    VERSION     = b(0x0001, 2, 'Microcontroller program/firmware version',[['MINOR',0,7,'Minor version number'],['MAJOR',8,15,'Major version number'] ],byteOrder='msb')
     SERIAL      = i(0x0003, 2, 'Board serial number',byteOrder='msb?')
-    XCVERSION   = i(0x0005, 2, 'FPGA (Xilinx) program vesion',byteOrder='msb?')
+    XCVERSION   = b(0x0005, 2, 'FPGA (Xilinx) program/firmware vesion',[ ['MINOR',0,7,'Minor version number'],['MAJOR',8,15,'Major version number'] ], byteOrder='msb')
     STATUS1     = b(0x0008, 1, 'STATUS1 register', [ ['BPLLOCK',0,0,"Base PLL locked"] ] )
     STATUS2     = b(0x0009, 1, 'STATUS2 register', [ ['ITS',0,0,'Internal trigger status'], \
                                                      ['OVD',1,1,'Overload'], \
@@ -869,8 +891,10 @@ class APDCAM10G_adc_registers_v1(APDCAM10G_register_table):
                    b(0x0017, 1, 'Channels 9-16 enabled (1)/disabled (0)', [ ['CH['+str(7-j)+']',j,j,'Channel '+str(16-j)+' enabled'] for j in range(8) ]), \
                    b(0x0018, 1, 'Channels 17-24 enabled (1)/disabled (0)',[ ['CH['+str(7-j)+']',j,j,'Channel '+str(24-j)+' enabled'] for j in range(8) ]), \
                    b(0x0019, 1, 'Channels 25-32 enabled (1)/disabled (0)',[ ['CH['+str(7-j)+']',j,j,'Channel '+str(32-j)+' enabled'] for j in range(8) ])]
-    
+
+    # This register is called 'STREAMCONTROL' in v1.05
     RINGBUFSIZE = b(0x001A, 2, 'Ring buffer size', [ ['RBSIZE',0,9,'Ring buffer size. If 0, ring buffer is disabled'] ],byteOrder='msb?')
+
     RESOLUTION = i(0x001C, 1, 'Resolution (number of bits per sample: 0-->14, 1-->12, 2-->8)')
     BPSCH      = [ APDCAM10G_register_int(0x001D+j, 1, 'Bytes per sample of 8-channel block ' + str(j)) for j in range(4)]
     ERRORCODE  = i(0x0024, 1, 'The code of the last error. 0 = no error')
@@ -907,9 +931,9 @@ class APDCAM10G_adc_registers_v2(APDCAM10G_register_table):
     mac = APDCAM10G_register_mac
 
     BOARDVER    = i(0x0000, 1, 'Board version number')
-    VERSION     = i(0x0001, 2, 'Microcontroller program version','msb?')
+    VERSION     = b(0x0001, 2, 'Microcontroller program/firmware version',[['MINOR',0,7,'Minor version number'],['MAJOR',8,15,'Major version number'] ],byteOrder='msb')
     SERIAL      = i(0x0003, 2, 'Board serial number','msb?')
-    XCVERSION   = i(0x0005, 2, 'FPGA (Xilinx) program vesion','msb?')
+    XCVERSION   = b(0x0005, 2, 'FPGA (Xilinx) program/firmware vesion',[ ['MINOR',0,7,'Minor version number'],['MAJOR',8,15,'Major version number'] ], byteOrder='msb')
     STATUS1     = b(0x0008, 1, 'STATUS1 register', [ ['BPLLOCK',0,0,'Base PLL locked'] ] )
     STATUS2     = b(0x0009, 1, 'STATUS2 register', [ ['ITS',0,0,'Internal trigger status'], \
                                                      ['OVD',1,1,'Overload'], \
@@ -939,9 +963,9 @@ class APDCAM10G_adc_registers_v2(APDCAM10G_register_table):
                    b(0x0019, 1, 'Channels 25-32 enabled (1)/disabled (0)',[ ['CH['+str(7-j)+']',j,j,'Channel '+str(32-j)+' enabled'] for j in range(8) ])]
 
 #    RINGBUFSIZE = b(0x001A, 2, 'Ring buffer size', [ ['RBSIZE',0,9,'Ring buffer size. If 0, ring buffer is disabled'] ],byteOrder='msb?')
-    STREAMCONTROL = b(0x1A, 2, 'Ring buffer size / SATA test mode / Stream mode', [ ['RBSIZE',0,9,'Ring buffer size. If 0, ring buffer is disabled'],\
-                                                                                    ['SATATEST',13,13,'SATA test mode'],\
-                                                                                    ['STREAMMODE',14,15,'0 = Off/sync mode; 1 = continuous mode; 2 = gate mode; 3 = trigger mode'] ],byteOrder='msb?')
+    STREAMCONTROL = b(0x1A, 2, 'Ring buffer size / SATA test mode / Stream mode (FW version >=1.05)', [ ['RBSIZE',0,9,'Ring buffer size. If 0, ring buffer is disabled'],\
+                                                                                                        ['SATATEST',13,13,'SATA test mode'],\
+                                                                                                        ['STREAMMODE',14,15,'0 = Off/sync mode; 1 = continuous mode; 2 = gate mode; 3 = trigger mode'] ],byteOrder='msb?')
     RESOLUTION = i(0x001C, 1, 'Resolution (number of bits per sample: 0-->14, 1-->12, 2-->8)')
     BPSCH      = [ APDCAM10G_register_int(0x001D+j, 1, 'Bytes per sample of 8-channel block ' + str(j)) for j in range(4)]
     ERRORCODE  = i(0x0024, 1, 'The code of the last error. 0 = no error')

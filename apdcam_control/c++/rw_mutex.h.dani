@@ -1,0 +1,104 @@
+/*
+
+The class 'rw_mutex' (which stands for read-write mutex) provides a tool to allow multiple simultaneous
+read operations on a resource (i.e. which do not modify it), and ensure exclusivity with writing (modifying) operations.
+Code that is writing (modifying) the resource must be guarded by rw_mutex::write(m); where 'm' is a rw_mutex instance,
+and code that is reading the resource must be guarded by rw_mutex::read(m), as illustrated below
+
+Usage:
+
+rw_mutex m;
+
+void write_operation()
+{
+  // Destructor of the variable 'write_lock' will release the lock
+  // Do not make the mistake to create an unnamed variable like this: rw_mutex::write(m) - this creates a variable
+  // which is potentially destroyed immediately and therefore the code is not guarded
+  rw_mutex::write_lock wl(m);
+  
+  ... do some operation which modifies the resource
+  // Code which is goarded by rw_mutex::write(m) can not run in parallel with
+  // any code that is guarded by either rw_mutex::write(m) or rw_mutex::read(m)
+}
+
+void read_operation()
+{
+  rw_mutex::read_lock rl(m);  // Destructor of the variable 'read_lock' will release the lock
+
+  ... do some operation which does not modify the resource
+  // Code which is guarded by rw_mutex::read(m) can run in parallel, but not
+  // with code that is guarded by rw_mutex::write(m)
+}
+
+ */
+
+#ifndef __APDCAM_RW_MUTEX_H__
+#define __APDCAM_RW_MUTEX_H__
+
+#include <mutex>
+
+using namespace std;
+
+namespace apdcam10g
+{
+
+    class rw_mutex
+    {
+    private:
+        std::mutex access_mutex_;
+        std::mutex modify_mutex_;
+        int readers_ = 0;
+    public:
+        class read_lock
+        {
+        private:
+            rw_mutex &rw_mutex_;
+        public:
+            read_lock(rw_mutex &m) : rw_mutex_(m)
+            {
+                // Lock the access mutex
+                rw_mutex_.access_mutex_.lock();
+                // Check if we are the first to lock the accesss mutex. If yes, lock the modify mutex
+                // so that no modify operation is possible while we (or later anybody else) is accessing
+                if(++rw_mutex_.readers_==1)
+                {
+                    rw_mutex_.modify_mutex_.lock();
+                }
+                // Now release the access mutex to give green light to other threads accessing the resource
+                rw_mutex_.access_mutex_.unlock();
+            }
+            ~read_lock()
+            {
+                rw_mutex_.access_mutex_.lock();
+                // Check if we were the last having access to the resource, and if so, unlock the modify-mutex
+                // so that modification becomes possible. 
+                if(--rw_mutex_.readers_ <= 0)
+                {
+                    rw_mutex_.modify_mutex_.unlock();
+                }
+                rw_mutex_.access_mutex_.unlock();
+            }
+        };
+
+        class write_lock
+        {
+        private:
+            rw_mutex &rw_mutex_;
+        public:
+            write_lock(rw_mutex &m) : rw_mutex_(m) 
+                { 
+                    //rw_mutex_.access_mutex_.lock();
+                    rw_mutex_.modify_mutex_.lock();
+                    //rw_mutex_.access_mutex_.unlock();
+                }
+            ~write_lock() 
+                { 
+                    //rw_mutex_.access_mutex_.lock();
+                    rw_mutex_.modify_mutex_.unlock();
+                    //rw_mutex_.access_mutex_.unlock();
+                }
+        };
+    };
+}
+
+#endif

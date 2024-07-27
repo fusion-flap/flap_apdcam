@@ -1,0 +1,93 @@
+#ifndef __APDCAM10G_MEMBER_PTR_H__
+#define __APDCAM10G_MEMBER_PTR_H__
+
+namespace apdcam10g
+{
+    /*
+
+      Description of the problem:
+
+      class Base { virtual void show() { cerr<<"Base"<<endl; }
+      class Derived : public Base { void show() { cerr<<"Derived"<<endl; }
+      class Parent
+      {
+        public:
+          Derived d;
+      }
+
+      Now, even though Derived is based from Base, one can not store the pointer-to-member of the member 'd'
+      in a "Base Parent::*" type variable:
+
+      Base Parent::*ptr = &Parent::d;   // error
+      
+     */
+
+    template <typename PARENT, typename BASE, typename DERIVED=void>
+    class member_ptr : public member_ptr<PARENT, BASE, void>
+    {
+    private:
+        DERIVED PARENT::*ptr_ = 0;
+    public:
+        // Constructor, initialize to point to a given member of type DERIVED
+        // of a class of type PARENT
+        member_ptr(DERIVED PARENT::*p) : ptr_(p) {}
+
+        const member_ptr<PARENT, BASE, DERIVED> &operator= (DERIVED PARENT::*p)
+        {
+            ptr_ = p;
+            return *this;
+        }
+
+        typedef DERIVED PARENT::*type;
+        operator type() const { return ptr_; }
+
+        BASE *operator()(PARENT *p)
+        {
+            return &(p->*ptr_);
+        }
+        const BASE *operator()(const PARENT *p)
+        {
+            return &(p->*ptr_);
+        }
+
+        BASE *operator()(PARENT &p)
+        {
+            return &(p.*ptr_);
+        }
+        const BASE *operator()(const PARENT &p)
+        {
+            return &(p.*ptr_);
+        }
+    };
+
+    // The base class (specialization), which only provides a virtual dereferencing parenthesis operator.
+    template <typename PARENT, typename BASE>
+    class member_ptr<PARENT, BASE, void>
+    {
+    public:
+        virtual BASE *operator()(PARENT *p) = 0;
+        virtual const BASE *operator()(const PARENT *p) = 0;
+        virtual BASE *operator()(PARENT &p) = 0;
+        virtual const BASE *operator()(const PARENT &p) = 0;
+    };
+
+
+    // A function to offer reducing the explicitely specified template arguments. It deduces PARENT and DERIVED from
+    // its function arguments, and only the BASE template argument must be given (i.e. the base class
+    // of the given member, which will determine the actual pointer type)
+    // Usage: if Derived is a class which is derived from Base, and Container is a class
+    // which has a data member 'data' of type Derived, then
+    // auto memptr = make_member_ptr<Base>(&Contaner::data)
+    // will be a pointer, which can be dereferenced on a specific instance 'c' of the class Container as follows:
+    // (*memptr)(&c)->some_function_of_the_class_Base();
+
+    template <typename BASE, typename PARENT, typename DERIVED>
+        member_ptr<PARENT,BASE,DERIVED> *make_member_ptr(DERIVED PARENT::*ptr)
+    {
+        return new member_ptr<PARENT,BASE,DERIVED>(ptr);
+    }
+        
+        
+}
+
+#endif

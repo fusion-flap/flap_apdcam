@@ -1,9 +1,0 @@
-Notes for inserting Flash read command into APDTest
-
-APDTest.cpp detects FLREAD command
-It calls ReadFlashPage in APDTest.cpp
-It calls APCAM_ReadFlashPage in HighLevelFunctions.cpp
-It calls  GetFlashPage in InternalFunctions.cpp
-It calls ReadFlashPage in LevelFunctions.cpp
-The answer from the camera is processed by CCamClient::OnFlashData() in CamClient.cpp
-OnFlashData is called from GECClient.cpp

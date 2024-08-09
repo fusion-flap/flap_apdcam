@@ -1,8 +1,0 @@
-Open 10.123.13.102
-Stream-Interface eth0
-Allocate 130002 12 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 60
-Arm 0 130002 0 1
-Start
-Wait 15000
-Save
-Close

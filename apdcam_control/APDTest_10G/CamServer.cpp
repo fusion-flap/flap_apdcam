@@ -20,9 +20,13 @@ void CCamServer::OnRead()
 	CC_STREAMHEADER *header = reinterpret_cast<CC_STREAMHEADER*>(pBuffer);
 	if (header->serial != m_StreamSerial)
 	{
-		fprintf(stderr, "Serial error 0x%X\n", header->serial);
+		fprintf(stderr, "Header serial does not match: 0x%X, expected 0x%X\n", header->serial,m_StreamSerial);
 		return;
 	}
+//	else
+//	{
+//		fprintf(stderr,"Header serial: 0x%X\n", header->serial);
+//	}
 	if (header->S1.UDP_Test_Mode)
 	{
 		++m_PacketCounter;
